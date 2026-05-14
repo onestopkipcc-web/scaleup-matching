@@ -1,0 +1,19 @@
+# 보안 파일 (절대 깃허브에 올리면 안 됨)
+credentials.json
+token.json
+token_*.json
+
+# 개인정보 포함 파일
+*.xlsx
+*.csv
+!sample_*.csv
+
+# 시스템
+__pycache__/
+*.pyc
+.env
+.DS_Store
+Thumbs.db
+
+# 로그
+*.log
