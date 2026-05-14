@@ -1,14 +1,13 @@
 """
 원스톱 스케일업 — 공고 매칭 시스템
-실행: streamlit run app.py
+구글 드라이브 연동 버전
 """
 import streamlit as st
 import pandas as pd
 import requests
-import re, os, glob, json, tempfile
+import re, os, json, io
 from datetime import datetime, timedelta
 
-# ── 페이지 설정 ────────────────────────────────────────
 st.set_page_config(
     page_title="원스톱 스케일업",
     page_icon="📢",
@@ -16,50 +15,16 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── 구글 인증 (Secrets 또는 로컬 파일) ───────────────
-def get_google_creds():
-    """Streamlit Cloud Secrets 또는 로컬 token.json에서 인증 로드"""
-    from google.oauth2.credentials import Credentials
-    from google.auth.transport.requests import Request
-
-    SCOPES = [
-        'https://www.googleapis.com/auth/gmail.send',
-        'https://www.googleapis.com/auth/calendar',
-    ]
-
-    # Streamlit Cloud 환경
-    if 'google' in st.secrets:
-        token_data = json.loads(st.secrets['google']['token'])
-        creds = Credentials.from_authorized_user_info(token_data, SCOPES)
-    # 로컬 환경
-    elif os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    else:
-        st.error("인증 파일이 없습니다. Secrets 설정 또는 token.json을 확인하세요.")
-        st.stop()
-
-    # 토큰 만료 시 갱신
-    if creds and creds.expired and creds.refresh_token:
-        try:
-            creds.refresh(Request())
-        except Exception as e:
-            st.error(f"토큰 갱신 실패: {e}\n재인증이 필요합니다.")
-            st.stop()
-
-    return creds
-
-# ── 작업 경로 설정 ────────────────────────────────────
-def get_work_dir():
-    """Streamlit Cloud면 임시 폴더, 로컬이면 작업 폴더"""
-    local = r'C:\Users\fbwlg\Desktop\26년도\2. 원스톱\7. 정보 전달 체계 구축'
-    if os.path.exists(local):
-        return local
-    return os.getcwd()
-
-WORK_DIR   = get_work_dir()
-WALLA_FILE = os.path.join(WORK_DIR, 'TEST_(WALLA) 2026년도 스케일업 프로그램 선정기업.xlsx')
-API_KEY    = "Nt604D"
-BASE_URL   = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do"
+# ── 상수 ──────────────────────────────────────────────
+DRIVE_FOLDER_ID = "1iWGYjaoslqST45ggDlg-IPMLaUHCYmV_"
+API_KEY  = "Nt604D"
+BASE_URL = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do"
+WALLA_FILENAME   = "companies_db.csv"
+NOTICES_FILENAME = "notices_db.csv"
+HISTORY_FILENAME = "send_history.csv"
+CALID_FILENAME   = "calendar_id.txt"
+CATCAL_FILENAME  = "category_calendars.json"
+INDCAL_FILENAME  = "individual_calendars.json"
 
 REALM_CODE = {
     "금융":"01","기술개발":"02","인력":"03","수출":"04",
@@ -67,6 +32,105 @@ REALM_CODE = {
 }
 HIGH = ["혁신제품","혁신조달","G-PASS","혁신기업","해외조달","공공구매","조달청"]
 MID  = ["해외판로","수출바우처","수출지원","해외진출","글로벌","스케일업","판로개척","해외마케팅"]
+
+# ── 구글 인증 ─────────────────────────────────────────
+@st.cache_resource
+def get_services():
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+    from googleapiclient.discovery import build
+
+    SCOPES = [
+        'https://www.googleapis.com/auth/gmail.send',
+        'https://www.googleapis.com/auth/calendar',
+        'https://www.googleapis.com/auth/drive',
+    ]
+
+    if 'google' in st.secrets:
+        token_data = json.loads(st.secrets['google']['token'])
+        creds = Credentials.from_authorized_user_info(token_data, SCOPES)
+    elif os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    else:
+        st.error("인증 파일이 없습니다.")
+        st.stop()
+
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+
+    gmail = build('gmail',    'v1', credentials=creds)
+    cal   = build('calendar', 'v3', credentials=creds)
+    drive = build('drive',    'v3', credentials=creds)
+    return gmail, cal, drive
+
+# ── 드라이브 유틸 ─────────────────────────────────────
+def drive_get_file_id(drive, filename):
+    """드라이브 폴더에서 파일 ID 검색"""
+    try:
+        res = drive.files().list(
+            q=f"name='{filename}' and '{DRIVE_FOLDER_ID}' in parents and trashed=false",
+            fields="files(id, name, modifiedTime)",
+            orderBy="modifiedTime desc"
+        ).execute()
+        files = res.get('files', [])
+        return files[0]['id'] if files else None
+    except:
+        return None
+
+def drive_download(drive, filename):
+    """드라이브에서 파일 다운로드 → bytes 반환"""
+    try:
+        file_id = drive_get_file_id(drive, filename)
+        if not file_id:
+            return None
+        content = drive.files().get_media(fileId=file_id).execute()
+        return content
+    except:
+        return None
+
+def drive_upload(drive, filename, content_bytes, mime_type="text/csv"):
+    """드라이브에 파일 업로드 (기존 파일 덮어쓰기)"""
+    from googleapiclient.http import MediaIoBaseUpload
+    try:
+        file_id = drive_get_file_id(drive, filename)
+        media   = MediaIoBaseUpload(io.BytesIO(content_bytes), mimetype=mime_type)
+
+        if file_id:
+            drive.files().update(fileId=file_id, media_body=media).execute()
+        else:
+            meta = {'name': filename, 'parents': [DRIVE_FOLDER_ID]}
+            drive.files().create(body=meta, media_body=media).execute()
+        return True
+    except Exception as e:
+        st.warning(f"드라이브 업로드 실패 ({filename}): {e}")
+        return False
+
+def load_csv_from_drive(drive, filename):
+    """드라이브에서 CSV 로드 → DataFrame"""
+    content = drive_download(drive, filename)
+    if content:
+        return pd.read_csv(io.BytesIO(content), dtype=str).fillna("")
+    return pd.DataFrame()
+
+def save_csv_to_drive(drive, df, filename):
+    """DataFrame → 드라이브에 CSV 저장"""
+    csv_bytes = df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+    return drive_upload(drive, filename, csv_bytes, "text/csv")
+
+def load_text_from_drive(drive, filename):
+    """드라이브에서 텍스트 파일 로드"""
+    content = drive_download(drive, filename)
+    return content.decode('utf-8').strip() if content else ""
+
+def load_json_from_drive(drive, filename):
+    """드라이브에서 JSON 파일 로드"""
+    content = drive_download(drive, filename)
+    if content:
+        try:
+            return json.loads(content.decode('utf-8'))
+        except:
+            return {}
+    return {}
 
 # ── 유틸 함수 ─────────────────────────────────────────
 def strip_html(html):
@@ -78,44 +142,6 @@ def parse_deadline(s):
         return datetime.strptime(re.sub(r'\.', '-', end), "%Y-%m-%d")
     except:
         return None
-
-def load_companies():
-    col_map = {
-        '기업명':       '(기본정보) 기업명을 입력해 주시기 바랍니다.',
-        '이메일':       '(기본정보) 담당자 이메일을 입력해 주시기 바랍니다.',
-        '관심사업분야': '(수요파악) 관심있는 정부 사업 분야를 선택하여 주시기 바랍니다.(최대 2개 선택 가능)',
-        '기술키워드':   '(수요파악) 귀사 제품의 주요 기술/분야 키워드를 입력하여 주시기 바랍니다.',
-        '제품분야':     '(기본정보) 귀사의 제품/기술 분야를 선택하여 주시기 바랍니다.(최대 3개선택 가능)',
-        '수출실적':     '(기업현황) 최근 3년간 수출 실적 여부를 선택하여 주시기 바랍니다.',
-        '수출국가':     '① 주요 수출 국가를 입력하여 주시기 바랍니다.',
-    }
-    if not os.path.exists(WALLA_FILE):
-        return pd.DataFrame()
-    raw = pd.read_excel(WALLA_FILE)
-    df  = pd.DataFrame({k: raw[v] for k, v in col_map.items() if v in raw.columns})
-    return df.fillna("")
-
-def load_notices():
-    path = os.path.join(WORK_DIR, "notices_db.csv")
-    if os.path.exists(path):
-        return pd.read_csv(path, dtype=str).fillna("")
-    return pd.DataFrame()
-
-def load_history():
-    path = os.path.join(WORK_DIR, "send_history.csv")
-    if os.path.exists(path):
-        return pd.read_csv(path, dtype=str).fillna("")
-    return pd.DataFrame(columns=["기업명","pblancId","공고명","발송일","매칭점수","담당자검토","검토의견","신청여부","선정결과"])
-
-def save_history(df):
-    path = os.path.join(WORK_DIR, "send_history.csv")
-    df.to_csv(path, index=False, encoding="utf-8-sig")
-
-def load_calendar_id():
-    path = os.path.join(WORK_DIR, "calendar_id.txt")
-    if os.path.exists(path):
-        return open(path).read().strip()
-    return ""
 
 def score_notice(notice, row, already_sent):
     pid = notice.get('pblancId', '')
@@ -132,8 +158,8 @@ def score_notice(notice, row, already_sent):
     matched_mid  = [kw for kw in MID  if kw in text]
     sys_score    = len(matched_high)*3 + len(matched_mid)*2
 
-    raw_kw = str(row.get('기술키워드','')) + ',' + str(row.get('제품분야',''))
-    co_kws = [k.strip() for k in raw_kw.split(',') if k.strip() and k.strip()!='nan']
+    raw_kw   = str(row.get('기술키워드','')) + ',' + str(row.get('제품분야','')) + ',' + str(row.get('키워드보완',''))
+    co_kws   = [k.strip() for k in raw_kw.split(',') if k.strip() and k.strip()!='nan']
     matched_co = [kw for kw in co_kws if kw in text]
     co_score   = len(matched_co)*2
 
@@ -177,7 +203,6 @@ with st.sidebar:
     st.markdown("### 📢 원스톱 스케일업")
     st.caption("공고 매칭 시스템")
     st.divider()
-
     page = st.radio(
         "메뉴",
         ["🏠 대시보드", "👥 기업 관리", "🔄 공고 수집",
@@ -192,6 +217,15 @@ with st.sidebar:
     else:
         st.success("실제 기업으로 발송")
 
+# ── 서비스 초기화 ─────────────────────────────────────
+try:
+    gmail, cal, drive = get_services()
+except Exception as e:
+    st.error(f"구글 인증 오류: {e}")
+    st.stop()
+
+TEST_RECIPIENTS = ["fbwlgns819@naver.com", "fbwlgns819@kip.re.kr"]
+
 
 # ══════════════════════════════════════════════════════
 # 대시보드
@@ -199,30 +233,38 @@ with st.sidebar:
 if page == "🏠 대시보드":
     st.title("대시보드")
 
-    try:
-        df_c = load_companies()
-        df_n = load_notices()
-        df_h = load_history()
-        n_companies = len(df_c)
-        n_notices   = len(df_n)
-        n_history   = len(df_h)
-    except:
-        n_companies = n_notices = n_history = 0
+    with st.spinner("드라이브에서 데이터 로딩 중..."):
+        df_c = load_csv_from_drive(drive, WALLA_FILENAME)
+        df_n = load_csv_from_drive(drive, NOTICES_FILENAME)
+        df_h = load_csv_from_drive(drive, HISTORY_FILENAME)
 
     c1,c2,c3,c4 = st.columns(4)
-    c1.metric("등록 기업",  f"{n_companies}개사")
-    c2.metric("수집 공고",  f"{n_notices:,}건")
-    c3.metric("발송 이력",  f"{n_history}건")
+    c1.metric("등록 기업",  f"{len(df_c)}개사")
+    c2.metric("수집 공고",  f"{len(df_n):,}건")
+    c3.metric("발송 이력",  f"{len(df_h)}건")
     c4.metric("운영 모드",  "테스트" if test_mode else "실제 발송")
 
     st.divider()
     st.subheader("이번 주 진행 단계")
     s1,s2,s3,s4,s5 = st.columns(5)
-    s1.markdown("**① 공고 수집**\n\n✅ 완료")
-    s2.markdown("**② 매칭 실행**\n\n✅ 완료")
-    s3.markdown("**③ 담당자 검토**\n\n🔵 진행중")
+    s1.markdown("**① 공고 수집**\n\n✅ 완료" if not df_n.empty else "**① 공고 수집**\n\n⬜ 대기")
+    s2.markdown("**② 매칭 실행**\n\n🔵 진행중")
+    s3.markdown("**③ 담당자 검토**\n\n⬜ 대기")
     s4.markdown("**④ 발송**\n\n⬜ 대기")
     s5.markdown("**⑤ 이력 기록**\n\n⬜ 대기")
+
+    st.divider()
+    st.subheader("📁 드라이브 파일 현황")
+    files_status = {
+        WALLA_FILENAME:   "기업 DB",
+        NOTICES_FILENAME: "공고 DB",
+        HISTORY_FILENAME: "발송 이력",
+        CALID_FILENAME:   "캘린더 ID",
+    }
+    cols = st.columns(len(files_status))
+    for col, (fname, label) in zip(cols, files_status.items()):
+        fid = drive_get_file_id(drive, fname)
+        col.metric(label, "✅ 있음" if fid else "❌ 없음")
 
 
 # ══════════════════════════════════════════════════════
@@ -230,36 +272,55 @@ if page == "🏠 대시보드":
 # ══════════════════════════════════════════════════════
 elif page == "👥 기업 관리":
     st.title("기업 관리")
-    st.caption("기업 정보 조회·수정·수신거부 처리")
+    st.caption("기업 정보 조회·수정·수신거부 처리 → 드라이브 자동 저장")
 
-    df_c = load_companies()
+    with st.spinner("드라이브에서 기업 DB 로딩 중..."):
+        df_c = load_csv_from_drive(drive, WALLA_FILENAME)
 
     if df_c.empty:
-        st.warning("WALLA 파일을 작업 폴더에 넣어주세요.")
+        st.warning("드라이브에 기업 DB가 없습니다.")
+        st.info("WALLA xlsx 파일을 아래에서 업로드하면 자동으로 변환·저장됩니다.")
+
+        uploaded = st.file_uploader("WALLA xlsx 업로드", type=["xlsx"])
+        if uploaded:
+            col_map = {
+                '기업명':       '(기본정보) 기업명을 입력해 주시기 바랍니다.',
+                '이메일':       '(기본정보) 담당자 이메일을 입력해 주시기 바랍니다.',
+                '관심사업분야': '(수요파악) 관심있는 정부 사업 분야를 선택하여 주시기 바랍니다.(최대 2개 선택 가능)',
+                '기술키워드':   '(수요파악) 귀사 제품의 주요 기술/분야 키워드를 입력하여 주시기 바랍니다.',
+                '제품분야':     '(기본정보) 귀사의 제품/기술 분야를 선택하여 주시기 바랍니다.(최대 3개선택 가능)',
+                '수출실적':     '(기업현황) 최근 3년간 수출 실적 여부를 선택하여 주시기 바랍니다.',
+                '수출국가':     '① 주요 수출 국가를 입력하여 주시기 바랍니다.',
+            }
+            raw = pd.read_excel(uploaded)
+            df_new = pd.DataFrame({k: raw[v] for k, v in col_map.items() if v in raw.columns})
+            df_new = df_new.fillna("")
+            df_new['키워드보완'] = ''
+            df_new['수신거부']   = ''
+            df_new['메모']       = ''
+
+            if save_csv_to_drive(drive, df_new, WALLA_FILENAME):
+                st.success(f"{len(df_new)}개사 기업 DB 저장 완료!")
+                st.rerun()
     else:
-        # 요약
         c1,c2,c3 = st.columns(3)
         c1.metric("전체 기업", f"{len(df_c)}개사")
-        if 'companies_db.csv' in os.listdir(WORK_DIR):
-            df_db = pd.read_csv(os.path.join(WORK_DIR,'companies_db.csv'),dtype=str).fillna("")
-            c2.metric("수신거부", f"{(df_db.get('수신거부','')=='Y').sum()}개사" if '수신거부' in df_db.columns else "0개사")
-            c3.metric("키워드 보완", f"{(df_db.get('키워드보완','')!='').sum()}개사" if '키워드보완' in df_db.columns else "0개사")
-        else:
-            c2.metric("수신거부", "0개사")
-            c3.metric("키워드 보완", "0개사")
+        c2.metric("수신거부", f"{(df_c['수신거부']=='Y').sum()}개사" if '수신거부' in df_c.columns else "0개사")
+        c3.metric("키워드 보완", f"{(df_c.get('키워드보완','')!='').sum()}개사" if '키워드보완' in df_c.columns else "0개사")
 
         st.divider()
 
-        # 검색
-        search = st.text_input("🔍 기업명 검색")
-        if search:
-            df_show = df_c[df_c['기업명'].str.contains(search)]
-        else:
-            df_show = df_c
+        if '키워드보완' not in df_c.columns: df_c['키워드보완'] = ''
+        if '수신거부'   not in df_c.columns: df_c['수신거부']   = ''
+        if '메모'       not in df_c.columns: df_c['메모']       = ''
 
-        # 기업 목록
-        for _, row in df_show.iterrows():
-            with st.expander(f"**{row['기업명']}**  |  {row.get('관심사업분야','')}"):
+        search = st.text_input("🔍 기업명 검색")
+        df_show = df_c[df_c['기업명'].str.contains(search)] if search else df_c
+
+        for idx, row in df_show.iterrows():
+            unsub_flag = row.get('수신거부','') == 'Y'
+            icon = "🚫" if unsub_flag else "🏢"
+            with st.expander(f"{icon} {row['기업명']}  |  {row.get('관심사업분야','')}"):
                 col1, col2 = st.columns(2)
                 with col1:
                     st.markdown(f"**이메일:** {row.get('이메일','')}")
@@ -269,36 +330,23 @@ elif page == "👥 기업 관리":
                     st.markdown(f"**제품분야:** {row.get('제품분야','')}")
                     st.markdown(f"**기술키워드:** {row.get('기술키워드','')}")
 
-                # 키워드 보완 입력
                 extra_kw = st.text_input(
-                    "키워드 보완 (담당자 직접 추가)",
-                    key=f"kw_{row['기업명']}",
-                    placeholder="예: 스마트팜, IoT, 농업기술"
+                    "키워드 보완",
+                    value=row.get('키워드보완',''),
+                    key=f"kw_{idx}",
+                    placeholder="담당자가 직접 추가 (예: 스마트팜, IoT)"
                 )
-                unsub = st.checkbox("수신거부", key=f"unsub_{row['기업명']}")
+                unsub = st.checkbox("수신거부", value=unsub_flag, key=f"unsub_{idx}")
+                memo  = st.text_input("메모", value=row.get('메모',''), key=f"memo_{idx}")
 
-                if st.button("저장", key=f"save_{row['기업명']}"):
-                    # companies_db.csv 업데이트
-                    db_path = os.path.join(WORK_DIR, 'companies_db.csv')
-                    if os.path.exists(db_path):
-                        df_db = pd.read_csv(db_path, dtype=str).fillna("")
+                if st.button("💾 저장", key=f"save_{idx}"):
+                    df_c.at[idx, '키워드보완'] = extra_kw
+                    df_c.at[idx, '수신거부']   = 'Y' if unsub else ''
+                    df_c.at[idx, '메모']       = memo
+                    if save_csv_to_drive(drive, df_c, WALLA_FILENAME):
+                        st.success(f"{row['기업명']} 저장 완료 → 드라이브 업데이트!")
                     else:
-                        df_db = df_c.copy()
-                        df_db['키워드보완'] = ''
-                        df_db['수신거부']   = ''
-                        df_db['메모']       = ''
-
-                    mask = df_db['기업명'] == row['기업명']
-                    if mask.any():
-                        df_db.loc[mask, '키워드보완'] = extra_kw
-                        df_db.loc[mask, '수신거부']   = 'Y' if unsub else ''
-                    else:
-                        new_row = row.to_dict()
-                        new_row.update({'키워드보완':extra_kw,'수신거부':'Y' if unsub else '','메모':''})
-                        df_db = pd.concat([df_db, pd.DataFrame([new_row])], ignore_index=True)
-
-                    df_db.to_csv(db_path, index=False, encoding='utf-8-sig')
-                    st.success(f"{row['기업명']} 저장 완료!")
+                        st.error("저장 실패")
 
 
 # ══════════════════════════════════════════════════════
@@ -306,9 +354,11 @@ elif page == "👥 기업 관리":
 # ══════════════════════════════════════════════════════
 elif page == "🔄 공고 수집":
     st.title("공고 수집")
-    st.caption("bizinfo API에서 전체 공고를 수집하고 notices_db.csv에 누적 저장합니다.")
+    st.caption("bizinfo API 수집 → 드라이브 notices_db.csv 자동 저장")
 
-    df_n = load_notices()
+    with st.spinner("드라이브에서 공고 DB 로딩 중..."):
+        df_n = load_csv_from_drive(drive, NOTICES_FILENAME)
+
     if not df_n.empty:
         c1,c2,c3 = st.columns(3)
         c1.metric("현재 DB 공고 수", f"{len(df_n):,}건")
@@ -316,13 +366,12 @@ elif page == "🔄 공고 수집":
         c3.metric("마감일 파싱 성공", f"{(df_n['마감일']!='').sum()}건" if '마감일' in df_n.columns else "—")
 
     st.divider()
-
     if st.button("🔄 지금 수집 실행", type="primary"):
         REALM_CODES = ["01","02","03","04","05","06","07","09"]
         all_items, seen = [], set()
-        progress = st.progress(0, text="수집 중...")
+        prog     = st.progress(0, text="수집 중...")
         log_area = st.empty()
-        logs = []
+        logs     = []
 
         for idx, code in enumerate(REALM_CODES):
             params = {"crtfcKey":API_KEY,"dataType":"json","searchCnt":"0","searchLclasId":code}
@@ -334,39 +383,32 @@ elif page == "🔄 공고 수집":
                         seen.add(pid); all_items.append(item)
                 logs.append(f"✅ 분야코드 {code}: {len(items)}건")
             except Exception as e:
-                logs.append(f"❌ 분야코드 {code} 오류: {e}")
-            progress.progress((idx+1)/len(REALM_CODES), text=f"수집 중... {idx+1}/{len(REALM_CODES)}")
+                logs.append(f"❌ 분야코드 {code}: {e}")
+            prog.progress((idx+1)/len(REALM_CODES))
             log_area.code("\n".join(logs))
 
         def to_row(item):
             def pdl(s):
                 try:
-                    e=s.split('~')[-1].strip()
-                    return datetime.strptime(re.sub(r'\.','-',e),"%Y-%m-%d").strftime("%Y-%m-%d")
+                    return datetime.strptime(re.sub(r'\.', '-', s.split('~')[-1].strip()), "%Y-%m-%d").strftime("%Y-%m-%d")
                 except: return ""
             return {
-                "pblancId":  item.get('pblancId',''),
-                "공고명":    item.get('pblancNm',''),
-                "주관기관":  item.get('jrsdInsttNm',''),
-                "분야":      item.get('pldirSportRealmLclasCodeNm',''),
-                "세부분야":  item.get('pldirSportRealmMlsfcCodeNm',''),
-                "접수기간":  item.get('reqstBeginEndDe',''),
-                "마감일":    pdl(item.get('reqstBeginEndDe','')),
-                "지원대상":  item.get('trgetNm',''),
-                "사업개요":  strip_html(item.get('bsnsSumryCn',''))[:500],
-                "해시태그":  item.get('hashtags',''),
-                "공고링크":  item.get('pblancUrl',''),
-                "수정일":    item.get('updtPnttm',''),
-                "수집일":    datetime.today().strftime("%Y-%m-%d"),
+                "pblancId": item.get('pblancId',''),
+                "공고명":   item.get('pblancNm',''),
+                "주관기관": item.get('jrsdInsttNm',''),
+                "분야":     item.get('pldirSportRealmLclasCodeNm',''),
+                "세부분야": item.get('pldirSportRealmMlsfcCodeNm',''),
+                "접수기간": item.get('reqstBeginEndDe',''),
+                "마감일":   pdl(item.get('reqstBeginEndDe','')),
+                "지원대상": item.get('trgetNm',''),
+                "사업개요": strip_html(item.get('bsnsSumryCn',''))[:500],
+                "해시태그": item.get('hashtags',''),
+                "공고링크": item.get('pblancUrl',''),
+                "수정일":   item.get('updtPnttm',''),
+                "수집일":   datetime.today().strftime("%Y-%m-%d"),
             }
 
-        db_path = os.path.join(WORK_DIR, "notices_db.csv")
-        if os.path.exists(db_path):
-            df_ex  = pd.read_csv(db_path, dtype=str).fillna("")
-            ex_map = {r['pblancId']:r.get('수정일','') for _,r in df_ex.iterrows()}
-        else:
-            df_ex = pd.DataFrame(); ex_map = {}
-
+        ex_map = {r['pblancId']:r.get('수정일','') for _,r in df_n.iterrows()} if not df_n.empty else {}
         new_rows, upd_rows = [], []
         for item in all_items:
             pid = item.get('pblancId','')
@@ -375,24 +417,25 @@ elif page == "🔄 공고 수집":
             if pid not in ex_map: new_rows.append(row)
             elif ex_map[pid] != item.get('updtPnttm',''): upd_rows.append(row)
 
-        if not df_ex.empty:
+        if not df_n.empty:
             upd_ids  = {r['pblancId'] for r in upd_rows}
-            df_keep  = df_ex[~df_ex['pblancId'].isin(upd_ids)]
+            df_keep  = df_n[~df_n['pblancId'].isin(upd_ids)]
             df_final = pd.concat([df_keep, pd.DataFrame(new_rows+upd_rows)], ignore_index=True)
         else:
             df_final = pd.DataFrame(new_rows)
 
-        df_final.to_csv(db_path, index=False, encoding="utf-8-sig")
-        progress.progress(1.0, text="완료!")
-        st.success(f"수집 완료! 총 {len(df_final):,}건 (신규 {len(new_rows)}건 / 업데이트 {len(upd_rows)}건)")
+        with st.spinner("드라이브에 저장 중..."):
+            save_csv_to_drive(drive, df_final, NOTICES_FILENAME)
+
+        prog.progress(1.0, text="완료!")
+        st.success(f"수집 완료! 총 {len(df_final):,}건 (신규 {len(new_rows)}건 / 업데이트 {len(upd_rows)}건) → 드라이브 저장됨")
         st.rerun()
 
     if not df_n.empty:
         st.divider()
         st.subheader("공고 DB 미리보기")
-        show_cols = ["공고명","주관기관","분야","접수기간","마감일"]
-        available = [c for c in show_cols if c in df_n.columns]
-        st.dataframe(df_n[available].head(20), use_container_width=True, hide_index=True)
+        cols = [c for c in ["공고명","주관기관","분야","접수기간","마감일"] if c in df_n.columns]
+        st.dataframe(df_n[cols].head(20), use_container_width=True, hide_index=True)
 
 
 # ══════════════════════════════════════════════════════
@@ -400,7 +443,6 @@ elif page == "🔄 공고 수집":
 # ══════════════════════════════════════════════════════
 elif page == "🔗 매칭 결과":
     st.title("매칭 결과")
-
     tab1, tab2 = st.tabs(["매칭 실행", "검토 & 승인"])
 
     with tab1:
@@ -408,30 +450,29 @@ elif page == "🔗 매칭 결과":
         max_per = st.slider("기업당 최대 추천 건수", 3, 10, 5)
 
         if st.button("🔗 매칭 실행", type="primary"):
-            df_c = load_companies()
-            df_n = load_notices()
-            df_h = load_history()
+            with st.spinner("드라이브에서 데이터 로딩 중..."):
+                df_c = load_csv_from_drive(drive, WALLA_FILENAME)
+                df_n = load_csv_from_drive(drive, NOTICES_FILENAME)
+                df_h = load_csv_from_drive(drive, HISTORY_FILENAME)
 
             if df_n.empty:
-                st.error("notices_db.csv 없음 → '공고 수집' 먼저 실행하세요.")
-                st.stop()
+                st.error("notices_db.csv 없음 → '공고 수집' 먼저 실행하세요."); st.stop()
+            if df_c.empty:
+                st.error("기업 DB 없음 → '기업 관리'에서 WALLA 파일 업로드하세요."); st.stop()
 
-            # 수신거부 기업 제외
-            db_path = os.path.join(WORK_DIR, 'companies_db.csv')
-            if os.path.exists(db_path):
-                df_db  = pd.read_csv(db_path, dtype=str).fillna("")
-                unsub  = set(df_db[df_db.get('수신거부','')=='Y']['기업명'].tolist()) if '수신거부' in df_db.columns else set()
-                df_c   = df_c[~df_c['기업명'].isin(unsub)]
+            # 수신거부 제외
+            if '수신거부' in df_c.columns:
+                df_c = df_c[df_c['수신거부'] != 'Y']
 
             already_sent = set(zip(df_h['기업명'], df_h['pblancId'])) if not df_h.empty else set()
             all_results  = []
             prog = st.progress(0, text="매칭 중...")
 
             for idx, (_, row) in enumerate(df_c.iterrows()):
-                interest = row['관심사업분야']
-                codes    = [v for k,v in REALM_CODE.items() if k in interest] or ["02","04"]
+                interest    = row.get('관심사업분야','')
+                codes       = [v for k,v in REALM_CODE.items() if k in interest] or ["02","04"]
                 realm_names = [k for k,v in REALM_CODE.items() if v in codes]
-                filtered = df_n[df_n['분야'].isin(realm_names)] if '분야' in df_n.columns else df_n
+                filtered    = df_n[df_n['분야'].isin(realm_names)] if '분야' in df_n.columns else df_n
 
                 scored = [r for _,n in filtered.iterrows() if (r:=score_notice(n.to_dict(),row,already_sent))]
                 scored.sort(key=lambda x:-x['점수'])
@@ -440,7 +481,7 @@ elif page == "🔗 매칭 결과":
 
             st.session_state['match_results'] = all_results
             prog.progress(1.0, text="완료!")
-            st.success(f"매칭 완료! 총 {len(all_results)}건")
+            st.success(f"매칭 완료! 총 {len(all_results)}건 → '검토 & 승인' 탭으로 이동하세요.")
 
     with tab2:
         st.subheader("담당자 검토")
@@ -450,7 +491,6 @@ elif page == "🔗 매칭 결과":
             st.info("매칭 실행 탭에서 매칭을 먼저 실행하세요.")
         else:
             df_show = pd.DataFrame(results)
-
             col_f1, col_f2 = st.columns(2)
             with col_f1:
                 filter_stars = st.multiselect("관련도", ["★★★","★★"], default=["★★★","★★"])
@@ -465,25 +505,24 @@ elif page == "🔗 매칭 결과":
             if 'review_state' not in st.session_state:
                 st.session_state['review_state'] = {}
 
-            approved = sum(1 for v in st.session_state['review_state'].values() if v=="○")
-            rejected = sum(1 for v in st.session_state['review_state'].values() if v=="✕")
-            st.caption(f"총 {len(filtered)}건  |  승인 {approved}건  |  제외 {rejected}건")
+            approved_n = sum(1 for v in st.session_state['review_state'].values() if v=="○")
+            rejected_n = sum(1 for v in st.session_state['review_state'].values() if v=="✕")
+            st.caption(f"총 {len(filtered)}건  |  승인 {approved_n}건  |  제외 {rejected_n}건")
             st.divider()
 
             for i, (idx, row) in enumerate(filtered.iterrows()):
                 key     = f"{row['기업명']}_{row.get('공고ID','')}"
                 current = st.session_state['review_state'].get(key, "")
-                bg      = "🟡" if not current else ("✅" if current=="○" else "❌")
+                icon    = "🟡" if not current else ("✅" if current=="○" else "❌")
 
-                with st.expander(f"{bg} {row['기업명']}  |  {row.get('관련도','')}  |  {row.get('공고명','')[:35]}"):
+                with st.expander(f"{icon} {row['기업명']}  |  {row.get('관련도','')}  |  {row.get('공고명','')[:35]}"):
                     c1, c2 = st.columns([3,1])
                     with c1:
                         st.markdown(f"**주관기관:** {row.get('주관기관','')}  |  **마감:** {row.get('마감일','')}")
                         st.markdown(f"**사업개요:** {row.get('사업개요','')}")
                         st.markdown(f"**매칭키워드:** {row.get('시스템매칭','')} / {row.get('기업키워드매칭','')}")
-                        link = row.get('공고링크','')
-                        if link:
-                            st.markdown(f"[🔗 공고 원문 보기]({link})")
+                        if row.get('공고링크',''):
+                            st.markdown(f"[🔗 공고 원문 보기]({row.get('공고링크','')})")
                     with c2:
                         if st.button("○ 승인", key=f"o_{key}_{i}", type="primary"):
                             st.session_state['review_state'][key] = "○"
@@ -491,7 +530,6 @@ elif page == "🔗 매칭 결과":
                         if st.button("✕ 제외", key=f"x_{key}_{i}"):
                             st.session_state['review_state'][key] = "✕"
                             st.rerun()
-                        memo = st.text_input("메모", key=f"memo_{key}_{i}", label_visibility="collapsed", placeholder="제외 사유 등")
 
             st.divider()
             if st.button("✅ 검토 완료 저장", type="primary"):
@@ -499,7 +537,7 @@ elif page == "🔗 매칭 결과":
                     key = f"{r['기업명']}_{r.get('공고ID','')}"
                     r['담당자검토'] = st.session_state['review_state'].get(key,"")
                 st.session_state['match_results'] = results
-                st.success(f"저장됨. 승인 {approved}건 → '발송 관리' 메뉴로 이동하세요.")
+                st.success(f"저장됨. 승인 {approved_n}건 → '발송 관리' 메뉴로 이동하세요.")
 
 
 # ══════════════════════════════════════════════════════
@@ -515,7 +553,7 @@ elif page == "📤 발송 관리":
         st.warning("승인된 공고가 없습니다. '매칭 결과' 메뉴에서 검토를 완료하세요.")
     else:
         companies = list(set(r['기업명'] for r in approved))
-        c1,c2,c3 = st.columns(3)
+        c1,c2,c3  = st.columns(3)
         c1.metric("승인 건수", f"{len(approved)}건")
         c2.metric("대상 기업", f"{len(companies)}개사")
         c3.metric("발송 모드", "테스트" if test_mode else "실제")
@@ -525,40 +563,30 @@ elif page == "📤 발송 관리":
         else:
             st.success("✅ 실제 모드: 기업 담당자 이메일로 발송됩니다.")
 
-        # 발송 미리보기
+        # 미리보기
         st.divider()
-        st.subheader("발송 예정 목록")
-        preview_co = st.selectbox("기업 선택해서 미리보기", companies)
+        st.subheader("발송 미리보기")
+        preview_co      = st.selectbox("기업 선택", companies)
         preview_notices = [r for r in approved if r['기업명'] == preview_co]
 
-        with st.expander(f"📧 {preview_co} 발송 메일 미리보기"):
-            st.markdown(f"**수신:** {preview_co} 담당자님")
-            st.markdown(f"**제목:** [원스톱 스케일업] 맞춤 지원공고 {len(preview_notices)}건 안내")
-            st.divider()
-            for i, n in enumerate(preview_notices, 1):
+        with st.expander(f"📧 {preview_co} 메일 미리보기"):
+            for i,n in enumerate(preview_notices,1):
                 st.markdown(f"**{i}. {n.get('관련도','')} [{n.get('공고명','')}]({n.get('공고링크','#')})**")
                 st.markdown(f"주관: {n.get('주관기관','')}  |  기간: {n.get('접수기간','')}")
-                st.markdown(f"{n.get('사업개요','')}")
+                st.caption(n.get('사업개요',''))
                 st.divider()
 
+        # 발송 실행
         st.divider()
         if st.button("📤 발송 실행", type="primary"):
-            from googleapiclient.discovery import build
-            from googleapiclient.errors import HttpError
             from email.mime.multipart import MIMEMultipart
             from email.mime.text import MIMEText
             import base64
 
-            TEST_RECIPIENTS = ["fbwlgns819@naver.com","fbwlgns819@kip.re.kr"]
-            cal_id = load_calendar_id()
+            cal_id        = load_text_from_drive(drive, CALID_FILENAME)
+            cat_cals      = load_json_from_drive(drive, CATCAL_FILENAME)
+            ind_cals      = load_json_from_drive(drive, INDCAL_FILENAME)
             CALENDAR_LINK = f"https://calendar.google.com/calendar?cid={cal_id}" if cal_id else ""
-
-            try:
-                creds = get_google_creds()
-                gmail = build('gmail','v1',credentials=creds)
-                cal   = build('calendar','v3',credentials=creds)
-            except Exception as e:
-                st.error(f"구글 인증 오류: {e}"); st.stop()
 
             history_records = []
             prog = st.progress(0, text="발송 중...")
@@ -580,12 +608,21 @@ elif page == "📤 발송 관리":
                       <td style="padding:8px;border-bottom:1px solid #eee;color:#666">{n.get('접수기간','')}</td>
                     </tr>"""
 
-                cal_btn = f"""<div style="background:#EBF3FB;border-radius:6px;padding:14px;margin-top:16px">
-                  <p style="margin:0 0 8px;color:#1F4E79;font-weight:bold;font-size:13px">📅 캘린더 구독</p>
-                  <a href="{CALENDAR_LINK}" style="background:#1F4E79;color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none;font-size:13px">구독하기</a>
-                </div>""" if CALENDAR_LINK else ""
+                # 개별 캘린더 구독 링크
+                ind_cal_link = ""
+                if company in ind_cals:
+                    ind_cal_link = f"""<div style="margin-top:10px">
+                      <a href="https://calendar.google.com/calendar?cid={ind_cals[company].get('calendar_id','')}"
+                         style="color:#2E75B6;font-size:13px">📅 {company} 전용 캘린더 구독</a>
+                    </div>"""
 
-                html=f"""<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f5f5f5">
+                cal_section = f"""<div style="background:#EBF3FB;border-radius:6px;padding:14px;margin-top:16px">
+                  <p style="margin:0 0 8px;color:#1F4E79;font-weight:bold;font-size:13px">📅 공고 마감일 캘린더</p>
+                  {"<a href='"+CALENDAR_LINK+"' style='background:#1F4E79;color:#fff;padding:8px 16px;border-radius:4px;text-decoration:none;font-size:13px;display:inline-block'>공통 캘린더 구독</a>" if CALENDAR_LINK else ""}
+                  {ind_cal_link}
+                </div>""" if (CALENDAR_LINK or ind_cal_link) else ""
+
+                html = f"""<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f5f5f5">
                 <table width="600" align="center" style="background:#fff;border-radius:8px;overflow:hidden;margin:20px auto">
                   <tr><td style="background:#1F4E79;padding:24px 32px">
                     <p style="margin:0;color:#fff;font-size:12px;opacity:.8">혁신제품지원센터</p>
@@ -602,68 +639,84 @@ elif page == "📤 발송 관리":
                         <td style="padding:8px;color:#fff;font-size:12px;font-weight:bold">접수기간</td>
                       </tr>{rows_html}
                     </table>
-                    {cal_btn}
+                    {cal_section}
                   </td></tr>
                   <tr><td style="background:#f9f9f9;padding:14px 32px;font-size:12px;color:#888;border-top:1px solid #eee">
                     혁신제품지원센터 원스톱 스케일업 운영팀 | onestop.kipcc@gmail.com
                   </td></tr>
                 </table></body></html>"""
 
-                msg=MIMEMultipart('alternative')
-                msg['From']="onestop.kipcc@gmail.com"
-                msg['Subject']=f"[원스톱 스케일업] 맞춤 지원공고 {len(notices)}건 안내 — {company}"
-                msg.attach(MIMEText(html,'html','utf-8'))
+                # 드라이브에서 기업 이메일 조회
+                df_c_cur  = load_csv_from_drive(drive, WALLA_FILENAME)
+                co_email  = ""
+                if not df_c_cur.empty and '이메일' in df_c_cur.columns:
+                    match = df_c_cur[df_c_cur['기업명']==company]
+                    if not match.empty:
+                        co_email = match.iloc[0].get('이메일','')
 
-                recipients = TEST_RECIPIENTS if test_mode else [notices[0].get('이메일','')]
+                recipients = TEST_RECIPIENTS if test_mode else ([co_email] if co_email else [])
                 for to in recipients:
-                    msg_copy = MIMEMultipart('alternative')
-                    msg_copy['From']=msg['From']; msg_copy['To']=to
-                    msg_copy['Subject']=msg['Subject']
-                    msg_copy.attach(MIMEText(html,'html','utf-8'))
-                    raw=base64.urlsafe_b64encode(msg_copy.as_bytes()).decode()
+                    msg = MIMEMultipart('alternative')
+                    msg['From']    = "onestop.kipcc@gmail.com"
+                    msg['To']      = to
+                    msg['Subject'] = f"[원스톱 스케일업] 맞춤 지원공고 {len(notices)}건 안내 — {company}"
+                    msg.attach(MIMEText(html,'html','utf-8'))
+                    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
                     gmail.users().messages().send(userId='me',body={'raw':raw}).execute()
 
-                # 캘린더 등록
-                if cal_id:
-                    for n in notices:
-                        dl=parse_deadline(n.get('접수기간',''))
-                        if dl:
-                            pid=n.get('공고ID','')
-                            try:
-                                ex=cal.events().list(calendarId=cal_id,privateExtendedProperty=f"pblancId={pid}").execute()
-                                if ex.get('items'): continue
-                            except: pass
-                            desc=f"주관기관: {n.get('주관기관','')}\n공고링크: {n.get('공고링크','')}\n안내기업: {company}"
-                            for days,label in [(0,"마감"),(7,"D-7"),(3,"D-3")]:
-                                d=(dl-timedelta(days=days)).strftime('%Y-%m-%d')
-                                cal.events().insert(calendarId=cal_id,body={
-                                    'summary':f"[{label}] {n.get('공고명','')}",
-                                    'description':desc,
-                                    'start':{'date':d,'timeZone':'Asia/Seoul'},
-                                    'end':  {'date':d,'timeZone':'Asia/Seoul'},
-                                    'extendedProperties':{'private':{'pblancId':pid}},
-                                }).execute()
+                # 캘린더 등록 (공통 + 개별)
+                for n in notices:
+                    dl  = parse_deadline(n.get('접수기간',''))
+                    pid = n.get('공고ID','')
+                    if not dl or not pid: continue
 
-                history_records.append({
-                    "기업명":company,"pblancId":notices[0].get('공고ID',''),
-                    "공고명":notices[0].get('공고명',''),
-                    "발송일":datetime.today().strftime("%Y-%m-%d"),
-                    "매칭점수":notices[0].get('점수',''),
-                    "담당자검토":"○","검토의견":"","신청여부":"","선정결과":"",
-                })
+                    desc = f"주관기관: {n.get('주관기관','')}\n공고링크: {n.get('공고링크','')}\n안내기업: {company}"
+                    target_cals = []
+                    if cal_id: target_cals.append(cal_id)
+                    if company in ind_cals and ind_cals[company].get('calendar_id'):
+                        target_cals.append(ind_cals[company]['calendar_id'])
+
+                    for cid in target_cals:
+                        try:
+                            ex = cal.events().list(calendarId=cid, privateExtendedProperty=f"pblancId={pid}").execute()
+                            if ex.get('items'): continue
+                        except: pass
+                        for days,label in [(0,"마감"),(7,"D-7"),(3,"D-3")]:
+                            d = (dl-timedelta(days=days)).strftime('%Y-%m-%d')
+                            cal.events().insert(calendarId=cid, body={
+                                'summary':     f"[{label}] {n.get('공고명','')}",
+                                'description': desc,
+                                'start': {'date':d,'timeZone':'Asia/Seoul'},
+                                'end':   {'date':d,'timeZone':'Asia/Seoul'},
+                                'extendedProperties': {'private':{'pblancId':pid}},
+                            }).execute()
+
+                for n in notices:
+                    history_records.append({
+                        "기업명":    company,
+                        "pblancId":  n.get('공고ID',''),
+                        "공고명":    n.get('공고명',''),
+                        "발송일":    datetime.today().strftime("%Y-%m-%d"),
+                        "매칭점수":  n.get('점수',''),
+                        "담당자검토":"○",
+                        "검토의견":  n.get('검토의견',''),
+                        "신청여부":  "",
+                        "선정결과":  "",
+                    })
 
                 logs.append(f"✅ {company} — {len(notices)}건 발송 완료")
                 log.code("\n".join(logs))
                 prog.progress((idx+1)/len(grouped))
 
-            # 이력 저장
-            df_h   = load_history()
-            df_new = pd.DataFrame(history_records)
-            df_fin = pd.concat([df_h,df_new],ignore_index=True) if not df_h.empty else df_new
-            save_history(df_fin)
+            # 이력 드라이브 저장
+            with st.spinner("발송 이력 드라이브 저장 중..."):
+                df_h   = load_csv_from_drive(drive, HISTORY_FILENAME)
+                df_new = pd.DataFrame(history_records)
+                df_fin = pd.concat([df_h,df_new],ignore_index=True) if not df_h.empty else df_new
+                save_csv_to_drive(drive, df_fin, HISTORY_FILENAME)
 
             prog.progress(1.0,"완료!")
-            st.success(f"발송 완료! {len(history_records)}건 처리됨.")
+            st.success(f"발송 완료! {len(history_records)}건 → 드라이브 이력 저장됨")
             st.session_state['match_results'] = []
             st.session_state['review_state']  = {}
 
@@ -674,7 +727,9 @@ elif page == "📤 발송 관리":
 elif page == "📋 발송 이력":
     st.title("발송 이력")
 
-    df_h = load_history()
+    with st.spinner("드라이브에서 이력 로딩 중..."):
+        df_h = load_csv_from_drive(drive, HISTORY_FILENAME)
+
     if df_h.empty:
         st.info("발송 이력이 없습니다.")
     else:
@@ -685,8 +740,6 @@ elif page == "📋 발송 이력":
 
         st.divider()
         st.subheader("성과 업데이트")
-        st.caption("신청여부·선정결과를 직접 입력하고 저장하세요.")
-
         edited = st.data_editor(
             df_h, use_container_width=True, hide_index=True,
             column_config={
@@ -694,13 +747,14 @@ elif page == "📋 발송 이력":
                 "선정결과": st.column_config.SelectboxColumn("선정결과", options=["","선정","미선정","대기"]),
             }
         )
-        if st.button("💾 저장"):
-            save_history(edited)
-            st.success("저장 완료!")
+        if st.button("💾 저장 → 드라이브"):
+            with st.spinner("저장 중..."):
+                save_csv_to_drive(drive, edited, HISTORY_FILENAME)
+            st.success("드라이브에 저장 완료!")
 
         st.divider()
-        csv = df_h.to_csv(index=False, encoding="utf-8-sig")
-        st.download_button("📥 CSV 다운로드", csv, "send_history.csv", "text/csv")
+        csv = df_h.to_csv(index=False, encoding='utf-8-sig')
+        st.download_button("📥 CSV 다운로드", csv, HISTORY_FILENAME, "text/csv")
 
 
 # ══════════════════════════════════════════════════════
@@ -709,7 +763,9 @@ elif page == "📋 발송 이력":
 elif page == "📊 성과 집계":
     st.title("성과 집계")
 
-    df_h = load_history()
+    with st.spinner("드라이브에서 이력 로딩 중..."):
+        df_h = load_csv_from_drive(drive, HISTORY_FILENAME)
+
     if df_h.empty:
         st.info("발송 이력이 없습니다.")
     else:
@@ -719,9 +775,9 @@ elif page == "📊 성과 집계":
         rate     = f"{applied/total*100:.1f}%" if total else "0%"
 
         c1,c2,c3,c4 = st.columns(4)
-        c1.metric("총 발송", f"{total}건")
-        c2.metric("신청 건", f"{applied}건")
-        c3.metric("선정 건", f"{selected}건")
+        c1.metric("총 발송",    f"{total}건")
+        c2.metric("신청 건",    f"{applied}건")
+        c3.metric("선정 건",    f"{selected}건")
         c4.metric("신청 전환율", rate)
 
         if '기업명' in df_h.columns:
@@ -741,25 +797,35 @@ elif page == "📊 성과 집계":
 elif page == "⚙️ 설정":
     st.title("설정")
 
-    st.subheader("키워드 설정")
-    high_kw = st.text_area("★★★ 직접 연계 키워드", value=", ".join(HIGH), height=80)
-    mid_kw  = st.text_area("★★ 간접 연계 키워드",  value=", ".join(MID),  height=80)
-
-    st.divider()
-    st.subheader("캘린더 설정")
-    cal_id = load_calendar_id()
-    st.text_input("공통 캘린더 ID", value=cal_id, disabled=True)
-    if cal_id:
-        st.markdown(f"[📅 캘린더 바로가기](https://calendar.google.com/calendar?cid={cal_id})")
-
-    st.divider()
-    st.subheader("인증 상태")
+    st.subheader("🔐 인증 상태")
     if 'google' in st.secrets:
         st.success("✅ Streamlit Secrets 인증 설정됨")
     elif os.path.exists('token.json'):
         st.success("✅ 로컬 token.json 인증 설정됨")
     else:
         st.error("❌ 인증 파일 없음")
+
+    st.divider()
+    st.subheader("📁 드라이브 연동 현황")
+    st.code(f"폴더 ID: {DRIVE_FOLDER_ID}")
+    st.markdown(f"[📂 드라이브 폴더 열기](https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID})")
+
+    files_check = {
+        WALLA_FILENAME:   "기업 DB",
+        NOTICES_FILENAME: "공고 DB",
+        HISTORY_FILENAME: "발송 이력",
+        CALID_FILENAME:   "공통 캘린더 ID",
+        CATCAL_FILENAME:  "분야별 캘린더",
+        INDCAL_FILENAME:  "기업별 캘린더",
+    }
+    for fname, label in files_check.items():
+        fid = drive_get_file_id(drive, fname)
+        st.write(f"{'✅' if fid else '❌'} {label} ({fname})")
+
+    st.divider()
+    st.subheader("🔑 키워드 설정")
+    st.text_area("★★★ 직접 연계 키워드", value=", ".join(HIGH), height=80)
+    st.text_area("★★ 간접 연계 키워드",  value=", ".join(MID),  height=80)
 
     if st.button("저장", type="primary"):
         st.success("설정 저장됨")
