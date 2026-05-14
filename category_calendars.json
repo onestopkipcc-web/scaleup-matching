@@ -1,0 +1,42 @@
+{
+  "tech": {
+    "calendar_id": "78ee470673bde329cd200a45b02d68008f5646fbfb4edc03bb0f29b0580438fa@group.calendar.google.com",
+    "summary": "📡 스케일업 — 기술개발 공고 D-day",
+    "subscribe_link": "https://calendar.google.com/calendar?cid=78ee470673bde329cd200a45b02d68008f5646fbfb4edc03bb0f29b0580438fa@group.calendar.google.com",
+    "realm": [
+      "기술개발",
+      "R&D",
+      "기술"
+    ]
+  },
+  "export": {
+    "calendar_id": "46b3b7b5323913468f65beb9491e9a4d0141fbfb537b32da9b279501ce156e07@group.calendar.google.com",
+    "summary": "✈️ 스케일업 — 수출 공고 D-day",
+    "subscribe_link": "https://calendar.google.com/calendar?cid=46b3b7b5323913468f65beb9491e9a4d0141fbfb537b32da9b279501ce156e07@group.calendar.google.com",
+    "realm": [
+      "수출",
+      "해외진출",
+      "글로벌"
+    ]
+  },
+  "mgmt": {
+    "calendar_id": "7dced9cb12a83cf7adf930db5c5ed6d5a123b83ee98333352d43b4a99a7b41f5@group.calendar.google.com",
+    "summary": "💼 스케일업 — 경영·금융 공고 D-day",
+    "subscribe_link": "https://calendar.google.com/calendar?cid=7dced9cb12a83cf7adf930db5c5ed6d5a123b83ee98333352d43b4a99a7b41f5@group.calendar.google.com",
+    "realm": [
+      "경영",
+      "금융",
+      "창업"
+    ]
+  },
+  "innov": {
+    "calendar_id": "97e3ead7abf26654750dd9d4aec4861e8a7e8ee7cf3aae4564a3831a335c9156@group.calendar.google.com",
+    "summary": "🏆 스케일업 — 혁신제품 공고 D-day",
+    "subscribe_link": "https://calendar.google.com/calendar?cid=97e3ead7abf26654750dd9d4aec4861e8a7e8ee7cf3aae4564a3831a335c9156@group.calendar.google.com",
+    "realm": [
+      "혁신제품",
+      "조달",
+      "G-PASS"
+    ]
+  }
+}
