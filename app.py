@@ -309,22 +309,60 @@ def score_notice(notice, row, already_sent, HIGH, MID):
         if any(kw in text for kw in ['R&D','연구개발','기술개발과제','기초연구','원천기술']):
             return None
 
-    # ── 소재지 필터: 타 지역 공고 감점 ──────────────
+    # ── 소재지 필터: 지역 공고 판단 ─────────────────
     location = str(row.get('소재지',''))
     location_score = 0
     REGIONS = ['서울','부산','대구','인천','광주','대전','울산','세종',
                '경기','강원','충북','충남','전북','전남','경북','경남','제주']
+
+    # 지역 확장 매핑 (광역시도 → 관련 표현)
+    REGION_ALIAS = {
+        '서울': ['서울','수도권'],
+        '경기': ['경기','수도권','경기도'],
+        '인천': ['인천','수도권'],
+        '부산': ['부산','경남'],
+        '대구': ['대구','경북'],
+        '광주': ['광주','전남'],
+        '대전': ['대전','충남','충청'],
+        '울산': ['울산','경남'],
+        '강원': ['강원','강원도'],
+        '충북': ['충북','충청'],
+        '충남': ['충남','충청'],
+        '전북': ['전북','전라'],
+        '전남': ['전남','전라'],
+        '경북': ['경북'],
+        '경남': ['경남'],
+        '제주': ['제주'],
+        '세종': ['세종'],
+    }
+
     if location and location != 'nan':
-        hashtags = str(notice.get('해시태그',''))
-        # 공고에 지역 태그가 있는지 확인 (없으면 전국 공고 → 중립)
-        notice_regions = [r for r in REGIONS if r in hashtags]
+        # 공고 전체 텍스트에서 지역명 검색 (해시태그만 보지 않음)
+        notice_full = " ".join([
+            str(notice.get('공고명','')),
+            str(notice.get('사업개요','')),
+            str(notice.get('지원대상','')),
+            str(notice.get('해시태그','')),
+            str(notice.get('주관기관','')),
+        ])
+
+        # 공고에 지역 제한이 있는지 확인
+        notice_regions = [r for r in REGIONS if r in notice_full]
+
         if notice_regions:
-            # 기업 소재지가 공고 지역 태그에 포함되면 가산
-            matched_region = any(r in location for r in notice_regions)
-            if matched_region:
-                location_score = 2   # 같은 지역 가산
-            else:
-                location_score = -3  # 타 지역 감산 (더 강하게)
+            # 기업 소재지와 일치하는 지역 찾기
+            co_region = next((r for r in REGIONS if r in location), None)
+            if co_region:
+                aliases = REGION_ALIAS.get(co_region, [co_region])
+                matched = any(
+                    any(a in notice_full for a in aliases)
+                    for _ in [1]
+                )
+                if matched:
+                    location_score = 2   # 같은 지역 가산
+                else:
+                    location_score = -3  # 타 지역 감산
+        # 지역 제한 없는 공고 (전국) → 중립 (0점)
 
     # ── 축1: 지원대상 매칭 ────────────────────────────
     matched_target = {}
