@@ -57,7 +57,14 @@ REALM_CODE   = {
     "금융":"01","기술개발":"02","인력":"03","수출":"04",
     "내수":"05","창업":"06","경영":"07","기타":"09",
 }
-TEST_RECIPIENTS = ["fbwlgns819@naver.com","fbwlgns819@kip.re.kr"]
+# 테스트 수신자 — 설정 탭에서 변경 가능 (session_state 우선)
+_DEFAULT_TEST_RECIPIENTS = ["fbwlgns819@naver.com","fbwlgns819@kip.re.kr"]
+
+def get_test_recipients():
+    saved = st.session_state.get('test_recipients_str','')
+    if saved:
+        return [e.strip() for e in saved.split(',') if e.strip()]
+    return _DEFAULT_TEST_RECIPIENTS
 
 # ── 구글 인증 ─────────────────────────────────────────
 @st.cache_resource
@@ -1016,7 +1023,7 @@ elif page == "발송 관리":
                     m = df_c_cur[df_c_cur['기업명']==company]
                     if not m.empty: co_email = m.iloc[0].get('이메일','')
 
-                recipients = TEST_RECIPIENTS if test_mode else ([co_email] if co_email else [])
+                recipients = get_test_recipients() if test_mode else ([co_email] if co_email else [])
                 for to in recipients:
                     msg = MIMEMultipart('alternative')
                     msg['From']    = "onestop.kipcc@gmail.com"
@@ -1172,6 +1179,26 @@ elif page == "설정":
 → `app.py` 수정 후 깃허브 push → Streamlit Cloud 자동 재배포
         """)
 
+    # 테스트 메일 설정
+    st.subheader("📧 테스트 수신 이메일")
+    st.caption("테스트 모드 ON 시 기업 대신 아래 이메일로 발송 — 쉼표로 구분하여 여러 개 입력 가능")
+
+    current_recipients = st.session_state.get(
+        'test_recipients_str',
+        ', '.join(_DEFAULT_TEST_RECIPIENTS)
+    )
+    new_recipients = st.text_input(
+        "테스트 수신 이메일",
+        value=current_recipients,
+        placeholder="email1@example.com, email2@example.com",
+        label_visibility="collapsed"
+    )
+    if st.button("💾 테스트 이메일 저장", key="save_test_email"):
+        st.session_state['test_recipients_str'] = new_recipients
+        parsed = [e.strip() for e in new_recipients.split(',') if e.strip()]
+        st.success(f"저장 완료 — {len(parsed)}개: {', '.join(parsed)}")
+
+    st.divider()
     st.subheader("🔐 인증 상태")
     if 'google' in st.secrets: st.success("✅ Streamlit Secrets 인증 설정됨")
     elif os.path.exists('token.json'): st.success("✅ 로컬 token.json 인증 설정됨")
