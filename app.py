@@ -244,25 +244,19 @@ def score_notice(notice, row, already_sent, HIGH, MID):
     # ── 소재지 필터: 타 지역 공고 감점 ──────────────
     location = str(row.get('소재지',''))
     location_score = 0
+    REGIONS = ['서울','부산','대구','인천','광주','대전','울산','세종',
+               '경기','강원','충북','충남','전북','전남','경북','경남','제주']
     if location and location != 'nan':
-        # 광역시도 추출
-        region_map = {
-            '서울':'서울','부산':'부산','대구':'대구','인천':'인천',
-            '광주':'광주','대전':'대전','울산':'울산','세종':'세종',
-            '경기':'경기','강원':'강원','충북':'충북','충남':'충남',
-            '전북':'전북','전남':'전남','경북':'경북','경남':'경남','제주':'제주'
-        }
-        for region, tag in region_map.items():
-            if region in location:
-                hashtags = str(notice.get('해시태그',''))
-                # 지역 태그가 아예 없으면 중립 (전국 공고)
-                has_any_region = any(r in hashtags for r in region_map.values())
-                if has_any_region:
-                    if tag in hashtags:
-                        location_score = 2   # 같은 지역 가산
-                    else:
-                        location_score = -2  # 다른 지역 감산
-                break
+        hashtags = str(notice.get('해시태그',''))
+        # 공고에 지역 태그가 있는지 확인 (없으면 전국 공고 → 중립)
+        notice_regions = [r for r in REGIONS if r in hashtags]
+        if notice_regions:
+            # 기업 소재지가 공고 지역 태그에 포함되면 가산
+            matched_region = any(r in location for r in notice_regions)
+            if matched_region:
+                location_score = 2   # 같은 지역 가산
+            else:
+                location_score = -3  # 타 지역 감산 (더 강하게)
 
     # ── 축1: 지원대상 매칭 ────────────────────────────
     matched_target = {}
@@ -296,31 +290,50 @@ def score_notice(notice, row, already_sent, HIGH, MID):
     has_overseas      = '해외진출'     in matched_type
     has_tech          = '기술개발'     in matched_type
 
-    # ★★★: 혁신기업 특화 + 조달/해외 → 직접 연계
-    if has_innov_target and (has_procurement or has_overseas):
+    # 기업 키워드(기술키워드+제품분야+핵심수요태그) 공고 매칭 여부
+    has_co_match = bool(matched_co or matched_demand)
+
+    # ── 역매칭 체크: 공고에 특정 업종 키워드가 있는데
+    #    기업 키워드와 전혀 겹치지 않으면 업종 불일치로 판단
+    INDUSTRY_SPECIFIC = [
+        '농식품','농업','식품','농산물','수산','임업',
+        '의료','바이오','제약','화장품','뷰티',
+        '건설','건축','토목','부동산',
+        '관광','숙박','외식','요식',
+        '섬유','패션','의류',
+    ]
+    industry_mismatch = False
+    for ind_kw in INDUSTRY_SPECIFIC:
+        if ind_kw in text and not any(ind_kw in kw or kw in ind_kw
+                                      for kw in co_kws + demand_tags):
+            industry_mismatch = True
+            break
+
+    # 업종 불일치면 바로 제외
+    if industry_mismatch:
+        return None
+
+    # ★★★: 혁신기업 특화 + 조달/해외 + 기업 키워드 매칭
+    if has_innov_target and (has_procurement or has_overseas) and has_co_match:
         stars = "★★★"
-    # ★★★: 혁신기업 특화 단독 (조달청 공고 등)
+    # ★★★: 혁신기업 특화 + 조달 (기업 키워드 없어도 조달청은 혁신기업 전체 대상)
     elif has_innov_target and has_procurement:
         stars = "★★★"
-    # ★★: 수출기업 특화 + 해외진출
+    # ★★: 수출기업 특화 + 해외진출 + 기업 키워드
+    elif has_export_target and has_overseas and has_co_match:
+        stars = "★★"
+    # ★★: 수출기업 특화 + 해외진출 (키워드 없어도 수출기업 전체 대상)
     elif has_export_target and has_overseas:
         stars = "★★"
     # ★★: 혁신기업 특화 + 기술개발
     elif has_innov_target and has_tech:
         stars = "★★"
-    # ★★: 기업 키워드 직접 매칭
-    elif matched_co and (matched_target or matched_type):
-        stars = "★★"
-    # ★★: 해외진출 + 기업 키워드
-    elif has_overseas and matched_co:
+    # ★★: 기업 키워드 직접 매칭 + 사업성격 있음
+    elif has_co_match and (matched_target or matched_type):
         stars = "★★"
     # 매칭 없음
     else:
-        if not (matched_target or matched_type or matched_co):
-            return None
-        # 단독 매칭은 낮은 관련성
-        stars = "★★" if (matched_type or matched_co) else None
-        if not stars: return None
+        return None
 
     # ── 점수 계산 (정렬용) ────────────────────────────
     score = (
@@ -734,13 +747,15 @@ elif page == "기업 관리":
             with st.expander(f"{icon} **{row.get('기업명','')}**  |  {row.get('사업자등록번호','')}  |  {row.get('관심사업분야','')}"):
                 c1,c2 = st.columns(2)
                 with c1:
+                    st.markdown(f"**소재지:** {row.get('소재지','')}")
                     st.markdown(f"**이메일:** {row.get('이메일','')}")
                     st.markdown(f"**관심분야:** {row.get('관심사업분야','')}")
                     st.markdown(f"**수출:** {row.get('수출실적','')} / {row.get('수출국가','')}")
-                    st.markdown(f"**구글계정:** {row.get('구글계정','')}")
+                    st.markdown(f"**TRL단계:** {row.get('TRL단계','')}")
                 with c2:
                     st.markdown(f"**제품분야:** {row.get('제품분야','')}")
                     st.markdown(f"**기술키워드:** {row.get('기술키워드','')}")
+                    st.markdown(f"**핵심수요태그:** {row.get('핵심수요태그','')}")
                     st.markdown(f"**사업자번호:** {row.get('사업자등록번호','')}")
 
                 extra_kw = st.text_input("키워드 보완", value=row.get('키워드보완',''),
