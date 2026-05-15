@@ -312,20 +312,21 @@ def score_notice(notice, row, already_sent, HIGH, MID):
     # ── 소재지 필터: 지역 공고 판단 ─────────────────
     location = str(row.get('소재지',''))
     location_score = 0
+    notice_region_tag = ''   # 공고에서 감지된 지역명 (검토 화면 표시용)
+
     REGIONS = ['서울','부산','대구','인천','광주','대전','울산','세종',
                '경기','강원','충북','충남','전북','전남','경북','경남','제주']
-
-    # 지역 확장 매핑 (광역시도 → 관련 표현)
     REGION_ALIAS = {
         '서울': ['서울','수도권'],
-        '경기': ['경기','수도권','경기도'],
+        '경기': ['경기','수도권'],
         '인천': ['인천','수도권'],
-        '부산': ['부산','경남'],
-        '대구': ['대구','경북'],
-        '광주': ['광주','전남'],
-        '대전': ['대전','충남','충청'],
-        '울산': ['울산','경남'],
-        '강원': ['강원','강원도'],
+        '부산': ['부산'],
+        '대구': ['대구'],
+        '광주': ['광주'],
+        '대전': ['대전','충청'],
+        '울산': ['울산'],
+        '세종': ['세종'],
+        '강원': ['강원'],
         '충북': ['충북','충청'],
         '충남': ['충남','충청'],
         '전북': ['전북','전라'],
@@ -333,36 +334,46 @@ def score_notice(notice, row, already_sent, HIGH, MID):
         '경북': ['경북'],
         '경남': ['경남'],
         '제주': ['제주'],
-        '세종': ['세종'],
     }
 
     if location and location != 'nan':
-        # 공고 전체 텍스트에서 지역명 검색 (해시태그만 보지 않음)
-        notice_full = " ".join([
-            str(notice.get('공고명','')),
+        notice_name = str(notice.get('공고명',''))
+        notice_full  = " ".join([
+            notice_name,
             str(notice.get('사업개요','')),
             str(notice.get('지원대상','')),
             str(notice.get('해시태그','')),
-            str(notice.get('주관기관','')),
         ])
+        co_region = next((r for r in REGIONS if r in location), None)
 
-        # 공고에 지역 제한이 있는지 확인
-        notice_regions = [r for r in REGIONS if r in notice_full]
-
-        if notice_regions:
-            # 기업 소재지와 일치하는 지역 찾기
-            co_region = next((r for r in REGIONS if r in location), None)
-            if co_region:
-                aliases = REGION_ALIAS.get(co_region, [co_region])
-                matched = any(
-                    any(a in notice_full for a in aliases)
-                    for _ in [1]
-                )
-                if matched:
-                    location_score = 2   # 같은 지역 가산
-                else:
-                    location_score = -3  # 타 지역 감산
-        # 지역 제한 없는 공고 (전국) → 중립 (0점)
+        # ① 공고명 [] 패턴 최우선 (가장 신뢰도 높음)
+        #    예: [경기] 중소기업 수출지원, [서울·경기] 스케일업 지원
+        import re as _re
+        bracket_match = _re.search(r'\[([^\]]+)\]', notice_name)
+        if bracket_match:
+            bracket_text = bracket_match.group(1)
+            bracket_regions = [r for r in REGIONS if r in bracket_text]
+            if bracket_regions:
+                notice_region_tag = f"[{bracket_text}]"
+                if co_region:
+                    aliases = REGION_ALIAS.get(co_region, [co_region])
+                    if any(a in bracket_text for a in aliases):
+                        location_score = 3   # [] 패턴 일치 → 높은 가산
+                    else:
+                        location_score = -5  # [] 패턴 불일치 → 강한 감산
+            # [] 안에 지역명 없으면 공고 유형 태그 → 소재지 무관
+        else:
+            # ② 공고 전체 텍스트에서 지역명 검색
+            notice_regions = [r for r in REGIONS if r in notice_full]
+            if notice_regions:
+                notice_region_tag = ", ".join(notice_regions[:2])
+                if co_region:
+                    aliases = REGION_ALIAS.get(co_region, [co_region])
+                    if any(any(a in notice_full for a in aliases) for _ in [1]):
+                        location_score = 2
+                    else:
+                        location_score = -3
+        # 지역 제한 없는 공고 → 중립 (0점)
 
     # ── 축1: 지원대상 매칭 ────────────────────────────
     matched_target = {}
@@ -473,6 +484,7 @@ def score_notice(notice, row, already_sent, HIGH, MID):
         "기업키워드매칭": ", ".join(matched_co),
         "핵심수요매칭": ", ".join(matched_demand),
         "소재지점수":   location_score,
+        "공고지역":     notice_region_tag,
         "매칭근거":     _build_reason(stars, matched_target, matched_type, matched_co, matched_demand, location_score),
         "공고링크":     notice.get('공고링크',''),
         "담당자검토":   "",
@@ -1082,9 +1094,14 @@ elif page == "매칭 결과":
                 # 매칭 근거 한 줄 표시
                 reason = row.get('매칭근거','')
 
+                loc_icon = ""
+                if row.get('공고지역',''):
+                    _ls = str(row.get('소재지점수','0'))
+                    _lv = int(_ls) if _ls.lstrip('-').isdigit() else 0
+                    loc_icon = " ✅" if _lv > 0 else (" ⚠️" if _lv < 0 else "")
                 with st.expander(
                     f"{icon} **{row['기업명']}**  |  {row.get('관련도','')}  |  "
-                    f"{row.get('공고명','')[:30]}  |  {reason[:25]}"
+                    f"{row.get('공고명','')[:28]}{loc_icon}  |  {reason[:22]}"
                 ):
                     # ── 상단: 기업 vs 공고 나란히 ──────────────
                     left, right = st.columns(2)
