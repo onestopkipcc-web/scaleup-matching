@@ -90,11 +90,15 @@ def get_test_recipients():
     return _DEFAULT_TEST_RECIPIENTS
 
 # ── 구글 인증 ─────────────────────────────────────────
-@st.cache_resource
 def get_services():
     from google.oauth2.credentials import Credentials
     from google.auth.transport.requests import Request
     from googleapiclient.discovery import build
+
+    # session_state에 캐싱 (cache_resource 대신 — C레벨 리소스 충돌 방지)
+    if 'google_services' in st.session_state:
+        return st.session_state['google_services']
+
     SCOPES = [
         'https://www.googleapis.com/auth/gmail.send',
         'https://www.googleapis.com/auth/calendar',
@@ -109,9 +113,12 @@ def get_services():
         st.error("인증 파일 없음"); st.stop()
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
-    return (build('gmail','v1',credentials=creds),
-            build('calendar','v3',credentials=creds),
-            build('drive','v3',credentials=creds))
+
+    services = (build('gmail','v1',credentials=creds),
+                build('calendar','v3',credentials=creds),
+                build('drive','v3',credentials=creds))
+    st.session_state['google_services'] = services
+    return services
 
 # ── 드라이브 유틸 ─────────────────────────────────────
 def drive_file_id(drive, filename):
