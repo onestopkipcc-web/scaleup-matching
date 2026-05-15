@@ -91,15 +91,19 @@ def get_test_recipients():
     return _DEFAULT_TEST_RECIPIENTS
 
 # ── 구글 인증 ─────────────────────────────────────────
+# ── 구글 인증 (requests 기반, httplib2 미사용) ──────────
 def get_creds():
-    """인증 정보만 반환 (서비스 객체 생성 없음)"""
     from google.oauth2.credentials import Credentials
-    from google.auth.transport.requests import Request
+    from google.auth.transport.requests import Request as GRequest
     SCOPES = [
         'https://www.googleapis.com/auth/gmail.send',
         'https://www.googleapis.com/auth/calendar',
         'https://www.googleapis.com/auth/drive',
     ]
+    if 'g_creds' in st.session_state:
+        creds = st.session_state['g_creds']
+        if creds and not creds.expired:
+            return creds
     if 'google' in st.secrets:
         creds = Credentials.from_authorized_user_info(
             json.loads(st.secrets['google']['token']), SCOPES)
@@ -107,29 +111,89 @@ def get_creds():
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     else:
         return None
-    if creds.expired and creds.refresh_token:
-        try: creds.refresh(Request())
+    if creds and creds.expired and creds.refresh_token:
+        try: creds.refresh(GRequest())
         except: return None
+    st.session_state['g_creds'] = creds
     return creds
 
-def get_services():
-    """필요할 때만 서비스 객체 생성"""
-    from googleapiclient.discovery import build
-    if 'google_services' in st.session_state:
-        return st.session_state['google_services']
+def gapi(method, url, **kwargs):
+    """인증된 구글 API 요청 (requests 직접 호출)"""
     creds = get_creds()
     if not creds:
-        st.error("인증 파일 없음"); st.stop()
-    try:
-        services = (
-            build('gmail',    'v1', credentials=creds),
-            build('calendar', 'v3', credentials=creds),
-            build('drive',    'v3', credentials=creds),
-        )
-        st.session_state['google_services'] = services
-        return services
-    except Exception as e:
-        st.error(f"구글 서비스 초기화 오류: {e}"); st.stop()
+        raise Exception("인증 실패")
+    headers = kwargs.pop('headers', {})
+    headers['Authorization'] = f'Bearer {creds.token}'
+    return requests.request(method, url, headers=headers, **kwargs)
+
+# ── gmail API (requests 기반) ──────────────────────────
+def gmail_send(raw_b64):
+    resp = gapi('POST',
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+        json={'raw': raw_b64})
+    resp.raise_for_status()
+    return resp.json()
+
+# ── calendar API (requests 기반) ───────────────────────
+def cal_list_events(cal_id, private_prop=None):
+    params = {'maxResults': 10}
+    if private_prop:
+        params['privateExtendedProperty'] = private_prop
+    resp = gapi('GET',
+        f'https://www.googleapis.com/calendar/v3/calendars/{cal_id}/events',
+        params=params)
+    return resp.json() if resp.ok else {'items': []}
+
+def cal_insert_event(cal_id, body):
+    resp = gapi('POST',
+        f'https://www.googleapis.com/calendar/v3/calendars/{cal_id}/events',
+        json=body)
+    return resp.json() if resp.ok else {}
+
+# ── drive API (requests 기반) ──────────────────────────
+def drive_list_files(name, folder_id):
+    params = {
+        'q': f"name='{name}' and '{folder_id}' in parents and trashed=false",
+        'fields': 'files(id,name)',
+        'orderBy': 'modifiedTime desc',
+    }
+    resp = gapi('GET', 'https://www.googleapis.com/drive/v3/files', params=params)
+    return resp.json().get('files', []) if resp.ok else []
+
+def drive_download_file(file_id):
+    resp = gapi('GET',
+        f'https://www.googleapis.com/drive/v3/files/{file_id}',
+        params={'alt': 'media'})
+    return resp.content if resp.ok else None
+
+def drive_upload_file(name, folder_id, content_bytes, mime, file_id=None):
+    meta = json.dumps({"name": name, "parents": [folder_id]}).encode()
+    bnd  = b"----MIMEBoundary"
+    crlf = b"\r\n"
+    body = b"--" + bnd + crlf
+    body += b"Content-Type: application/json; charset=UTF-8" + crlf + crlf
+    body += meta + crlf
+    body += b"--" + bnd + crlf
+    body += b"Content-Type: " + mime.encode() + crlf + crlf
+    body += content_bytes + crlf
+    body += b"--" + bnd + b"--"
+    ct = "multipart/related; boundary=----MIMEBoundary"
+    if file_id:
+        resp = gapi("PATCH",
+            f"https://www.googleapis.com/upload/drive/v3/files/{file_id}",
+            params={"uploadType": "multipart"},
+            data=body, headers={"Content-Type": ct})
+    else:
+        resp = gapi("POST",
+            "https://www.googleapis.com/upload/drive/v3/files",
+            params={"uploadType": "multipart"},
+            data=body, headers={"Content-Type": ct})
+    return resp.ok
+
+def get_services(): return None, None, None
+def _get_drive():   return 'drive'
+def _get_gmail():   return 'gmail'
+def _get_cal():     return 'cal' 
 
 # ── 드라이브 유틸 ─────────────────────────────────────
 def drive_file_id(drive, filename):
@@ -143,10 +207,8 @@ def drive_file_id(drive, filename):
     except: return None
 
 def drive_download(drive, filename):
-    try:
-        fid = drive_file_id(drive, filename)
-        return drive.files().get_media(fileId=fid).execute() if fid else None
-    except: return None
+    fid = drive_file_id(drive, filename)
+    return drive_download_file(fid) if fid else None
 
 def drive_upload(drive, filename, content_bytes, mime):
     from googleapiclient.http import MediaIoBaseUpload
@@ -1102,8 +1164,6 @@ elif page == "매칭 결과":
 # ══════════════════════════════════════════════════════
 elif page == "발송 관리":
     drive = _get_drive()
-    gmail = _get_gmail()
-    cal   = _get_cal()
     st.title("발송 관리")
     info_box("발송 관리",
         """
@@ -1386,8 +1446,7 @@ elif page == "발송 관리":
                     msg['To']      = to
                     msg['Subject'] = f"[원스톱 스케일업] 맞춤 지원공고 {len(notices)}건 안내 — {company}"
                     msg.attach(MIMEText(html,'html','utf-8'))
-                    gmail.users().messages().send(userId='me',
-                        body={'raw':base64.urlsafe_b64encode(msg.as_bytes()).decode()}).execute()
+                    gmail_send(base64.urlsafe_b64encode(msg.as_bytes()).decode())
 
                 for n in notices:
                     dl  = parse_deadline(n.get('접수기간','')); pid = n.get('공고ID','')
@@ -1398,17 +1457,17 @@ elif page == "발송 관리":
                         cids.append(ind_cals[company]['calendar_id'])
                     for cid in cids:
                         try:
-                            if cal.events().list(calendarId=cid, privateExtendedProperty=f"pblancId={pid}").execute().get('items'): continue
+                            if cal_list_events(cid, f"pblancId={pid}").get('items'): continue
                         except: pass
                         for days,label in [(0,"마감"),(7,"D-7"),(3,"D-3")]:
                             d = (dl-timedelta(days=days)).strftime('%Y-%m-%d')
-                            cal.events().insert(calendarId=cid, body={
+                            cal_insert_event(cid, {
                                 'summary':f"[{label}] {n.get('공고명','')}",
                                 'description':desc,
                                 'start':{'date':d,'timeZone':'Asia/Seoul'},
                                 'end':  {'date':d,'timeZone':'Asia/Seoul'},
                                 'extendedProperties':{'private':{'pblancId':pid}},
-                            }).execute()
+                            })
 
                 for n in notices:
                     history_records.append({"기업명":company,"pblancId":n.get('공고ID',''),
