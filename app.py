@@ -9,11 +9,40 @@ import re, os, json, io
 from datetime import datetime, timedelta
 
 st.set_page_config(
-    page_title="원스톱 스케일업",
+    page_title="원스톱 스케일업_UJH",
     page_icon="📢",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ── 비밀번호 인증 ─────────────────────────────────────
+def check_password():
+    """비밀번호 확인 — Secrets의 password 값과 비교"""
+    if st.session_state.get("authenticated"):
+        return True
+
+    st.markdown("""
+    <div style="max-width:400px;margin:80px auto;text-align:center">
+      <h2 style="color:#1F4E79">📢 원스톱 스케일업</h2>
+      <p style="color:#666;margin-bottom:24px">혁신제품지원센터 공고 매칭 시스템</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col1,col2,col3 = st.columns([1,2,1])
+    with col2:
+        pw = st.text_input("비밀번호", type="password", placeholder="비밀번호를 입력하세요")
+        if st.button("로그인", use_container_width=True, type="primary"):
+            correct = st.secrets.get("password", "scaleup2026")
+            if pw == correct:
+                st.session_state["authenticated"] = True
+                st.rerun()
+            else:
+                st.error("비밀번호가 틀렸습니다.")
+    return False
+
+if not check_password():
+    st.stop()
+
 
 # ── 상수 ──────────────────────────────────────────────
 DRIVE_FOLDER_ID = "1iWGYjaoslqST45ggDlg-IPMLaUHCYmV_"
