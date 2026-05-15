@@ -1340,8 +1340,7 @@ elif page == "설정":
             }
             st.markdown(f"**{label_map.get(cat, cat)}**")
             t_inputs[cat] = st.text_area(
-                "", value="
-".join(kws), height=100,
+                "", value="\n".join(kws), height=100,
                 key=f"tkw_{cat}", label_visibility="collapsed"
             )
 
@@ -1359,18 +1358,15 @@ elif page == "설정":
             }
             st.markdown(f"**{label_map.get(cat, cat)}**")
             ty_inputs[cat] = st.text_area(
-                "", value="
-".join(kws), height=80,
+                "", value="\n".join(kws), height=80,
                 key=f"tykw_{cat}", label_visibility="collapsed"
             )
 
     st.caption("💡 별점 판정 기준: 혁신기업특화 + 조달/해외진출 → ★★★ / 그 외 조합 → ★★")
     if st.button("💾 키워드 저장 → 드라이브", type="primary"):
-        new_target = {cat: [k.strip() for k in v.split("
-") if k.strip()]
+        new_target = {cat: [k.strip() for k in v.split("\n") if k.strip()]
                       for cat, v in t_inputs.items()}
-        new_type   = {cat: [k.strip() for k in v.split("
-") if k.strip()]
+        new_type   = {cat: [k.strip() for k in v.split("\n") if k.strip()]
                       for cat, v in ty_inputs.items()}
         save_data  = {
             "TARGET_KW": new_target,
