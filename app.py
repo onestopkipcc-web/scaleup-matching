@@ -419,7 +419,7 @@ elif page == "공고 수집":
 
 **권장 수집 주기** — 주 1회 (매주 월요일)
         """,
-        "수집 분야 변경 → `app.py`의 `REALM_CODES` 리스트 수정")
+        "수집 분야 변경 → 화면의 '수집 분야 선택' 옵션에서 체크박스로 선택")
 
     with st.spinner("드라이브에서 공고 DB 로딩 중..."):
         df_n = load_excel(drive, NOTICES_FILE)
@@ -432,10 +432,39 @@ elif page == "공고 수집":
                   f"{(df_n['마감일']!='').sum()}건" if '마감일' in df_n.columns else "—")
 
     st.divider()
+
+    # 분야 선택 옵션
+    REALM_OPTIONS = {
+        "금융":     "01",
+        "기술개발": "02",
+        "인력":     "03",
+        "수출":     "04",
+        "내수":     "05",
+        "창업":     "06",
+        "경영":     "07",
+        "기타":     "09",
+    }
+
+    with st.expander("⚙️ 수집 분야 선택 (기본: 전체)", expanded=False):
+        st.caption("원칙은 전체 수집 — 특정 분야만 빠르게 확인할 때 선택")
+        col1, col2, col3, col4 = st.columns(4)
+        selected_realms = {}
+        for i, (name, code) in enumerate(REALM_OPTIONS.items()):
+            col = [col1, col2, col3, col4][i % 4]
+            selected_realms[code] = col.checkbox(name, value=True, key=f"realm_{code}")
+
+        selected_codes = [code for code, checked in selected_realms.items() if checked]
+        if not selected_codes:
+            st.warning("최소 1개 이상 선택 필요")
+            selected_codes = list(REALM_OPTIONS.values())
+
+        st.caption(f"선택된 분야: **{len(selected_codes)}개** / {', '.join([k for k,v in REALM_OPTIONS.items() if v in selected_codes])}")
+
     if st.button("🔄 지금 수집 실행", type="primary"):
-        REALM_CODES = ["01","02","03","04","05","06","07","09"]
+        REALM_CODES = selected_codes
         all_items, seen = [], set()
         prog = st.progress(0); log_area = st.empty(); logs = []
+        realm_name_map = {v:k for k,v in REALM_OPTIONS.items()}
 
         for idx, code in enumerate(REALM_CODES):
             params = {"crtfcKey":API_KEY,"dataType":"json","searchCnt":"0","searchLclasId":code}
@@ -444,9 +473,9 @@ elif page == "공고 수집":
                 for item in items:
                     pid = item.get('pblancId','')
                     if pid and pid not in seen: seen.add(pid); all_items.append(item)
-                logs.append(f"✅ 분야코드 {code}: {len(items)}건")
+                logs.append(f"✅ {realm_name_map.get(code, code)}: {len(items)}건")
             except Exception as e:
-                logs.append(f"❌ 분야코드 {code}: {e}")
+                logs.append(f"❌ {realm_name_map.get(code, code)}: {e}")
             prog.progress((idx+1)/len(REALM_CODES)); log_area.code("\n".join(logs))
 
         def to_row(item):
