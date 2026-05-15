@@ -116,7 +116,10 @@ def drive_upload(drive, filename, content_bytes, mime):
 def load_excel(drive, filename):
     content = drive_download(drive, filename)
     if content:
-        try: return pd.read_excel(io.BytesIO(content), dtype=str).fillna("")
+        try:
+            # 선정기업 명단은 1행이 구분행(필수/운영관리)이라 2행을 헤더로 읽음
+            header = 1 if filename == SELECTED_FILE else 0
+            return pd.read_excel(io.BytesIO(content), header=header, dtype=str).fillna("")
         except: return pd.DataFrame()
     return pd.DataFrame()
 
@@ -224,25 +227,87 @@ def info_box(title, desc, how_to=None):
 # ── CSS (툴팁 제거 포함) ──────────────────────────────
 st.markdown("""
 <style>
-[data-testid="stSidebar"] {background:#1A2940;}
+/* ── 전체 배경·텍스트 ── */
+.stApp {background:#0F1923;}
+.stApp, .stApp * {color:#E8EDF2;}
+p, li, span, div, label {color:#E8EDF2 !important;}
+h1, h2, h3 {color:#FFFFFF !important;}
+
+/* ── 사이드바 ── */
+[data-testid="stSidebar"] {background:#0A1628 !important;}
 [data-testid="stSidebar"] * {color:#E8EDF2 !important;}
 [data-testid="stSidebarNav"] {display:none;}
-.stRadio label {color:#E8EDF2 !important;}
-.stButton button {border-radius:6px;}
 
-/* 툴팁·도움말 완전 제거 */
+/* ── 메트릭 ── */
+[data-testid="stMetricLabel"] {color:#A0AEC0 !important;}
+[data-testid="stMetricValue"] {color:#FFFFFF !important; font-weight:700;}
+
+/* ── 버튼 ── */
+.stButton button {
+    border-radius:6px;
+    background:#1F4E79;
+    color:#FFFFFF !important;
+    border:none;
+}
+.stButton button:hover {background:#2E75B6;}
+button[kind="primary"] {background:#4A9EFF !important; color:#0F1923 !important; font-weight:700;}
+button[kind="primary"]:hover {background:#63B3FF !important;}
+
+/* ── 입력창 ── */
+.stTextInput input, .stTextArea textarea {
+    background:#1A2940 !important;
+    color:#E8EDF2 !important;
+    border:1px solid #2D4A6E !important;
+    border-radius:6px;
+}
+.stSelectbox div[data-baseweb="select"] {
+    background:#1A2940 !important;
+    border:1px solid #2D4A6E !important;
+}
+.stSelectbox div[data-baseweb="select"] * {color:#E8EDF2 !important;}
+
+/* ── 슬라이더 ── */
+.stSlider * {color:#E8EDF2 !important;}
+
+/* ── 체크박스 ── */
+.stCheckbox label, .stCheckbox span, .stCheckbox p {color:#E8EDF2 !important;}
+[data-testid="stCheckbox"] label {color:#E8EDF2 !important;}
+
+/* ── 토글 ── */
+.stToggle label {color:#E8EDF2 !important;}
+
+/* ── 탭 ── */
+.stTabs [data-baseweb="tab"] {color:#A0AEC0 !important;}
+.stTabs [aria-selected="true"] {color:#4A9EFF !important; border-bottom:2px solid #4A9EFF;}
+
+/* ── expander ── */
+.streamlit-expanderHeader {color:#E8EDF2 !important; background:#1A2940 !important;}
+.streamlit-expanderContent {background:#131F2E !important;}
+
+/* ── 데이터프레임 ── */
+.stDataFrame {background:#1A2940 !important;}
+.stDataFrame * {color:#E8EDF2 !important;}
+
+/* ── 구분선 ── */
+hr {border-color:#2D4A6E !important;}
+
+/* ── 강조 ── */
+strong {color:#4A9EFF !important;}
+code {color:#63FFA8 !important; background:#1A2940 !important;}
+.stCaption {color:#A0AEC0 !important;}
+
+/* ── 알림 박스 ── */
+.stSuccess {background:#0D2B1A !important; border-left:4px solid #63FFA8 !important;}
+.stWarning {background:#2B1D0A !important; border-left:4px solid #FFC863 !important;}
+.stError   {background:#2B0A0A !important; border-left:4px solid #FF6363 !important;}
+.stInfo    {background:#0A1A2B !important; border-left:4px solid #4A9EFF !important;}
+
+/* ── 툴팁·도움말 완전 제거 ── */
 .stTooltipIcon {display:none !important;}
-[data-testid="stWidgetLabel"] > div:last-child {display:none !important;}
-.tooltip {display:none !important;}
 div[data-testid="stStatusWidget"] {display:none !important;}
 #MainMenu {visibility:hidden;}
-footer {visibility:hidden;}
-header {visibility:hidden;}
-
-/* 체크박스 라벨 색상 강제 지정 */
-.stCheckbox label, .stCheckbox span {color:#E8EDF2 !important;}
-.stCheckbox label p {color:#E8EDF2 !important;}
-[data-testid="stCheckbox"] label {color:#E8EDF2 !important;}
+footer    {visibility:hidden;}
+header    {visibility:hidden;}
 </style>
 """, unsafe_allow_html=True)
 
