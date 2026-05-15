@@ -230,8 +230,10 @@ st.markdown("""
 /* ── 전체 배경·텍스트 ── */
 .stApp {background:#0F1923;}
 .stApp, .stApp * {color:#E8EDF2;}
-p, li, span, div, label {color:#E8EDF2 !important;}
-h1, h2, h3 {color:#FFFFFF !important;}
+p, li, span, div, label {color:#E8EDF2 !important; font-size:14px;}
+h1 {color:#FFFFFF !important; font-size:28px !important; font-weight:700 !important;}
+h2 {color:#FFFFFF !important; font-size:18px !important; font-weight:700 !important;}
+h3 {color:#FFFFFF !important; font-size:16px !important; font-weight:600 !important;}
 
 /* ── 사이드바 ── */
 [data-testid="stSidebar"] {background:#0A1628 !important;}
@@ -239,8 +241,9 @@ h1, h2, h3 {color:#FFFFFF !important;}
 [data-testid="stSidebarNav"] {display:none;}
 
 /* ── 메트릭 ── */
-[data-testid="stMetricLabel"] {color:#A0AEC0 !important;}
-[data-testid="stMetricValue"] {color:#FFFFFF !important; font-weight:700;}
+[data-testid="stMetricLabel"] {color:#A0AEC0 !important; font-size:12px !important;}
+[data-testid="stMetricValue"] {color:#FFFFFF !important; font-weight:700; font-size:24px !important;}
+[data-testid="stMetricDelta"] {font-size:12px !important;}
 
 /* ── 버튼 ── */
 .stButton button {
@@ -248,6 +251,9 @@ h1, h2, h3 {color:#FFFFFF !important;}
     background:#1F4E79;
     color:#FFFFFF !important;
     border:none;
+    font-size:14px !important;
+    font-weight:600 !important;
+    padding:6px 16px !important;
 }
 .stButton button:hover {background:#2E75B6;}
 button[kind="primary"] {background:#4A9EFF !important; color:#0F1923 !important; font-weight:700;}
@@ -293,8 +299,26 @@ hr {border-color:#2D4A6E !important;}
 
 /* ── 강조 ── */
 strong {color:#4A9EFF !important;}
-code {color:#63FFA8 !important; background:#1A2940 !important;}
-.stCaption {color:#A0AEC0 !important;}
+code {color:#63FFA8 !important; background:#1A2940 !important; font-size:13px !important;}
+.stCaption, [data-testid="stCaptionContainer"] {color:#A0AEC0 !important; font-size:12px !important;}
+
+/* ── 폰트 크기 통일 ── */
+.stTextInput input    {font-size:14px !important;}
+.stTextArea textarea  {font-size:14px !important;}
+.stSelectbox *        {font-size:14px !important;}
+.stMultiSelect *      {font-size:14px !important;}
+.stSlider *           {font-size:13px !important;}
+.stRadio label        {font-size:14px !important;}
+.stCheckbox label     {font-size:14px !important;}
+.stExpander summary   {font-size:14px !important;}
+.stTabs [data-baseweb="tab"] {font-size:14px !important;}
+.stDataFrame          {font-size:13px !important;}
+[data-testid="stSidebar"] .stRadio label {font-size:14px !important;}
+
+/* ── info_box 안내 텍스트 ── */
+.streamlit-expanderContent p  {font-size:13px !important; line-height:1.7;}
+.streamlit-expanderContent li {font-size:13px !important; line-height:1.7;}
+.streamlit-expanderHeader p   {font-size:13px !important;}
 
 /* ── 알림 박스 ── */
 .stSuccess {background:#0D2B1A !important; border-left:4px solid #63FFA8 !important;}
@@ -382,6 +406,166 @@ if page == "대시보드":
     }.items()):
         fid = drive_file_id(drive, fname)
         col.metric(label, "✅" if fid else "❌")
+
+    # ── 차트 섹션 ──────────────────────────────────────
+    st.divider()
+    st.subheader("📊 현황 분석")
+
+    tab_c1, tab_c2, tab_c3, tab_c4 = st.tabs([
+        "분야별 공고", "기업 관심분야", "매칭 점수", "발송 추이"
+    ])
+
+    # ① 분야별 공고 현황
+    with tab_c1:
+        if df_n.empty:
+            st.info("공고 수집 후 확인 가능")
+        else:
+            if '분야' in df_n.columns:
+                realm_count = df_n['분야'].value_counts().reset_index()
+                realm_count.columns = ['분야', '공고 수']
+                realm_count = realm_count[realm_count['분야'] != '']
+
+                import altair as alt
+                chart = alt.Chart(realm_count).mark_bar(
+                    cornerRadiusTopLeft=4,
+                    cornerRadiusTopRight=4,
+                    color='#4A9EFF'
+                ).encode(
+                    x=alt.X('공고 수:Q', title='공고 수'),
+                    y=alt.Y('분야:N', sort='-x', title=''),
+                    tooltip=['분야','공고 수']
+                ).properties(
+                    height=280,
+                    background='transparent'
+                ).configure_axis(
+                    labelColor='#E8EDF2',
+                    titleColor='#A0AEC0',
+                    gridColor='#2D4A6E',
+                ).configure_view(
+                    strokeOpacity=0
+                )
+                st.altair_chart(chart, use_container_width=True)
+                st.caption(f"총 {len(df_n):,}건 / {len(realm_count)}개 분야")
+            else:
+                st.info("분야 컬럼 없음 — 공고 재수집 필요")
+
+    # ② 기업 관심분야 분포
+    with tab_c2:
+        if df_c.empty:
+            st.info("선정기업 명단 업로드 후 확인 가능")
+        else:
+            if '관심사업분야' in df_c.columns:
+                # 관심분야 파싱 (쉼표 구분)
+                all_interests = []
+                for val in df_c['관심사업분야']:
+                    for item in str(val).split(','):
+                        item = item.strip()
+                        if item and item != 'nan':
+                            all_interests.append(item)
+
+                import pandas as pd2
+                interest_count = pd2.Series(all_interests).value_counts().reset_index()
+                interest_count.columns = ['관심분야', '기업 수']
+
+                import altair as alt
+                chart2 = alt.Chart(interest_count).mark_arc(
+                    innerRadius=60
+                ).encode(
+                    theta=alt.Theta('기업 수:Q'),
+                    color=alt.Color('관심분야:N',
+                        scale=alt.Scale(scheme='blues'),
+                        legend=alt.Legend(labelColor='#E8EDF2', titleColor='#A0AEC0')),
+                    tooltip=['관심분야','기업 수']
+                ).properties(
+                    height=280,
+                    background='transparent'
+                ).configure_view(strokeOpacity=0)
+                st.altair_chart(chart2, use_container_width=True)
+
+                # 상세 테이블
+                st.dataframe(interest_count, use_container_width=True, hide_index=True)
+            else:
+                st.info("관심사업분야 컬럼 없음")
+
+    # ③ 매칭 점수 분포
+    with tab_c3:
+        results = st.session_state.get('match_results', [])
+        if not results:
+            st.info("매칭 실행 후 확인 가능")
+        else:
+            import pandas as pd2
+            df_r = pd2.DataFrame(results)
+
+            # 별점 분포 도넛
+            if '관련도' in df_r.columns:
+                star_count = df_r['관련도'].value_counts().reset_index()
+                star_count.columns = ['관련도', '건수']
+
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    import altair as alt
+                    colors = {'★★★':'#FFC863','★★':'#63FFA8'}
+                    chart3 = alt.Chart(star_count).mark_arc(innerRadius=50).encode(
+                        theta=alt.Theta('건수:Q'),
+                        color=alt.Color('관련도:N',
+                            scale=alt.Scale(
+                                domain=list(colors.keys()),
+                                range=list(colors.values())),
+                            legend=alt.Legend(labelColor='#E8EDF2')),
+                        tooltip=['관련도','건수']
+                    ).properties(height=220, background='transparent').configure_view(strokeOpacity=0)
+                    st.altair_chart(chart3, use_container_width=True)
+
+                with col_b:
+                    total_r = len(df_r)
+                    for _, row in star_count.iterrows():
+                        pct = row['건수']/total_r*100
+                        st.metric(row['관련도'], f"{row['건수']}건", f"{pct:.1f}%")
+
+            # 기업별 매칭 건수
+            if '기업명' in df_r.columns:
+                st.divider()
+                co_count = df_r.groupby('기업명').size().reset_index(name='매칭 건수')
+                co_count = co_count.sort_values('매칭 건수', ascending=False)
+                st.dataframe(co_count, use_container_width=True, hide_index=True)
+
+    # ④ 발송 추이
+    with tab_c4:
+        if df_h.empty:
+            st.info("발송 이력 쌓이면 확인 가능")
+        else:
+            import pandas as pd2, altair as alt
+
+            if '발송일' in df_h.columns:
+                df_h2 = df_h.copy()
+                df_h2['발송일'] = pd2.to_datetime(df_h2['발송일'], errors='coerce')
+                df_h2['월'] = df_h2['발송일'].dt.to_period('M').astype(str)
+                monthly = df_h2.groupby('월').size().reset_index(name='발송 건수')
+
+                chart4 = alt.Chart(monthly).mark_line(
+                    point=alt.OverlayMarkDef(color='#4A9EFF', size=80),
+                    color='#4A9EFF',
+                    strokeWidth=2
+                ).encode(
+                    x=alt.X('월:O', title='', axis=alt.Axis(labelColor='#E8EDF2')),
+                    y=alt.Y('발송 건수:Q', title='발송 건수',
+                            axis=alt.Axis(labelColor='#E8EDF2', gridColor='#2D4A6E')),
+                    tooltip=['월','발송 건수']
+                ).properties(height=220, background='transparent').configure_view(strokeOpacity=0)
+                st.altair_chart(chart4, use_container_width=True)
+
+            # 신청·선정 현황
+            if '신청여부' in df_h.columns and '선정결과' in df_h.columns:
+                st.divider()
+                c1,c2,c3 = st.columns(3)
+                total_h  = len(df_h)
+                applied  = (df_h['신청여부']=='Y').sum()
+                selected = (df_h['선정결과']=='선정').sum()
+                c1.metric("총 발송", f"{total_h}건")
+                c2.metric("신청 건", f"{applied}건",
+                          f"{applied/total_h*100:.1f}%" if total_h else "")
+                c3.metric("선정 건", f"{selected}건",
+                          f"{selected/applied*100:.1f}%" if applied else "")
 
 
 # ══════════════════════════════════════════════════════
