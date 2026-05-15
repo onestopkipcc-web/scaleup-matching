@@ -238,6 +238,11 @@ div[data-testid="stStatusWidget"] {display:none !important;}
 #MainMenu {visibility:hidden;}
 footer {visibility:hidden;}
 header {visibility:hidden;}
+
+/* 체크박스 라벨 색상 강제 지정 */
+.stCheckbox label, .stCheckbox span {color:#E8EDF2 !important;}
+.stCheckbox label p {color:#E8EDF2 !important;}
+[data-testid="stCheckbox"] label {color:#E8EDF2 !important;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -367,13 +372,19 @@ elif page == "기업 관리":
                 if save_excel(drive, df_new, SELECTED_FILE, "선정기업명단", "1F4E79"):
                     st.success("교체 완료!"); st.rerun()
 
+        # 컬럼명 확인 및 안내
+        if '기업명' not in df_c.columns:
+            st.error(f"'기업명' 컬럼을 찾을 수 없음 — 현재 컬럼: {', '.join(df_c.columns.tolist())}")
+            st.info("선정기업_명단.xlsx의 첫 번째 컬럼명이 '기업명'인지 확인하세요.")
+            st.stop()
+
         search = st.text_input("🔍 기업명 검색")
-        df_show = df_c[df_c['기업명'].str.contains(search)] if search else df_c
+        df_show = df_c[df_c['기업명'].str.contains(search, na=False)] if search else df_c
 
         for idx, row in df_show.iterrows():
-            unsub = row.get('수신거부','') == 'Y'
+            unsub = str(row.get('수신거부','')) == 'Y'
             icon  = "🚫" if unsub else "🏢"
-            with st.expander(f"{icon} **{row['기업명']}**  |  {row.get('사업자등록번호','')}  |  {row.get('관심사업분야','')}"):
+            with st.expander(f"{icon} **{row.get('기업명','')}**  |  {row.get('사업자등록번호','')}  |  {row.get('관심사업분야','')}"):
                 c1,c2 = st.columns(2)
                 with c1:
                     st.markdown(f"**이메일:** {row.get('이메일','')}")
