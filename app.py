@@ -1107,7 +1107,6 @@ elif page == "매칭 결과":
                     left, right = st.columns(2)
                     with left:
                         st.markdown("**🏢 기업 정보**")
-                        # 선정기업 DB에서 기업 정보 조회
                         co_info = {}
                         if 'df_companies_cache' in st.session_state:
                             df_co = st.session_state['df_companies_cache']
@@ -1115,15 +1114,46 @@ elif page == "매칭 결과":
                             if not co_rows.empty:
                                 co_info = co_rows.iloc[0].to_dict()
 
-                        st.markdown(f"- **관심분야:** {co_info.get('관심사업분야', '—')}")
+                        # 소재지 + 공고 지역 비교
+                        co_loc      = co_info.get('소재지','—')
+                        notice_loc  = row.get('공고지역','')
+                        loc_score   = int(str(row.get('소재지점수','0')).strip()) if str(row.get('소재지점수','0')).lstrip('-').strip().isdigit() else 0
+
+                        if notice_loc:
+                            if loc_score > 0:
+                                loc_tag = "🟢 일치"
+                            elif loc_score < 0:
+                                loc_tag = "🔴 불일치"
+                            else:
+                                loc_tag = ""
+                            st.markdown(f"- **소재지:** {co_loc} &nbsp; {loc_tag}")
+                        else:
+                            st.markdown(f"- **소재지:** {co_loc}")
+
+                        st.markdown(f"- **관심분야:** {co_info.get('관심사업분야','—')}")
                         st.markdown(f"- **기술키워드:** {co_info.get('기술키워드','—')}")
                         st.markdown(f"- **제품분야:** {co_info.get('제품분야','—')}")
                         st.markdown(f"- **수출실적:** {co_info.get('수출실적','—')} / {co_info.get('수출국가','—')}")
+                        if co_info.get('TRL단계'):
+                            st.markdown(f"- **TRL:** {co_info.get('TRL단계')}")
+                        if co_info.get('핵심수요태그'):
+                            st.markdown(f"- **핵심수요:** {co_info.get('핵심수요태그')}")
                         if co_info.get('키워드보완'):
                             st.markdown(f"- **보완키워드:** {co_info.get('키워드보완')}")
 
                     with right:
                         st.markdown("**📋 공고 정보**")
+                        # 공고 지역 + 기업 소재지 비교
+                        if notice_loc:
+                            if loc_score > 0:
+                                region_tag = f"🟢 `{notice_loc}` (귀사 소재지 포함)"
+                            elif loc_score < 0:
+                                region_tag = f"🔴 `{notice_loc}` (귀사 소재지 미포함)"
+                            else:
+                                region_tag = f"`{notice_loc}`"
+                            st.markdown(f"- **지역제한:** {region_tag}")
+                        else:
+                            st.markdown(f"- **지역제한:** 전국 공고")
                         st.markdown(f"- **주관기관:** {row.get('주관기관','—')}")
                         st.markdown(f"- **지원대상:** {row.get('지원대상','—')}")
                         st.markdown(f"- **접수기간:** {row.get('접수기간','—')}")
