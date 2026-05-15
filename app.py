@@ -1575,7 +1575,7 @@ elif page == "설정":
             }
             st.markdown(f"**{label_map.get(cat, cat)}**")
             t_inputs[cat] = st.text_area(
-                "", value="\n".join(kws), height=100,
+                f"{cat} 키워드", value="\n".join(kws), height=100,
                 key=f"tkw_{cat}", label_visibility="collapsed"
             )
 
@@ -1593,7 +1593,7 @@ elif page == "설정":
             }
             st.markdown(f"**{label_map.get(cat, cat)}**")
             ty_inputs[cat] = st.text_area(
-                "", value="\n".join(kws), height=80,
+                f"{cat} 키워드", value="\n".join(kws), height=80,
                 key=f"tykw_{cat}", label_visibility="collapsed"
             )
 
