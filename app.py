@@ -124,9 +124,12 @@ def load_excel(drive, filename):
     content = drive_download(drive, filename)
     if content:
         try:
-            # 선정기업 명단은 1행이 구분행(필수/운영관리)이라 2행을 헤더로 읽음
-            header = 1 if filename == SELECTED_FILE else 0
-            return pd.read_excel(io.BytesIO(content), header=header, dtype=str).fillna("")
+            df = pd.read_excel(io.BytesIO(content), dtype=str).fillna("")
+            # 선정기업 명단인데 '기업명' 컬럼이 없으면
+            # 1행이 필수/운영관리 구분행 → header=1로 재시도
+            if filename == SELECTED_FILE and '기업명' not in df.columns:
+                df = pd.read_excel(io.BytesIO(content), header=1, dtype=str).fillna("")
+            return df
         except: return pd.DataFrame()
     return pd.DataFrame()
 
