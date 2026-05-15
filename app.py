@@ -844,17 +844,45 @@ elif page == "매칭 결과":
             rj = sum(1 for v in st.session_state['review_state'].values() if v=="✕")
             st.caption(f"총 {len(filtered)}건  |  ✅ 승인 {ap}건  |  ❌ 제외 {rj}건")
             st.divider()
+            # 마감일 직접 입력 상태 초기화
+            if 'custom_deadline' not in st.session_state:
+                st.session_state['custom_deadline'] = {}
+
             for i,(idx,row) in enumerate(filtered.iterrows()):
-                key     = f"{row['기업명']}_{row.get('공고ID','')}"
-                current = st.session_state['review_state'].get(key,"")
-                icon    = "🟡" if not current else ("✅" if current=="○" else "❌")
+                key      = f"{row['기업명']}_{row.get('공고ID','')}"
+                current  = st.session_state['review_state'].get(key,"")
+                icon     = "🟡" if not current else ("✅" if current=="○" else "❌")
+                deadline = row.get('마감일','')
+                is_irregular = not deadline or deadline.strip() == ''
+
+                # 비정형 마감일 표시
+                deadline_display = f"⚠️ 비정형 ({row.get('접수기간','확인 필요')})" if is_irregular else deadline
+
                 with st.expander(f"{icon} **{row['기업명']}**  |  {row.get('관련도','')}  |  {row.get('공고명','')[:35]}"):
                     c1,c2 = st.columns([3,1])
                     with c1:
-                        st.markdown(f"**주관기관:** {row.get('주관기관','')}  |  **마감:** {row.get('마감일','')}")
+                        st.markdown(f"**주관기관:** {row.get('주관기관','')}  |  **마감:** {deadline_display}")
                         st.markdown(f"**사업개요:** {row.get('사업개요','')}")
                         st.markdown(f"**매칭키워드:** `{row.get('시스템매칭','')}` / `{row.get('기업키워드매칭','')}`")
                         if row.get('공고링크',''): st.markdown(f"[🔗 공고 원문]({row.get('공고링크','')})")
+
+                        # 비정형 마감일 → 담당자 직접 입력
+                        if is_irregular:
+                            st.caption("📅 공고 원문 확인 후 마감일 직접 입력 (캘린더 등록에 사용)")
+                            custom_dl = st.text_input(
+                                "마감일 직접 입력 (YYYY-MM-DD)",
+                                value=st.session_state['custom_deadline'].get(key,''),
+                                key=f"dl_{key}_{i}",
+                                placeholder="예: 2026-06-30"
+                            )
+                            if custom_dl:
+                                st.session_state['custom_deadline'][key] = custom_dl
+                                # 매칭 결과에도 반영
+                                for r in results:
+                                    if f"{r['기업명']}_{r.get('공고ID','')}" == key:
+                                        r['마감일'] = custom_dl
+                                        break
+
                     with c2:
                         if st.button("○ 승인", key=f"o_{key}_{i}", type="primary"):
                             st.session_state['review_state'][key]="○"; st.rerun()
