@@ -197,29 +197,17 @@ def _get_cal():     return 'cal'
 
 # ── 드라이브 유틸 ─────────────────────────────────────
 def drive_file_id(drive, filename):
-    try:
-        res = drive.files().list(
-            q=f"name='{filename}' and '{DRIVE_FOLDER_ID}' in parents and trashed=false",
-            fields="files(id,name)", orderBy="modifiedTime desc"
-        ).execute()
-        files = res.get('files', [])
-        return files[0]['id'] if files else None
-    except: return None
+    files = drive_list_files(filename, DRIVE_FOLDER_ID)
+    return files[0]['id'] if files else None
 
 def drive_download(drive, filename):
     fid = drive_file_id(drive, filename)
     return drive_download_file(fid) if fid else None
 
 def drive_upload(drive, filename, content_bytes, mime):
-    from googleapiclient.http import MediaIoBaseUpload
     try:
-        fid   = drive_file_id(drive, filename)
-        media = MediaIoBaseUpload(io.BytesIO(content_bytes), mimetype=mime)
-        if fid: drive.files().update(fileId=fid, media_body=media).execute()
-        else:   drive.files().create(
-            body={'name':filename,'parents':[DRIVE_FOLDER_ID]},
-            media_body=media).execute()
-        return True
+        fid = drive_file_id(drive, filename)
+        return drive_upload_file(filename, DRIVE_FOLDER_ID, content_bytes, mime, fid)
     except Exception as e:
         st.warning(f"드라이브 저장 실패 ({filename}): {e}"); return False
 
@@ -615,14 +603,7 @@ with st.sidebar:
     if test_mode: st.warning("테스트 메일 발송")
     else:         st.success("실제 기업 발송")
 
-# 구글 서비스는 각 페이지에서 필요할 때 초기화
-# (상단 초기화 제거 - segfault 방지)
-def _get_drive():
-    _,_,d = get_services(); return d
-def _get_gmail():
-    g,_,_ = get_services(); return g
-def _get_cal():
-    _,c,_ = get_services(); return c
+# 구글 서비스 — 필요할 때 get_creds()로 직접 인증
 
 
 # ══════════════════════════════════════════════════════
