@@ -346,10 +346,11 @@ def score_notice(notice, row, already_sent, HIGH, MID):
         ])
         co_region = next((r for r in REGIONS if r in location), None)
 
-        # ① 공고명 [] 패턴 최우선 (가장 신뢰도 높음)
-        #    예: [경기] 중소기업 수출지원, [서울·경기] 스케일업 지원
         import re as _re
-        bracket_match = _re.search(r'\[([^\]]+)\]', notice_name)
+
+        # ① 공고명 [] 패턴 최우선 (신뢰도 최고)
+        #    예: [경기] 중소기업 수출지원, [서울·경기] 스케일업 지원
+        bracket_match = _re.search('[[]([^]]+)[]]', notice_name)
         if bracket_match:
             bracket_text = bracket_match.group(1)
             bracket_regions = [r for r in REGIONS if r in bracket_text]
@@ -358,21 +359,38 @@ def score_notice(notice, row, already_sent, HIGH, MID):
                 if co_region:
                     aliases = REGION_ALIAS.get(co_region, [co_region])
                     if any(a in bracket_text for a in aliases):
-                        location_score = 3   # [] 패턴 일치 → 높은 가산
+                        location_score = 3   # 일치 → 가산
                     else:
-                        location_score = -5  # [] 패턴 불일치 → 강한 감산
+                        location_score = -5  # 불일치 → 강한 감산
             # [] 안에 지역명 없으면 공고 유형 태그 → 소재지 무관
-        else:
-            # ② 공고 전체 텍스트에서 지역명 검색
-            notice_regions = [r for r in REGIONS if r in notice_full]
-            if notice_regions:
-                notice_region_tag = ", ".join(notice_regions[:2])
-                if co_region:
+
+        # ② 주관기관이 지방자치단체이면 해당 지역 공고
+        #    예: 충청남도, 경기도청, 서울특별시 → 지역 제한
+        elif co_region:
+            organizer = str(notice.get('주관기관',''))
+            org_regions = [r for r in REGIONS if r in organizer]
+            if org_regions:
+                notice_region_tag = f"주관기관({organizer})"
+                aliases = REGION_ALIAS.get(co_region, [co_region])
+                if any(a in organizer for a in aliases):
+                    location_score = 2
+                else:
+                    location_score = -3
+
+        # ③ 사업개요에 "○○ 소재 기업" 명시 패턴
+        #    "전국"이 포함되면 지역 제한 없음으로 처리
+        elif co_region:
+            summary = str(notice.get('사업개요',''))
+            if '전국' not in summary and '전 지역' not in summary:
+                sojaepat = _re.findall(r'([가-힣]{2,4}(?:도|시|군|구))\s*소재', summary)
+                if sojaepat:
+                    notice_region_tag = ", ".join(sojaepat[:2])
                     aliases = REGION_ALIAS.get(co_region, [co_region])
-                    if any(any(a in notice_full for a in aliases) for _ in [1]):
+                    if any(any(a in s for a in aliases) for s in sojaepat):
                         location_score = 2
                     else:
                         location_score = -3
+
         # 지역 제한 없는 공고 → 중립 (0점)
 
     # ── 축1: 지원대상 매칭 ────────────────────────────
