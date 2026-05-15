@@ -652,7 +652,6 @@ code {color:#63FFA8 !important; background:#1A2940 !important; font-size:13px !i
 div[data-testid="stStatusWidget"] {display:none !important;}
 #MainMenu {visibility:hidden;}
 footer    {visibility:hidden;}
-header    {visibility:hidden;}
 </style>
 """, unsafe_allow_html=True)
 
