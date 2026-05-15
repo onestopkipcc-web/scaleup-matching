@@ -1130,32 +1130,55 @@ elif page == "발송 관리":
             for r in approved: grouped.setdefault(r['기업명'],[]).append(r)
 
             for idx,(company,notices) in enumerate(grouped.items()):
-                rows_html=""
-                for i,n in enumerate(notices,1):
-                    is_last = (i == len(notices))
-                    border  = "" if is_last else "border-bottom:1px solid #F0F4F8;"
-                    star    = n.get('관련도','')
-                    star_color = "#D4A017" if star=="★★★" else "#2E75B6"
-                    rows_html += f"""
+                # 별점별 공고 분류
+                notices_sss = [n for n in notices if n.get('관련도','')=='★★★']
+                notices_ss  = [n for n in notices if n.get('관련도','')=='★★']
+
+                def notice_card(n, idx):
+                    star = n.get('관련도','')
+                    return f"""
                     <table width="100%" cellpadding="0" cellspacing="0"
-                           style="margin-bottom:{'0' if is_last else '12px'};{border}padding-bottom:{'0' if is_last else '12px'}">
+                           style="margin-bottom:10px;background:#F8FAFD;border-radius:8px;overflow:hidden;">
                       <tr>
-                        <td width="28" valign="top" style="padding-top:2px;">
-                          <span style="font-size:13px;font-weight:700;color:{star_color};">{i}</span>
-                        </td>
-                        <td>
+                        <td style="padding:14px 16px;">
                           <a href="{n.get('공고링크','#')}"
-                             style="font-size:14px;font-weight:600;color:#1F4E79;text-decoration:none;line-height:1.4;display:block;">
+                             style="font-size:14px;font-weight:700;color:#0F1923;text-decoration:none;line-height:1.5;display:block;">
                             {n.get('공고명','')}
                           </a>
-                          <p style="margin:4px 0 0;font-size:12px;color:#888;">
-                            <span style="color:{star_color};font-weight:700;">{star}</span>
-                            &nbsp;·&nbsp;{n.get('주관기관','')}
-                            &nbsp;·&nbsp;{n.get('접수기간','')}
+                          <p style="margin:5px 0 0;font-size:12px;color:#666;">
+                            {n.get('주관기관','')}
+                            &nbsp;&nbsp;|&nbsp;&nbsp;
+                            마감&nbsp;{n.get('마감일','') or n.get('접수기간','').split('~')[-1].strip() if '~' in n.get('접수기간','') else n.get('접수기간','')}
                           </p>
+                        </td>
+                        <td width="80" align="center" valign="middle"
+                            style="padding:14px 12px;border-left:1px solid #EEF2F7;">
+                          <a href="{n.get('공고링크','#')}"
+                             style="display:inline-block;font-size:12px;font-weight:600;
+                                    color:#1F4E79;text-decoration:none;white-space:nowrap;">
+                            보기 →
+                          </a>
                         </td>
                       </tr>
                     </table>"""
+
+                rows_html = ""
+                if notices_sss:
+                    rows_html += """
+                    <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#B8860B;
+                               letter-spacing:1.5px;text-transform:uppercase;">
+                      ★★★ &nbsp;직접 연계 추천
+                    </p>"""
+                    for i,n in enumerate(notices_sss): rows_html += notice_card(n, i)
+                    rows_html += """<div style="height:16px;"></div>"""
+
+                if notices_ss:
+                    rows_html += """
+                    <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#2E75B6;
+                               letter-spacing:1.5px;text-transform:uppercase;">
+                      ★★ &nbsp;참고 추천
+                    </p>"""
+                    for i,n in enumerate(notices_ss): rows_html += notice_card(n, i)
 
                 ind_link=""
                 if company in ind_cals and ind_cals[company].get('calendar_id'):
@@ -1164,82 +1187,128 @@ elif page == "발송 관리":
                          style="color:#2E75B6;font-size:13px">📅 {company} 전용 캘린더 구독</a></div>"""
 
                 cal_sec=f"""
-                <div style="background:#F0F6FF;border-radius:10px;padding:18px 20px;border-left:3px solid #2E75B6;">
-                  <p style="margin:0 0 6px;color:#1F4E79;font-weight:700;font-size:13px;">📅 마감일 알림 캘린더</p>
-                  <p style="margin:0 0 12px;font-size:12px;color:#666;">공고 마감 D-7, D-3 자동 알림을 받아보세요.</p>
-                  {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#1F4E79;color:#fff;padding:9px 18px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;'>공통 캘린더 구독하기 →</a>" if CALENDAR_LINK else ""}
+                <div style="background:#F0F6FF;border-radius:10px;padding:16px 18px;
+                            border-left:3px solid #2563A8;margin-top:4px;">
+                  <p style="margin:0 0 4px;color:#1F4E79;font-weight:700;font-size:12px;
+                             letter-spacing:1px;text-transform:uppercase;">
+                    📅 마감일 알림 캘린더
+                  </p>
+                  <p style="margin:0 0 10px;font-size:12px;color:#64748B;">
+                    D-7 · D-3 자동 알림을 받아보세요.
+                  </p>
+                  {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#1F4E79;color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600;letter-spacing:0.3px;'>구독하기 →</a>" if CALENDAR_LINK else ""}
                   {ind_link}
                 </div>""" if (CALENDAR_LINK or ind_link) else ""
 
+                today_str = datetime.today().strftime('%Y.%m.%d')
                 html=f"""<!DOCTYPE html>
 <html lang="ko">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#F0F4F8;font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#F0F4F8;padding:32px 0;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background:#EAEEF4;
+             font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#EAEEF4;padding:36px 0;">
 <tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+<table width="580" cellpadding="0" cellspacing="0"
+       style="border-radius:16px;overflow:hidden;
+              box-shadow:0 8px 40px rgba(15,25,35,0.13);">
 
-  <!-- 헤더 -->
+  <!-- ── 다크 헤더 ── -->
   <tr>
-    <td style="background:linear-gradient(135deg,#1F4E79 0%,#2E75B6 100%);padding:32px 36px;">
+    <td style="background:linear-gradient(145deg,#0D2137 0%,#1F4E79 60%,#2563A8 100%);
+               padding:36px 36px 0;">
+
+      <!-- 브랜드 라인 -->
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td>
-            <p style="margin:0 0 4px;color:rgba(255,255,255,0.7);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;">KIPCC · 혁신제품지원센터</p>
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.3px;">원스톱 스케일업 프로그램</h1>
-            <p style="margin:8px 0 0;color:rgba(255,255,255,0.8);font-size:13px;">맞춤형 지원사업 공고 안내</p>
+            <p style="margin:0;font-size:10px;font-weight:600;letter-spacing:2.5px;
+                      color:rgba(255,255,255,0.45);text-transform:uppercase;">
+              KIPCC &nbsp;·&nbsp; 혁신제품지원센터
+            </p>
           </td>
-          <td align="right" valign="middle">
-            <div style="background:rgba(255,255,255,0.15);border-radius:50px;padding:8px 16px;display:inline-block;">
-              <span style="color:#ffffff;font-size:20px;font-weight:700;">{len(notices)}</span>
-              <span style="color:rgba(255,255,255,0.8);font-size:12px;margin-left:2px;">건</span>
-            </div>
+          <td align="right">
+            <p style="margin:0;font-size:10px;color:rgba(255,255,255,0.35);">
+              {today_str}
+            </p>
           </td>
         </tr>
       </table>
+
+      <!-- 메인 타이틀 -->
+      <h1 style="margin:14px 0 4px;font-size:26px;font-weight:800;
+                 color:#ffffff;letter-spacing:-0.5px;line-height:1.2;">
+        원스톱 스케일업
+      </h1>
+      <p style="margin:0 0 28px;font-size:13px;color:rgba(255,255,255,0.55);
+                font-weight:400;letter-spacing:0.3px;">
+        Scale-Up Program &nbsp;·&nbsp; 맞춤 공고 안내
+      </p>
+
+      <!-- 흰 인서트 카드 -->
+      <div style="background:#ffffff;border-radius:12px 12px 0 0;padding:22px 24px 18px;
+                  margin:0 -0px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td>
+              <p style="margin:0 0 2px;font-size:16px;font-weight:700;color:#0D2137;">
+                {company} 담당자님
+              </p>
+              <p style="margin:0;font-size:13px;color:#64748B;line-height:1.6;">
+                이번 주 수집된 공고 중 귀사에 적합한
+                <strong style="color:#1F4E79;">{len(notices)}건</strong>을 선별했습니다.
+              </p>
+            </td>
+            <td width="52" align="right" valign="middle">
+              <div style="width:48px;height:48px;border-radius:50%;
+                          background:linear-gradient(135deg,#1F4E79,#2563A8);
+                          display:flex;align-items:center;justify-content:center;
+                          text-align:center;line-height:48px;">
+                <span style="color:#fff;font-size:18px;font-weight:800;
+                             display:block;margin-top:-2px;">{len(notices)}</span>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </div>
     </td>
   </tr>
 
-  <!-- 인사말 -->
+  <!-- ── 공고 목록 (흰 바디) ── -->
   <tr>
-    <td style="padding:28px 36px 20px;">
-      <p style="margin:0;font-size:15px;color:#1a1a2e;line-height:1.7;">
-        안녕하세요, <strong style="color:#1F4E79;">{company}</strong> 담당자님.
-      </p>
-      <p style="margin:8px 0 0;font-size:14px;color:#555;line-height:1.7;">
-        귀사의 관심 분야 및 기술 키워드를 분석하여 연계 가능성이 높은
-        지원사업 공고 <strong style="color:#1F4E79;">{len(notices)}건</strong>을 선별하였습니다.
-      </p>
-    </td>
-  </tr>
-
-  <!-- 구분선 -->
-  <tr><td style="padding:0 36px;"><div style="height:1px;background:#EEF2F7;"></div></td></tr>
-
-  <!-- 공고 목록 -->
-  <tr>
-    <td style="padding:20px 36px;">
-      <p style="margin:0 0 14px;font-size:12px;font-weight:700;color:#888;letter-spacing:1px;text-transform:uppercase;">추천 공고 목록</p>
+    <td style="background:#ffffff;padding:20px 36px 24px;">
       {rows_html}
     </td>
   </tr>
 
-  <!-- 캘린더 섹션 -->
-  {f'''<tr><td style="padding:0 36px 24px;">{cal_sec}</td></tr>''' if cal_sec else ''}
+  <!-- ── 캘린더 섹션 ── -->
+  {f'''<tr><td style="background:#ffffff;padding:0 36px 24px;">{cal_sec}</td></tr>''' if cal_sec else ''}
 
-  <!-- 푸터 -->
+  <!-- ── 구분선 ── -->
   <tr>
-    <td style="background:#F8FAFC;padding:20px 36px;border-top:1px solid #EEF2F7;">
+    <td style="background:#ffffff;padding:0 36px;">
+      <div style="height:1px;background:#EEF2F7;"></div>
+    </td>
+  </tr>
+
+  <!-- ── 푸터 ── -->
+  <tr>
+    <td style="background:#F8FAFC;padding:18px 36px;border-radius:0 0 16px 16px;">
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td>
-            <p style="margin:0;font-size:12px;color:#888;line-height:1.8;">
-              <strong style="color:#555;">혁신제품지원센터 원스톱 스케일업 운영팀</strong><br>
-              <a href="mailto:onestop.kipcc@gmail.com" style="color:#2E75B6;text-decoration:none;">onestop.kipcc@gmail.com</a>
+            <p style="margin:0;font-size:12px;color:#94A3B8;line-height:1.9;">
+              혁신제품지원센터 원스톱 스케일업 운영팀<br>
+              <a href="mailto:onestop.kipcc@gmail.com"
+                 style="color:#1F4E79;text-decoration:none;font-weight:600;">
+                onestop.kipcc@gmail.com
+              </a>
             </p>
           </td>
-          <td align="right">
-            <p style="margin:0;font-size:11px;color:#aaa;">
+          <td align="right" valign="middle">
+            <p style="margin:0;font-size:10px;color:#CBD5E1;letter-spacing:0.5px;">
               수신 동의 기업 대상 발송
             </p>
           </td>
