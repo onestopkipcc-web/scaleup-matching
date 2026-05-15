@@ -235,6 +235,35 @@ def score_notice(notice, row, already_sent, HIGH, MID):
 
     text = " ".join([str(notice.get(k,'')) for k in ['공고명','사업개요','해시태그','주관기관','지원대상']])
 
+    # ── TRL 필터: 8-9단계 기업은 R&D 공고 제외 ──────
+    trl = str(row.get('TRL단계',''))
+    if any(t in trl for t in ['8','9']):
+        if any(kw in text for kw in ['R&D','연구개발','기술개발과제','기초연구','원천기술']):
+            return None
+
+    # ── 소재지 필터: 타 지역 공고 감점 ──────────────
+    location = str(row.get('소재지',''))
+    location_score = 0
+    if location and location != 'nan':
+        # 광역시도 추출
+        region_map = {
+            '서울':'서울','부산':'부산','대구':'대구','인천':'인천',
+            '광주':'광주','대전':'대전','울산':'울산','세종':'세종',
+            '경기':'경기','강원':'강원','충북':'충북','충남':'충남',
+            '전북':'전북','전남':'전남','경북':'경북','경남':'경남','제주':'제주'
+        }
+        for region, tag in region_map.items():
+            if region in location:
+                hashtags = str(notice.get('해시태그',''))
+                # 지역 태그가 아예 없으면 중립 (전국 공고)
+                has_any_region = any(r in hashtags for r in region_map.values())
+                if has_any_region:
+                    if tag in hashtags:
+                        location_score = 2   # 같은 지역 가산
+                    else:
+                        location_score = -2  # 다른 지역 감산
+                break
+
     # ── 축1: 지원대상 매칭 ────────────────────────────
     matched_target = {}
     for cat, kws in TARGET_KW.items():
@@ -247,10 +276,14 @@ def score_notice(notice, row, already_sent, HIGH, MID):
         hits = [kw for kw in kws if kw in text]
         if hits: matched_type[cat] = hits
 
-    # ── 기업 키워드 매칭 ──────────────────────────────
-    raw = ",".join([str(row.get(k,'')) for k in ['기술키워드','제품분야','키워드보완']])
+    # ── 기업 키워드 + 핵심수요태그 매칭 ────────────────
+    raw = ",".join([str(row.get(k,'')) for k in ['기술키워드','제품분야','키워드보완','핵심수요태그']])
     co_kws = [k.strip() for k in raw.split(',') if k.strip() and k.strip()!='nan']
     matched_co = [kw for kw in co_kws if kw in text]
+
+    # 핵심수요태그는 가중치 높게
+    demand_tags = [t.strip() for t in str(row.get('핵심수요태그','')).split(',') if t.strip() and t.strip()!='nan']
+    matched_demand = [kw for kw in demand_tags if kw in text]
 
     # ── 수출국가 가산 ─────────────────────────────────
     cn = str(row.get('수출국가',''))
@@ -293,9 +326,13 @@ def score_notice(notice, row, already_sent, HIGH, MID):
     score = (
         len(sum(matched_target.values(), [])) * 3 +
         len(sum(matched_type.values(),   [])) * 2 +
-        len(matched_co) * 2 + xs
+        len(matched_co) * 2 +
+        len(matched_demand) * 3 +  # 핵심수요태그 높은 가중치
+        xs + location_score
     )
-    if stars == "★★★": score += 5  # 별점 보정
+    if stars == "★★★": score += 5
+    # 소재지 감산으로 점수가 너무 낮아지면 제외
+    if score <= 0: return None
 
     # ── 매칭 근거 텍스트 ──────────────────────────────
     target_str = " / ".join([f"{k}({','.join(v)})" for k,v in matched_target.items()])
@@ -315,13 +352,15 @@ def score_notice(notice, row, already_sent, HIGH, MID):
         "지원대상매칭": target_str,
         "사업성격매칭": type_str,
         "기업키워드매칭": ", ".join(matched_co),
-        "매칭근거":     _build_reason(stars, matched_target, matched_type, matched_co),
+        "핵심수요매칭": ", ".join(matched_demand),
+        "소재지점수":   location_score,
+        "매칭근거":     _build_reason(stars, matched_target, matched_type, matched_co, matched_demand, location_score),
         "공고링크":     notice.get('공고링크',''),
         "담당자검토":   "",
         "검토의견":     "",
     }
 
-def _build_reason(stars, matched_target, matched_type, matched_co):
+def _build_reason(stars, matched_target, matched_type, matched_co, matched_demand=[], location_score=0):
     """담당자 검토 화면에 표시할 매칭 근거 한 줄 설명"""
     parts = []
     if '혁신기업특화' in matched_target:
@@ -336,8 +375,14 @@ def _build_reason(stars, matched_target, matched_type, matched_co):
         parts.append("기술개발 지원")
     if '금융융자' in matched_type:
         parts.append("금융·융자 지원")
-    if matched_co:
-        parts.append(f"기업 키워드 직접 매칭({', '.join(matched_co[:3])})")
+    if matched_demand:
+        parts.append(f"수요태그 매칭({', '.join(matched_demand[:2])})")
+    elif matched_co:
+        parts.append(f"기업 키워드 매칭({', '.join(matched_co[:2])})")
+    if location_score > 0:
+        parts.append("✓ 동일 지역")
+    elif location_score < 0:
+        parts.append("△ 타 지역 공고")
     if not parts:
         return "키워드 매칭"
     return " + ".join(parts)
