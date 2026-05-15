@@ -51,8 +51,31 @@ CALID_FILE       = "calendar_id.txt"
 CATCAL_FILE      = "category_calendars.json"
 INDCAL_FILE      = "individual_calendars.json"
 
-DEFAULT_HIGH = ["혁신제품","혁신조달","G-PASS","혁신기업","해외조달","공공구매","조달청"]
-DEFAULT_MID  = ["해외판로","수출바우처","수출지원","해외진출","글로벌","스케일업","판로개척","해외마케팅"]
+# ── 키워드 두 축 구조 ────────────────────────────────
+# 축1: 지원대상 (누구를 위한 공고인가)
+TARGET_KW = {
+    "혁신기업특화": ["혁신제품","혁신기업","G-PASS","혁신조달","혁신바우처","혁신성장"],
+    "수출기업특화": ["수출기업","수출실적","수출유망","글로벌강소"],
+    "중소기업일반": ["중소기업","소기업","중견기업","벤처기업"],
+}
+# 축2: 사업성격 (어떤 종류의 지원인가)
+TYPE_KW = {
+    "조달공공구매": ["조달청","공공구매","시범구매","우선구매","해외조달","공공조달","MAS"],
+    "해외진출":     ["해외판로","수출바우처","수출지원","해외진출","해외마케팅","판로개척","글로벌","수출컨소시엄"],
+    "기술개발":     ["기술개발","R&D","기술사업화","연구개발","기술혁신","스케일업"],
+    "금융융자":     ["융자","보증","이차보전","경영안정자금","정책자금"],
+}
+
+# 별점 판정 함수용 flat 리스트 (설정 탭 표시용)
+DEFAULT_HIGH = (
+    TARGET_KW["혁신기업특화"] +
+    TYPE_KW["조달공공구매"]
+)
+DEFAULT_MID = (
+    TARGET_KW["수출기업특화"] +
+    TYPE_KW["해외진출"] +
+    TYPE_KW["기술개발"]
+)
 REALM_CODE   = {
     "금융":"01","기술개발":"02","인력":"03","수출":"04",
     "내수":"05","창업":"06","경영":"07","기타":"09",
@@ -187,6 +210,10 @@ def load_text(drive, filename):
 
 def load_keywords(drive):
     kw = load_json(drive, KEYWORDS_FILE)
+    # 드라이브에 두 축 구조가 있으면 그걸 쓰고, 없으면 기본값
+    global TARGET_KW, TYPE_KW
+    if "TARGET_KW" in kw: TARGET_KW = kw["TARGET_KW"]
+    if "TYPE_KW"   in kw: TYPE_KW   = kw["TYPE_KW"]
     return kw.get("HIGH", DEFAULT_HIGH), kw.get("MID", DEFAULT_MID)
 
 # ── 유틸 ─────────────────────────────────────────────
@@ -205,25 +232,115 @@ def score_notice(notice, row, already_sent, HIGH, MID):
     dl = notice.get('마감일', '')
     if dl and dl < datetime.today().strftime("%Y-%m-%d"): return None
     if str(row.get('수출실적',''))=='아니오' and '수출' in str(notice.get('분야','')): return None
+
     text = " ".join([str(notice.get(k,'')) for k in ['공고명','사업개요','해시태그','주관기관','지원대상']])
-    mh = [kw for kw in HIGH if kw in text]
-    mm = [kw for kw in MID  if kw in text]
-    ss = len(mh)*3 + len(mm)*2
+
+    # ── 축1: 지원대상 매칭 ────────────────────────────
+    matched_target = {}
+    for cat, kws in TARGET_KW.items():
+        hits = [kw for kw in kws if kw in text]
+        if hits: matched_target[cat] = hits
+
+    # ── 축2: 사업성격 매칭 ────────────────────────────
+    matched_type = {}
+    for cat, kws in TYPE_KW.items():
+        hits = [kw for kw in kws if kw in text]
+        if hits: matched_type[cat] = hits
+
+    # ── 기업 키워드 매칭 ──────────────────────────────
     raw = ",".join([str(row.get(k,'')) for k in ['기술키워드','제품분야','키워드보완']])
-    co  = [kw for kw in [k.strip() for k in raw.split(',') if k.strip() and k.strip()!='nan'] if kw in text]
-    cs  = len(co)*2
-    cn  = str(row.get('수출국가',''))
-    xs  = 2 if (cn and cn!='nan' and cn in text) else 0
-    total = ss + cs + xs
-    if not (mh or mm or co): return None
-    stars = "★★★" if (mh or total>=6) else ("★★" if (mm or co) else None)
-    if not stars: return None
-    return {"기업명":row['기업명'],"관련도":stars,"점수":total,
-            "공고ID":pid,"공고명":notice.get('공고명',''),
-            "주관기관":notice.get('주관기관',''),"접수기간":notice.get('접수기간',''),
-            "마감일":dl,"사업개요":str(notice.get('사업개요',''))[:150]+"...",
-            "시스템매칭":", ".join(mh+mm),"기업키워드매칭":", ".join(co),
-            "공고링크":notice.get('공고링크',''),"담당자검토":"","검토의견":""}
+    co_kws = [k.strip() for k in raw.split(',') if k.strip() and k.strip()!='nan']
+    matched_co = [kw for kw in co_kws if kw in text]
+
+    # ── 수출국가 가산 ─────────────────────────────────
+    cn = str(row.get('수출국가',''))
+    xs = 2 if (cn and cn!='nan' and cn in text) else 0
+
+    # ── 별점 판정 (두 축 교차) ────────────────────────
+    has_innov_target  = '혁신기업특화' in matched_target
+    has_export_target = '수출기업특화' in matched_target
+    has_procurement   = '조달공공구매' in matched_type
+    has_overseas      = '해외진출'     in matched_type
+    has_tech          = '기술개발'     in matched_type
+
+    # ★★★: 혁신기업 특화 + 조달/해외 → 직접 연계
+    if has_innov_target and (has_procurement or has_overseas):
+        stars = "★★★"
+    # ★★★: 혁신기업 특화 단독 (조달청 공고 등)
+    elif has_innov_target and has_procurement:
+        stars = "★★★"
+    # ★★: 수출기업 특화 + 해외진출
+    elif has_export_target and has_overseas:
+        stars = "★★"
+    # ★★: 혁신기업 특화 + 기술개발
+    elif has_innov_target and has_tech:
+        stars = "★★"
+    # ★★: 기업 키워드 직접 매칭
+    elif matched_co and (matched_target or matched_type):
+        stars = "★★"
+    # ★★: 해외진출 + 기업 키워드
+    elif has_overseas and matched_co:
+        stars = "★★"
+    # 매칭 없음
+    else:
+        if not (matched_target or matched_type or matched_co):
+            return None
+        # 단독 매칭은 낮은 관련성
+        stars = "★★" if (matched_type or matched_co) else None
+        if not stars: return None
+
+    # ── 점수 계산 (정렬용) ────────────────────────────
+    score = (
+        len(sum(matched_target.values(), [])) * 3 +
+        len(sum(matched_type.values(),   [])) * 2 +
+        len(matched_co) * 2 + xs
+    )
+    if stars == "★★★": score += 5  # 별점 보정
+
+    # ── 매칭 근거 텍스트 ──────────────────────────────
+    target_str = " / ".join([f"{k}({','.join(v)})" for k,v in matched_target.items()])
+    type_str   = " / ".join([f"{k}({','.join(v)})" for k,v in matched_type.items()])
+
+    return {
+        "기업명":       row['기업명'],
+        "관련도":       stars,
+        "점수":         score,
+        "공고ID":       pid,
+        "공고명":       notice.get('공고명',''),
+        "주관기관":     notice.get('주관기관',''),
+        "접수기간":     notice.get('접수기간',''),
+        "지원대상":     notice.get('지원대상',''),
+        "마감일":       dl,
+        "사업개요":     str(notice.get('사업개요',''))[:200]+"...",
+        "지원대상매칭": target_str,
+        "사업성격매칭": type_str,
+        "기업키워드매칭": ", ".join(matched_co),
+        "매칭근거":     _build_reason(stars, matched_target, matched_type, matched_co),
+        "공고링크":     notice.get('공고링크',''),
+        "담당자검토":   "",
+        "검토의견":     "",
+    }
+
+def _build_reason(stars, matched_target, matched_type, matched_co):
+    """담당자 검토 화면에 표시할 매칭 근거 한 줄 설명"""
+    parts = []
+    if '혁신기업특화' in matched_target:
+        parts.append("혁신기업 대상 공고")
+    if '수출기업특화' in matched_target:
+        parts.append("수출기업 대상 공고")
+    if '조달공공구매' in matched_type:
+        parts.append("공공조달 연계 가능")
+    if '해외진출' in matched_type:
+        parts.append("해외진출 지원")
+    if '기술개발' in matched_type:
+        parts.append("기술개발 지원")
+    if '금융융자' in matched_type:
+        parts.append("금융·융자 지원")
+    if matched_co:
+        parts.append(f"기업 키워드 직접 매칭({', '.join(matched_co[:3])})")
+    if not parts:
+        return "키워드 매칭"
+    return " + ".join(parts)
 
 # ── 안내 박스 ─────────────────────────────────────────
 def info_box(title, desc, how_to=None):
@@ -429,73 +546,32 @@ if page == "대시보드":
     with tab_c1:
         if df_n.empty:
             st.info("공고 수집 후 확인 가능")
+        elif '분야' in df_n.columns:
+            realm_count = df_n['분야'].value_counts().reset_index()
+            realm_count.columns = ['분야', '공고 수']
+            realm_count = realm_count[realm_count['분야'] != ''].head(10)
+            st.bar_chart(realm_count.set_index('분야'), height=300)
+            st.caption(f"총 {len(df_n):,}건 / {len(realm_count)}개 분야")
         else:
-            if '분야' in df_n.columns:
-                realm_count = df_n['분야'].value_counts().reset_index()
-                realm_count.columns = ['분야', '공고 수']
-                realm_count = realm_count[realm_count['분야'] != '']
-
-                import altair as alt
-                chart = alt.Chart(realm_count).mark_bar(
-                    cornerRadiusTopLeft=4,
-                    cornerRadiusTopRight=4,
-                    color='#4A9EFF'
-                ).encode(
-                    x=alt.X('공고 수:Q', title='공고 수'),
-                    y=alt.Y('분야:N', sort='-x', title=''),
-                    tooltip=['분야','공고 수']
-                ).properties(
-                    height=280,
-                    background='transparent'
-                ).configure_axis(
-                    labelColor='#E8EDF2',
-                    titleColor='#A0AEC0',
-                    gridColor='#2D4A6E',
-                ).configure_view(
-                    strokeOpacity=0
-                )
-                st.altair_chart(chart, use_container_width=True)
-                st.caption(f"총 {len(df_n):,}건 / {len(realm_count)}개 분야")
-            else:
-                st.info("분야 컬럼 없음 — 공고 재수집 필요")
+            st.info("분야 컬럼 없음 — 공고 재수집 필요")
 
     # ② 기업 관심분야 분포
     with tab_c2:
         if df_c.empty:
             st.info("선정기업 명단 업로드 후 확인 가능")
+        elif '관심사업분야' in df_c.columns:
+            all_interests = []
+            for val in df_c['관심사업분야']:
+                for item in str(val).split(','):
+                    item = item.strip()
+                    if item and item != 'nan':
+                        all_interests.append(item)
+            interest_count = pd.Series(all_interests).value_counts().reset_index()
+            interest_count.columns = ['관심분야', '기업 수']
+            st.bar_chart(interest_count.set_index('관심분야'), height=280)
+            st.dataframe(interest_count, use_container_width=True, hide_index=True)
         else:
-            if '관심사업분야' in df_c.columns:
-                # 관심분야 파싱 (쉼표 구분)
-                all_interests = []
-                for val in df_c['관심사업분야']:
-                    for item in str(val).split(','):
-                        item = item.strip()
-                        if item and item != 'nan':
-                            all_interests.append(item)
-
-                import pandas as pd2
-                interest_count = pd2.Series(all_interests).value_counts().reset_index()
-                interest_count.columns = ['관심분야', '기업 수']
-
-                import altair as alt
-                chart2 = alt.Chart(interest_count).mark_arc(
-                    innerRadius=60
-                ).encode(
-                    theta=alt.Theta('기업 수:Q'),
-                    color=alt.Color('관심분야:N',
-                        scale=alt.Scale(scheme='blues'),
-                        legend=alt.Legend(labelColor='#E8EDF2', titleColor='#A0AEC0')),
-                    tooltip=['관심분야','기업 수']
-                ).properties(
-                    height=280,
-                    background='transparent'
-                ).configure_view(strokeOpacity=0)
-                st.altair_chart(chart2, use_container_width=True)
-
-                # 상세 테이블
-                st.dataframe(interest_count, use_container_width=True, hide_index=True)
-            else:
-                st.info("관심사업분야 컬럼 없음")
+            st.info("관심사업분야 컬럼 없음")
 
     # ③ 매칭 점수 분포
     with tab_c3:
@@ -503,36 +579,18 @@ if page == "대시보드":
         if not results:
             st.info("매칭 실행 후 확인 가능")
         else:
-            import pandas as pd2
-            df_r = pd2.DataFrame(results)
-
-            # 별점 분포 도넛
+            df_r = pd.DataFrame(results)
             if '관련도' in df_r.columns:
                 star_count = df_r['관련도'].value_counts().reset_index()
                 star_count.columns = ['관련도', '건수']
-
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    import altair as alt
-                    colors = {'★★★':'#FFC863','★★':'#63FFA8'}
-                    chart3 = alt.Chart(star_count).mark_arc(innerRadius=50).encode(
-                        theta=alt.Theta('건수:Q'),
-                        color=alt.Color('관련도:N',
-                            scale=alt.Scale(
-                                domain=list(colors.keys()),
-                                range=list(colors.values())),
-                            legend=alt.Legend(labelColor='#E8EDF2')),
-                        tooltip=['관련도','건수']
-                    ).properties(height=220, background='transparent').configure_view(strokeOpacity=0)
-                    st.altair_chart(chart3, use_container_width=True)
-
-                with col_b:
-                    total_r = len(df_r)
+                total_r = len(df_r)
+                c1,c2 = st.columns(2)
+                with c1:
+                    st.bar_chart(star_count.set_index('관련도'), height=220)
+                with c2:
                     for _, row in star_count.iterrows():
-                        pct = row['건수']/total_r*100
-                        st.metric(row['관련도'], f"{row['건수']}건", f"{pct:.1f}%")
-
-            # 기업별 매칭 건수
+                        st.metric(row['관련도'], f"{row['건수']}건",
+                                  f"{row['건수']/total_r*100:.1f}%")
             if '기업명' in df_r.columns:
                 st.divider()
                 co_count = df_r.groupby('기업명').size().reset_index(name='매칭 건수')
@@ -544,27 +602,12 @@ if page == "대시보드":
         if df_h.empty:
             st.info("발송 이력 쌓이면 확인 가능")
         else:
-            import pandas as pd2, altair as alt
-
             if '발송일' in df_h.columns:
                 df_h2 = df_h.copy()
-                df_h2['발송일'] = pd2.to_datetime(df_h2['발송일'], errors='coerce')
+                df_h2['발송일'] = pd.to_datetime(df_h2['발송일'], errors='coerce')
                 df_h2['월'] = df_h2['발송일'].dt.to_period('M').astype(str)
                 monthly = df_h2.groupby('월').size().reset_index(name='발송 건수')
-
-                chart4 = alt.Chart(monthly).mark_line(
-                    point=alt.OverlayMarkDef(color='#4A9EFF', size=80),
-                    color='#4A9EFF',
-                    strokeWidth=2
-                ).encode(
-                    x=alt.X('월:O', title='', axis=alt.Axis(labelColor='#E8EDF2')),
-                    y=alt.Y('발송 건수:Q', title='발송 건수',
-                            axis=alt.Axis(labelColor='#E8EDF2', gridColor='#2D4A6E')),
-                    tooltip=['월','발송 건수']
-                ).properties(height=220, background='transparent').configure_view(strokeOpacity=0)
-                st.altair_chart(chart4, use_container_width=True)
-
-            # 신청·선정 현황
+                st.line_chart(monthly.set_index('월'), height=220)
             if '신청여부' in df_h.columns and '선정결과' in df_h.columns:
                 st.divider()
                 c1,c2,c3 = st.columns(3)
@@ -836,6 +879,7 @@ elif page == "매칭 결과":
                 all_results.extend(scored[:max_per])
                 prog.progress((idx+1)/len(df_c))
             st.session_state['match_results'] = all_results
+            st.session_state['df_companies_cache'] = df_c  # 검토 화면에서 기업 정보 표시용
             st.success(f"매칭 완료 — 총 {len(all_results)}건 → '검토 & 승인' 탭으로 이동")
 
     with tab2:
@@ -864,38 +908,89 @@ elif page == "매칭 결과":
                 icon     = "🟡" if not current else ("✅" if current=="○" else "❌")
                 deadline = row.get('마감일','')
                 is_irregular = not deadline or deadline.strip() == ''
+                deadline_display = f"⚠️ 비정형" if is_irregular else deadline
 
-                # 비정형 마감일 표시
-                deadline_display = f"⚠️ 비정형 ({row.get('접수기간','확인 필요')})" if is_irregular else deadline
+                # 매칭 근거 한 줄 표시
+                reason = row.get('매칭근거','')
 
-                with st.expander(f"{icon} **{row['기업명']}**  |  {row.get('관련도','')}  |  {row.get('공고명','')[:35]}"):
-                    c1,c2 = st.columns([3,1])
-                    with c1:
-                        st.markdown(f"**주관기관:** {row.get('주관기관','')}  |  **마감:** {deadline_display}")
-                        st.markdown(f"**사업개요:** {row.get('사업개요','')}")
-                        st.markdown(f"**매칭키워드:** `{row.get('시스템매칭','')}` / `{row.get('기업키워드매칭','')}`")
-                        if row.get('공고링크',''): st.markdown(f"[🔗 공고 원문]({row.get('공고링크','')})")
+                with st.expander(
+                    f"{icon} **{row['기업명']}**  |  {row.get('관련도','')}  |  "
+                    f"{row.get('공고명','')[:30]}  |  {reason[:25]}"
+                ):
+                    # ── 상단: 기업 vs 공고 나란히 ──────────────
+                    left, right = st.columns(2)
+                    with left:
+                        st.markdown("**🏢 기업 정보**")
+                        # 선정기업 DB에서 기업 정보 조회
+                        co_info = {}
+                        if 'df_companies_cache' in st.session_state:
+                            df_co = st.session_state['df_companies_cache']
+                            co_rows = df_co[df_co['기업명']==row['기업명']]
+                            if not co_rows.empty:
+                                co_info = co_rows.iloc[0].to_dict()
 
-                        # 비정형 마감일 → 담당자 직접 입력
-                        if is_irregular:
-                            st.caption("📅 공고 원문 확인 후 마감일 직접 입력 (캘린더 등록에 사용)")
-                            custom_dl = st.text_input(
-                                "마감일 직접 입력 (YYYY-MM-DD)",
-                                value=st.session_state['custom_deadline'].get(key,''),
-                                key=f"dl_{key}_{i}",
-                                placeholder="예: 2026-06-30"
-                            )
-                            if custom_dl:
-                                st.session_state['custom_deadline'][key] = custom_dl
-                                # 매칭 결과에도 반영
-                                for r in results:
-                                    if f"{r['기업명']}_{r.get('공고ID','')}" == key:
-                                        r['마감일'] = custom_dl
-                                        break
+                        st.markdown(f"- **관심분야:** {co_info.get('관심사업분야', '—')}")
+                        st.markdown(f"- **기술키워드:** {co_info.get('기술키워드','—')}")
+                        st.markdown(f"- **제품분야:** {co_info.get('제품분야','—')}")
+                        st.markdown(f"- **수출실적:** {co_info.get('수출실적','—')} / {co_info.get('수출국가','—')}")
+                        if co_info.get('키워드보완'):
+                            st.markdown(f"- **보완키워드:** {co_info.get('키워드보완')}")
 
-                    with c2:
+                    with right:
+                        st.markdown("**📋 공고 정보**")
+                        st.markdown(f"- **주관기관:** {row.get('주관기관','—')}")
+                        st.markdown(f"- **지원대상:** {row.get('지원대상','—')}")
+                        st.markdown(f"- **접수기간:** {row.get('접수기간','—')}")
+                        st.markdown(f"- **마감일:** {deadline_display}")
+                        if row.get('공고링크',''):
+                            st.markdown(f"[🔗 공고 원문 보기]({row.get('공고링크','')})")
+
+                    st.divider()
+
+                    # ── 매칭 근거 ──────────────────────────────
+                    st.markdown("**🔍 매칭 근거**")
+                    rc1, rc2, rc3 = st.columns(3)
+                    with rc1:
+                        st.caption("지원대상 매칭")
+                        v = row.get('지원대상매칭','—')
+                        st.markdown(f"`{v}`" if v and v!='—' else "—")
+                    with rc2:
+                        st.caption("사업성격 매칭")
+                        v = row.get('사업성격매칭','—')
+                        st.markdown(f"`{v}`" if v and v!='—' else "—")
+                    with rc3:
+                        st.caption("기업키워드 매칭")
+                        v = row.get('기업키워드매칭','—')
+                        st.markdown(f"`{v}`" if v and v!='—' else "—")
+
+                    # ── 사업개요 ───────────────────────────────
+                    st.divider()
+                    st.caption("사업개요")
+                    st.markdown(row.get('사업개요',''))
+
+                    # ── 비정형 마감일 입력 ─────────────────────
+                    if is_irregular:
+                        st.divider()
+                        st.caption("📅 비정형 마감일 — 공고 원문 확인 후 직접 입력")
+                        custom_dl = st.text_input(
+                            "마감일 (YYYY-MM-DD)",
+                            value=st.session_state['custom_deadline'].get(key,''),
+                            key=f"dl_{key}_{i}",
+                            placeholder="예: 2026-06-30"
+                        )
+                        if custom_dl:
+                            st.session_state['custom_deadline'][key] = custom_dl
+                            for r in results:
+                                if f"{r['기업명']}_{r.get('공고ID','')}" == key:
+                                    r['마감일'] = custom_dl; break
+
+                    # ── 승인/제외 버튼 ─────────────────────────
+                    st.divider()
+                    bc1, bc2, bc3 = st.columns([1,1,3])
+                    with bc1:
                         if st.button("○ 승인", key=f"o_{key}_{i}", type="primary"):
                             st.session_state['review_state'][key]="○"; st.rerun()
+                    with bc2:
                         if st.button("✕ 제외", key=f"x_{key}_{i}"):
                             st.session_state['review_state'][key]="✕"; st.rerun()
             st.divider()
@@ -1227,26 +1322,64 @@ elif page == "설정":
     with st.spinner("키워드 로딩 중..."):
         HIGH, MID = load_keywords(drive)
 
-    c1,c2 = st.columns(2)
-    with c1:
-        st.markdown("**★★★ 직접 연계** (+3점)")
-        st.caption("공고에 포함 시 무조건 추천 목록 포함")
-        high_input = st.text_area("", value="\n".join(HIGH), height=180,
-            label_visibility="collapsed", key="high_kw",
-            placeholder="한 줄에 키워드 하나씩")
-    with c2:
-        st.markdown("**★★ 간접 연계** (+2점)")
-        st.caption("공고에 포함 시 추천 후보 포함")
-        mid_input = st.text_area("", value="\n".join(MID), height=180,
-            label_visibility="collapsed", key="mid_kw",
-            placeholder="한 줄에 키워드 하나씩")
+    st.caption("💡 두 축(지원대상 × 사업성격) 교차로 별점 판정 — 아래에서 각 축 키워드 수정")
 
-    st.caption("💡 너무 일반적인 단어(중소기업, 수출 등)는 오탐 발생 가능 — 신중하게 추가")
+    tab_k1, tab_k2 = st.tabs(["지원대상 키워드", "사업성격 키워드"])
+
+    with tab_k1:
+        st.caption("**축1 — 지원대상**: 공고가 어떤 기업을 대상으로 하는지 판단")
+        kw_data = load_json(drive, KEYWORDS_FILE)
+        current_target = kw_data.get("TARGET_KW", TARGET_KW)
+
+        t_inputs = {}
+        for cat, kws in current_target.items():
+            label_map = {
+                "혁신기업특화": "혁신기업특화 (★★★ 판정 핵심)",
+                "수출기업특화": "수출기업특화 (★★ 판정)",
+                "중소기업일반": "중소기업일반 (참고용)",
+            }
+            st.markdown(f"**{label_map.get(cat, cat)}**")
+            t_inputs[cat] = st.text_area(
+                "", value="
+".join(kws), height=100,
+                key=f"tkw_{cat}", label_visibility="collapsed"
+            )
+
+    with tab_k2:
+        st.caption("**축2 — 사업성격**: 공고가 어떤 종류의 지원인지 판단")
+        current_type = kw_data.get("TYPE_KW", TYPE_KW)
+
+        ty_inputs = {}
+        for cat, kws in current_type.items():
+            label_map = {
+                "조달공공구매": "조달·공공구매 (★★★ 판정 핵심)",
+                "해외진출":     "해외진출 (★★★/★★ 판정)",
+                "기술개발":     "기술개발 (★★ 판정)",
+                "금융융자":     "금융·융자 (참고용)",
+            }
+            st.markdown(f"**{label_map.get(cat, cat)}**")
+            ty_inputs[cat] = st.text_area(
+                "", value="
+".join(kws), height=80,
+                key=f"tykw_{cat}", label_visibility="collapsed"
+            )
+
+    st.caption("💡 별점 판정 기준: 혁신기업특화 + 조달/해외진출 → ★★★ / 그 외 조합 → ★★")
     if st.button("💾 키워드 저장 → 드라이브", type="primary"):
-        new_high = [k.strip() for k in high_input.split('\n') if k.strip()]
-        new_mid  = [k.strip() for k in mid_input.split('\n')  if k.strip()]
+        new_target = {cat: [k.strip() for k in v.split("
+") if k.strip()]
+                      for cat, v in t_inputs.items()}
+        new_type   = {cat: [k.strip() for k in v.split("
+") if k.strip()]
+                      for cat, v in ty_inputs.items()}
+        save_data  = {
+            "TARGET_KW": new_target,
+            "TYPE_KW":   new_type,
+            "HIGH": sum(new_target.values(), [])[:10],
+            "MID":  sum(new_type.values(), [])[:10],
+        }
         with st.spinner("드라이브 저장 중..."):
-            if save_json(drive, {"HIGH":new_high,"MID":new_mid}, KEYWORDS_FILE):
-                st.success(f"저장 완료 — ★★★ {len(new_high)}개 / ★★ {len(new_mid)}개")
+            if save_json(drive, save_data, KEYWORDS_FILE):
+                st.success("저장 완료 — 다음 매칭부터 반영")
             else:
                 st.error("저장 실패")
