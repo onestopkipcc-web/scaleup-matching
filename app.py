@@ -91,15 +91,10 @@ def get_test_recipients():
     return _DEFAULT_TEST_RECIPIENTS
 
 # ── 구글 인증 ─────────────────────────────────────────
-def get_services():
+def get_creds():
+    """인증 정보만 반환 (서비스 객체 생성 없음)"""
     from google.oauth2.credentials import Credentials
     from google.auth.transport.requests import Request
-    from googleapiclient.discovery import build
-
-    # session_state에 캐싱 (cache_resource 대신 — C레벨 리소스 충돌 방지)
-    if 'google_services' in st.session_state:
-        return st.session_state['google_services']
-
     SCOPES = [
         'https://www.googleapis.com/auth/gmail.send',
         'https://www.googleapis.com/auth/calendar',
@@ -111,15 +106,30 @@ def get_services():
     elif os.path.exists('token.json'):
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     else:
-        st.error("인증 파일 없음"); st.stop()
+        return None
     if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
+        try: creds.refresh(Request())
+        except: return None
+    return creds
 
-    services = (build('gmail','v1',credentials=creds),
-                build('calendar','v3',credentials=creds),
-                build('drive','v3',credentials=creds))
-    st.session_state['google_services'] = services
-    return services
+def get_services():
+    """필요할 때만 서비스 객체 생성"""
+    from googleapiclient.discovery import build
+    if 'google_services' in st.session_state:
+        return st.session_state['google_services']
+    creds = get_creds()
+    if not creds:
+        st.error("인증 파일 없음"); st.stop()
+    try:
+        services = (
+            build('gmail',    'v1', credentials=creds),
+            build('calendar', 'v3', credentials=creds),
+            build('drive',    'v3', credentials=creds),
+        )
+        st.session_state['google_services'] = services
+        return services
+    except Exception as e:
+        st.error(f"구글 서비스 초기화 오류: {e}"); st.stop()
 
 # ── 드라이브 유틸 ─────────────────────────────────────
 def drive_file_id(drive, filename):
@@ -543,10 +553,14 @@ with st.sidebar:
     if test_mode: st.warning("테스트 메일 발송")
     else:         st.success("실제 기업 발송")
 
-try:
-    gmail, cal, drive = get_services()
-except Exception as e:
-    st.error(f"구글 인증 오류: {e}"); st.stop()
+# 구글 서비스는 각 페이지에서 필요할 때 초기화
+# (상단 초기화 제거 - segfault 방지)
+def _get_drive():
+    _,_,d = get_services(); return d
+def _get_gmail():
+    g,_,_ = get_services(); return g
+def _get_cal():
+    _,c,_ = get_services(); return c
 
 
 # ══════════════════════════════════════════════════════
@@ -566,6 +580,7 @@ if page == "대시보드":
 **드라이브 연동** — 모든 데이터 구글 드라이브 자동 저장, 팀 공유
         """)
 
+    drive = _get_drive()
     with st.spinner("드라이브 데이터 로딩 중..."):
         df_c = load_excel(drive, SELECTED_FILE)
         df_n = load_excel(drive, NOTICES_FILE)
@@ -802,6 +817,7 @@ elif page == "공고 수집":
         """,
         "수집 분야 변경 → 화면의 '수집 분야 선택' 옵션에서 체크박스로 선택")
 
+    drive = _get_drive()
     with st.spinner("드라이브에서 공고 DB 로딩 중..."):
         df_n = load_excel(drive, NOTICES_FILE)
 
@@ -1411,6 +1427,7 @@ elif page == "발송 관리":
 # 발송 이력
 # ══════════════════════════════════════════════════════
 elif page == "발송 이력":
+    drive = _get_drive()
     st.title("발송 이력")
     info_box("발송 이력",
         """
@@ -1457,6 +1474,7 @@ elif page == "발송 이력":
 # 성과 집계
 # ══════════════════════════════════════════════════════
 elif page == "성과 집계":
+    drive = _get_drive()
     st.title("성과 집계")
     info_box("성과 집계",
         """
@@ -1498,6 +1516,7 @@ elif page == "성과 집계":
 # 설정
 # ══════════════════════════════════════════════════════
 elif page == "설정":
+    drive = _get_drive()
     st.title("설정")
     info_box("설정",
         """
