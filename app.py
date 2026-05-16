@@ -1179,16 +1179,29 @@ elif page == "공고 수집":
         prog = st.progress(0); log_area = st.empty(); logs = []
         realm_name_map = {v:k for k,v in REALM_OPTIONS.items()}
 
+        import time as _time
         for idx, code in enumerate(REALM_CODES):
             params = {"crtfcKey":API_KEY,"dataType":"json","searchCnt":"0","searchLclasId":code}
-            try:
-                items = requests.get(BASE_URL, params=params, timeout=30).json().get('jsonArray',[])
-                for item in items:
-                    pid = item.get('pblancId','')
-                    if pid and pid not in seen: seen.add(pid); all_items.append(item)
-                logs.append(f"✅ {realm_name_map.get(code, code)}: {len(items)}건")
-            except Exception as e:
-                logs.append(f"❌ {realm_name_map.get(code, code)}: {e}")
+            realm_name = realm_name_map.get(code, code)
+            success = False
+            for retry in range(3):  # 최대 3회 재시도
+                try:
+                    _time.sleep(0.8 if retry == 0 else 2)  # 첫 요청 0.8초, 재시도 2초 대기
+                    resp  = requests.get(BASE_URL, params=params, timeout=40)
+                    items = resp.json().get('jsonArray', [])
+                    for item in items:
+                        pid = item.get('pblancId','')
+                        if pid and pid not in seen:
+                            seen.add(pid); all_items.append(item)
+                    logs.append(f"✅ {realm_name}: {len(items)}건")
+                    success = True
+                    break
+                except Exception as e:
+                    if retry < 2:
+                        logs.append(f"⚠️ {realm_name}: 재시도 중... ({retry+1}/3)")
+                    else:
+                        logs.append(f"❌ {realm_name}: 수집 실패 ({e})")
+                log_area.code("\n".join(logs))
             prog.progress((idx+1)/len(REALM_CODES)); log_area.code("\n".join(logs))
 
         def to_row(item):
