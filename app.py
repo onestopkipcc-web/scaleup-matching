@@ -53,29 +53,68 @@ CATCAL_FILE      = "category_calendars.json"
 INDCAL_FILE      = "individual_calendars.json"
 
 # ── 키워드 두 축 구조 ────────────────────────────────
+# 대상: 해외조달시장 진출 희망 조달 기업 (혁신제품 지정 여부 무관)
+
 # 축1: 지원대상 (누구를 위한 공고인가)
 TARGET_KW = {
-    "혁신기업특화": ["혁신제품","혁신기업","G-PASS","혁신조달","혁신바우처","혁신성장"],
-    "수출기업특화": ["수출기업","수출실적","수출유망","글로벌강소"],
-    "중소기업일반": ["중소기업","소기업","중견기업","벤처기업"],
+    "조달기업특화": [
+        "조달청","G-PASS","혁신제품","MAS","우선구매",
+        "공공조달","해외조달","나라장터","조달우수","혁신조달",
+        "혁신기업","혁신바우처","혁신성장","공공기관",
+    ],
+    "수출기업특화": [
+        "수출기업","수출유망","수출강소","글로벌강소","수출초보",
+        "FTA","무역","KOTRA","해외개척","수출성장","수출실적기업",
+        "수출유망중소기업",
+    ],
+    "중소벤처일반": [
+        "중소기업","중소·중견","벤처기업","이노비즈","메인비즈",
+        "강소기업","스타기업","유망기업","월드클래스","히든챔피언",
+        "중견기업","소기업",
+    ],
 }
 # 축2: 사업성격 (어떤 종류의 지원인가)
 TYPE_KW = {
-    "조달공공구매": ["조달청","공공구매","시범구매","우선구매","해외조달","공공조달","MAS"],
-    "해외진출":     ["해외판로","수출바우처","수출지원","해외진출","해외마케팅","판로개척","글로벌","수출컨소시엄"],
-    "기술개발":     ["기술개발","R&D","기술사업화","연구개발","기술혁신","스케일업"],
-    "금융융자":     ["융자","보증","이차보전","경영안정자금","정책자금"],
+    "공공조달":   [
+        "조달청","혁신조달","시범구매","우선구매","해외조달",
+        "공공구매","MAS등록","나라장터","조달시장","공공기관납품",
+    ],
+    "해외진출":   [
+        "해외판로","수출바우처","해외마케팅","판로개척","해외진출",
+        "글로벌","수출지원","해외시장","수출컨소시엄","해외무역",
+        "수출인큐베이터","해외거점",
+    ],
+    "마케팅홍보": [
+        "전시회","박람회","해외전시","전시참가","무역박람회",
+        "홍보","브랜드","온라인마케팅","해외홍보","쇼룸",
+    ],
+    "인증특허":   [
+        "인증","특허","지식재산","KC인증","CE인증","ISO",
+        "해외인증","IP","상표등록","국제인증","품질인증",
+    ],
+    "기술개발":   [
+        "기술개발","R&D","기술사업화","연구개발","기술혁신",
+        "기술이전","스케일업","실증","사업화",
+    ],
+    "금융융자":   [
+        "융자","보증","정책자금","이차보전","경영안정",
+        "투자","펀드","자금지원","신용보증",
+    ],
+    "내수판로":   [
+        "온라인몰","플랫폼","유통","알리바바","바이코리아",
+        "내수판로","홈쇼핑","라이브커머스","B2B",
+    ],
 }
 
 # 별점 판정 함수용 flat 리스트 (설정 탭 표시용)
 DEFAULT_HIGH = (
-    TARGET_KW["혁신기업특화"] +
-    TYPE_KW["조달공공구매"]
+    TARGET_KW["조달기업특화"] +
+    TYPE_KW["공공조달"]
 )
 DEFAULT_MID = (
     TARGET_KW["수출기업특화"] +
     TYPE_KW["해외진출"] +
-    TYPE_KW["기술개발"]
+    TYPE_KW["마케팅홍보"]
 )
 REALM_CODE   = {
     "금융":"01","기술개발":"02","인력":"03","수출":"04",
@@ -278,7 +317,6 @@ def load_text(drive, filename):
 
 def load_keywords(drive):
     kw = load_json(drive, KEYWORDS_FILE)
-    # 드라이브에 두 축 구조가 있으면 그걸 쓰고, 없으면 기본값
     global TARGET_KW, TYPE_KW
     if "TARGET_KW" in kw: TARGET_KW = kw["TARGET_KW"]
     if "TYPE_KW"   in kw: TYPE_KW   = kw["TYPE_KW"]
@@ -418,56 +456,71 @@ def score_notice(notice, row, already_sent, HIGH, MID):
     cn = str(row.get('수출국가',''))
     xs = 2 if (cn and cn!='nan' and cn in text) else 0
 
-    # ── 별점 판정 (두 축 교차) ────────────────────────
-    has_innov_target  = '혁신기업특화' in matched_target
-    has_export_target = '수출기업특화' in matched_target
-    has_procurement   = '조달공공구매' in matched_type
-    has_overseas      = '해외진출'     in matched_type
-    has_tech          = '기술개발'     in matched_type
-
-    # 기업 키워드(기술키워드+제품분야+핵심수요태그) 공고 매칭 여부
-    has_co_match = bool(matched_co or matched_demand)
-
-    # ── 역매칭 체크: 공고에 특정 업종 키워드가 있는데
-    #    기업 키워드와 전혀 겹치지 않으면 업종 불일치로 판단
+    # ── 역매칭: 특정 업종 명시 공고에서 기업 키워드 없으면 제외 ──
     INDUSTRY_SPECIFIC = [
         '농식품','농업','식품','농산물','수산','임업',
         '의료','바이오','제약','화장품','뷰티',
         '건설','건축','토목','부동산',
-        '관광','숙박','외식','요식',
+        '관광','숙박','외식','요식업',
         '섬유','패션','의류',
     ]
-    industry_mismatch = False
     for ind_kw in INDUSTRY_SPECIFIC:
-        if ind_kw in text and not any(ind_kw in kw or kw in ind_kw
-                                      for kw in co_kws + demand_tags):
-            industry_mismatch = True
-            break
+        if ind_kw in text and not any(
+            ind_kw in kw or kw in ind_kw for kw in co_kws + demand_tags
+        ):
+            return None
 
-    # 업종 불일치면 바로 제외
-    if industry_mismatch:
-        return None
+    # ── 별점 판정 (두 축 교차 + 기업 키워드) ────────
+    has_procurement   = '공공조달'   in matched_type
+    has_overseas      = '해외진출'   in matched_type
+    has_marketing     = '마케팅홍보' in matched_type
+    has_cert          = '인증특허'   in matched_type
+    has_tech          = '기술개발'   in matched_type
+    has_finance       = '금융융자'   in matched_type
+    has_domestic      = '내수판로'   in matched_type
 
-    # ★★★: 혁신기업 특화 + 조달/해외 + 기업 키워드 매칭
-    if has_innov_target and (has_procurement or has_overseas) and has_co_match:
+    has_procurement_target = '조달기업특화' in matched_target
+    has_export_target      = '수출기업특화' in matched_target
+    has_general_target     = '중소벤처일반' in matched_target
+
+    has_co_match    = bool(matched_co or matched_demand)
+    has_demand_hit  = bool(matched_demand)  # 핵심수요태그 직접 매칭
+
+    stars = None  # 초기화
+
+    # ★★★ 판정
+    if has_demand_hit:
+        # 핵심수요태그 직접 매칭 → 무조건 ★★★
         stars = "★★★"
-    # ★★★: 혁신기업 특화 + 조달 (기업 키워드 없어도 조달청은 혁신기업 전체 대상)
-    elif has_innov_target and has_procurement:
+    elif has_procurement_target and has_procurement:
+        # 조달기업 대상 + 공공조달 사업
         stars = "★★★"
-    # ★★: 수출기업 특화 + 해외진출 + 기업 키워드
-    elif has_export_target and has_overseas and has_co_match:
-        stars = "★★"
-    # ★★: 수출기업 특화 + 해외진출 (키워드 없어도 수출기업 전체 대상)
+    elif has_procurement_target and has_overseas:
+        # 조달기업 대상 + 해외진출 사업
+        stars = "★★★"
     elif has_export_target and has_overseas:
+        # 수출기업 대상 + 해외진출 사업
+        stars = "★★★"
+    elif has_co_match and has_procurement:
+        # 기업 키워드 매칭 + 공공조달
+        stars = "★★★"
+
+    # ★★ 판정
+    elif has_procurement_target and (has_tech or has_cert or has_marketing):
         stars = "★★"
-    # ★★: 혁신기업 특화 + 기술개발
-    elif has_innov_target and has_tech:
+    elif has_export_target and (has_marketing or has_cert or has_domestic):
         stars = "★★"
-    # ★★: 기업 키워드 직접 매칭 + 사업성격 있음
-    elif has_co_match and (matched_target or matched_type):
+    elif has_co_match and (has_overseas or has_marketing or has_cert):
         stars = "★★"
+    elif has_co_match and matched_target:
+        stars = "★★"
+    elif has_general_target and (has_procurement or has_overseas):
+        stars = "★★"
+    elif has_general_target and has_co_match:
+        stars = "★★"
+
     # 매칭 없음
-    else:
+    if not stars:
         return None
 
     # ── 점수 계산 (정렬용) ────────────────────────────
@@ -652,6 +705,7 @@ code {color:#63FFA8 !important; background:#1A2940 !important; font-size:13px !i
 div[data-testid="stStatusWidget"] {display:none !important;}
 #MainMenu {visibility:hidden;}
 footer    {visibility:hidden;}
+header    {visibility:hidden;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1727,55 +1781,64 @@ elif page == "설정":
 
     st.caption("💡 두 축(지원대상 × 사업성격) 교차로 별점 판정 — 아래에서 각 축 키워드 수정")
 
-    tab_k1, tab_k2 = st.tabs(["지원대상 키워드", "사업성격 키워드"])
+    kw_data = load_json(drive, KEYWORDS_FILE)
+    tab_k1, tab_k2 = st.tabs(["축1 — 지원대상", "축2 — 사업성격"])
 
     with tab_k1:
-        st.caption("**축1 — 지원대상**: 공고가 어떤 기업을 대상으로 하는지 판단")
-        kw_data = load_json(drive, KEYWORDS_FILE)
+        st.caption("공고가 어떤 기업을 대상으로 하는지 판단 — 대상과 사업성격이 교차될 때 별점 결정")
         current_target = kw_data.get("TARGET_KW", TARGET_KW)
-
         t_inputs = {}
+        label_map1 = {
+            "조달기업특화": "조달기업특화 ★★★ (G-PASS·조달청·해외조달 대상 공고)",
+            "수출기업특화": "수출기업특화 ★★★ (수출·글로벌 대상 공고)",
+            "중소벤처일반": "중소벤처일반 ★★ (일반 중소·벤처 대상 공고)",
+        }
         for cat, kws in current_target.items():
-            label_map = {
-                "혁신기업특화": "혁신기업특화 (★★★ 판정 핵심)",
-                "수출기업특화": "수출기업특화 (★★ 판정)",
-                "중소기업일반": "중소기업일반 (참고용)",
-            }
-            st.markdown(f"**{label_map.get(cat, cat)}**")
+            st.markdown(f"**{label_map1.get(cat, cat)}**")
             t_inputs[cat] = st.text_area(
-                f"{cat} 키워드", value="\n".join(kws), height=100,
+                f"{cat} 키워드", value=", ".join(kws), height=70,
                 key=f"tkw_{cat}", label_visibility="collapsed"
             )
 
     with tab_k2:
-        st.caption("**축2 — 사업성격**: 공고가 어떤 종류의 지원인지 판단")
+        st.caption("공고가 어떤 종류의 지원인지 판단 — 지원대상과 교차하여 별점 결정")
         current_type = kw_data.get("TYPE_KW", TYPE_KW)
-
         ty_inputs = {}
-        for cat, kws in current_type.items():
-            label_map = {
-                "조달공공구매": "조달·공공구매 (★★★ 판정 핵심)",
-                "해외진출":     "해외진출 (★★★/★★ 판정)",
-                "기술개발":     "기술개발 (★★ 판정)",
-                "금융융자":     "금융·융자 (참고용)",
-            }
-            st.markdown(f"**{label_map.get(cat, cat)}**")
-            ty_inputs[cat] = st.text_area(
-                f"{cat} 키워드", value="\n".join(kws), height=80,
-                key=f"tykw_{cat}", label_visibility="collapsed"
-            )
+        label_map2 = {
+            "공공조달":   "공공조달 ★★★ (조달청·시범구매·MAS)",
+            "해외진출":   "해외진출 ★★★ (수출바우처·해외판로)",
+            "마케팅홍보": "마케팅·홍보 ★★ (전시회·박람회·홍보)",
+            "인증특허":   "인증·특허 ★★ (해외인증·IP)",
+            "기술개발":   "기술개발 ★★ (R&D·기술사업화)",
+            "금융융자":   "금융·융자 ★★ (정책자금·보증)",
+            "내수판로":   "내수판로 ★★ (온라인몰·유통)",
+        }
+        col1, col2 = st.columns(2)
+        cats = list(current_type.items())
+        for i, (cat, kws) in enumerate(cats):
+            with (col1 if i % 2 == 0 else col2):
+                st.markdown(f"**{label_map2.get(cat, cat)}**")
+                ty_inputs[cat] = st.text_area(
+                    f"{cat} 키워드", value=", ".join(kws), height=70,
+                    key=f"tykw_{cat}", label_visibility="collapsed"
+                )
 
-    st.caption("💡 별점 판정 기준: 혁신기업특화 + 조달/해외진출 → ★★★ / 그 외 조합 → ★★")
+    st.divider()
+    st.caption("""
+    **별점 판정 기준**
+    ★★★: 핵심수요태그 직접 매칭 / 조달기업+공공조달 / 조달기업+해외진출 / 수출기업+해외진출 / 기업키워드+공공조달
+    ★★:  기업키워드+사업성격 / 조달·수출기업+마케팅·인증 / 중소벤처+조달·해외진출
+    """)
     if st.button("💾 키워드 저장 → 드라이브", type="primary"):
-        new_target = {cat: [k.strip() for k in v.split("\n") if k.strip()]
+        new_target = {cat: [k.strip() for k in v.replace("\n",",").split(",") if k.strip()]
                       for cat, v in t_inputs.items()}
-        new_type   = {cat: [k.strip() for k in v.split("\n") if k.strip()]
+        new_type   = {cat: [k.strip() for k in v.replace("\n",",").split(",") if k.strip()]
                       for cat, v in ty_inputs.items()}
         save_data  = {
             "TARGET_KW": new_target,
             "TYPE_KW":   new_type,
-            "HIGH": sum(new_target.values(), [])[:10],
-            "MID":  sum(new_type.values(), [])[:10],
+            "HIGH": sum(new_target.values(), [])[:15],
+            "MID":  sum(new_type.values(), [])[:15],
         }
         with st.spinner("드라이브 저장 중..."):
             if save_json(drive, save_data, KEYWORDS_FILE):
