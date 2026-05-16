@@ -336,28 +336,44 @@ def drive_download_file(file_id):
     return resp.content if resp.ok else None
 
 def drive_upload_file(name, folder_id, content_bytes, mime, file_id=None):
-    meta = json.dumps({"name": name, "parents": [folder_id]}).encode()
     bnd  = b"----MIMEBoundary"
     crlf = b"\r\n"
-    body = b"--" + bnd + crlf
-    body += b"Content-Type: application/json; charset=UTF-8" + crlf + crlf
-    body += meta + crlf
-    body += b"--" + bnd + crlf
-    body += b"Content-Type: " + mime.encode() + crlf + crlf
-    body += content_bytes + crlf
-    body += b"--" + bnd + b"--"
-    ct = "multipart/related; boundary=----MIMEBoundary"
+    ct   = "multipart/related; boundary=----MIMEBoundary"
+
     if file_id:
+        # 기존 파일 업데이트: parents 제외, 내용만 교체
+        meta = json.dumps({"name": name}).encode()
+        body = b"--" + bnd + crlf
+        body += b"Content-Type: application/json; charset=UTF-8" + crlf + crlf
+        body += meta + crlf
+        body += b"--" + bnd + crlf
+        body += b"Content-Type: " + mime.encode() + crlf + crlf
+        body += content_bytes + crlf
+        body += b"--" + bnd + b"--"
         resp = gapi("PATCH",
             f"https://www.googleapis.com/upload/drive/v3/files/{file_id}",
             params={"uploadType": "multipart"},
-            data=body, headers={"Content-Type": ct})
+            data=body,
+            headers={"Content-Type": ct})
     else:
+        # 신규 파일 생성: parents 포함
+        meta = json.dumps({"name": name, "parents": [folder_id]}).encode()
+        body = b"--" + bnd + crlf
+        body += b"Content-Type: application/json; charset=UTF-8" + crlf + crlf
+        body += meta + crlf
+        body += b"--" + bnd + crlf
+        body += b"Content-Type: " + mime.encode() + crlf + crlf
+        body += content_bytes + crlf
+        body += b"--" + bnd + b"--"
         resp = gapi("POST",
             "https://www.googleapis.com/upload/drive/v3/files",
             params={"uploadType": "multipart"},
-            data=body, headers={"Content-Type": ct})
-    return resp.ok
+            data=body,
+            headers={"Content-Type": ct})
+
+    if not resp.ok:
+        raise Exception(f"HTTP {resp.status_code}: {resp.text[:200]}")
+    return True
 
 def get_services(): return None, None, None
 def _get_drive():   return 'drive'
@@ -376,9 +392,11 @@ def drive_download(drive, filename):
 def drive_upload(drive, filename, content_bytes, mime):
     try:
         fid = drive_file_id(drive, filename)
-        return drive_upload_file(filename, DRIVE_FOLDER_ID, content_bytes, mime, fid)
+        result = drive_upload_file(filename, DRIVE_FOLDER_ID, content_bytes, mime, fid)
+        return result
     except Exception as e:
-        st.warning(f"드라이브 저장 실패 ({filename}): {e}"); return False
+        st.error(f"드라이브 저장 실패 ({filename}): {e}")
+        return False
 
 def load_excel(drive, filename):
     content = drive_download(drive, filename)
