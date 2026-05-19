@@ -727,9 +727,23 @@ def score_notice(notice, row, already_sent, HIGH, MID):
 
 def claude_analyze(company_info, notice_info):
     """Claude API로 공고-기업 적합성 분석"""
-    api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+    # 여러 방식으로 API 키 탐색
+    api_key = ""
+    try:
+        api_key = st.secrets["ANTHROPIC_API_KEY"]
+    except:
+        try:
+            api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+        except:
+            pass
+
     if not api_key:
-        return {"error": "API 키 없음 — Secrets에 ANTHROPIC_API_KEY 추가 필요"}
+        # 디버깅: 어떤 키가 있는지 확인
+        try:
+            available = list(st.secrets.keys())
+        except:
+            available = []
+        return {"error": f"API 키 없음 — 현재 Secrets 키 목록: {available}"}
 
     prompt = f"""당신은 정부 지원사업 매칭 전문가입니다.
 아래 기업 정보와 공고 내용을 보고 적합성을 판단해주세요.
@@ -1319,36 +1333,49 @@ elif page == "공고 수집":
                     "해시태그":item.get('hashtags',''),"공고링크":item.get('pblancUrl',''),
                     "수정일":item.get('updtPnttm',''),"수집일":datetime.today().strftime("%Y-%m-%d")}
 
+        today = datetime.today().strftime("%Y-%m-%d")
         ex_map = {r['pblancId']:r.get('수정일','') for _,r in df_n.iterrows()} if not df_n.empty else {}
         new_rows, upd_rows = [], []
+        dup_count = 0
         for item in all_items:
             pid = item.get('pblancId','')
             if not pid: continue
             row = to_row(item)
-            if pid not in ex_map: new_rows.append(row)
-            elif ex_map[pid] != item.get('updtPnttm',''): upd_rows.append(row)
+            if pid not in ex_map:
+                new_rows.append(row)
+            elif ex_map[pid] != item.get('updtPnttm',''):
+                upd_rows.append(row)
+            else:
+                dup_count += 1
 
         if not df_n.empty:
             upd_ids  = {r['pblancId'] for r in upd_rows}
-            df_final = pd.concat([df_n[~df_n['pblancId'].isin(upd_ids)],
-                                   pd.DataFrame(new_rows+upd_rows)], ignore_index=True)
+            df_base  = df_n[~df_n['pblancId'].isin(upd_ids)].copy()
+            # 기존 공고도 수집일 오늘로 갱신 (마지막 수집일 반영)
+            df_base['수집일'] = today
+            df_final = pd.concat([df_base, pd.DataFrame(new_rows+upd_rows)], ignore_index=True)
         else:
             df_final = pd.DataFrame(new_rows)
+
+        summary = "\n".join(logs) + f"\n\n📊 결과 요약\n  신규: {len(new_rows)}건 / 업데이트: {len(upd_rows)}건 / 중복유지: {dup_count}건 / 총 DB: {len(df_final):,}건"
+        log_area.code(summary)
 
         with st.spinner("드라이브 저장 중..."):
             save_ok = save_excel(drive, df_final, NOTICES_FILE, "공고DB", "00897B")
 
         prog.progress(1.0)
         if save_ok:
-            # 세션에 최신 건수 저장 (rerun 후에도 유지)
             st.session_state['notices_count'] = len(df_final)
             st.session_state['notices_new']   = len(new_rows)
             st.session_state['notices_upd']   = len(upd_rows)
-            st.success(f"✅ 수집 및 저장 완료 — 총 {len(df_final):,}건 (신규 {len(new_rows)} / 업데이트 {len(upd_rows)})")
+            st.success(
+                f"✅ 수집 완료 — 총 {len(df_final):,}건 "
+                f"(신규 {len(new_rows)} / 업데이트 {len(upd_rows)} / 중복유지 {dup_count})"
+            )
             st.rerun()
         else:
-            st.error("❌ 드라이브 저장 실패 — 인증 상태 또는 권한 확인 필요")
-            st.info(f"수집은 완료됨: 총 {len(df_final):,}건 (신규 {len(new_rows)} / 업데이트 {len(upd_rows)})")
+            st.error("❌ 드라이브 저장 실패 — 설정 메뉴에서 드라이브 연동 확인 필요")
+            st.info(f"수집은 완료: 총 {len(df_final):,}건 (신규 {len(new_rows)} / 업데이트 {len(upd_rows)} / 중복 {dup_count})")
 
     if not df_n.empty:
         st.divider()
