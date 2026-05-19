@@ -867,6 +867,10 @@ code {color:#63FFA8 !important; background:#1A2940 !important; font-size:13px !i
 .stError   {background:#2B0A0A !important; border-left:4px solid #FF6363 !important;}
 .stInfo    {background:#0A1A2B !important; border-left:4px solid #4A9EFF !important;}
 
+/* ── 사이드바 항상 노출 (접기 버튼 숨김) ── */
+[data-testid="stSidebarCollapseButton"] {display:none !important;}
+[data-testid="collapsedControl"]        {display:none !important;}
+
 /* ── 툴팁·도움말 완전 제거 ── */
 .stTooltipIcon {display:none !important;}
 div[data-testid="stStatusWidget"] {display:none !important;}
