@@ -788,7 +788,7 @@ def claude_analyze(company_info, notice_info):
                 "content-type": "application/json",
             },
             json={
-                "model": "claude-sonnet-4-20250514",
+                "model": "claude-sonnet-4-5",
                 "max_tokens": 500,
                 "messages": [{"role": "user", "content": prompt}]
             },
@@ -1444,14 +1444,51 @@ elif page == "매칭 결과":
             with c2: filter_co    = st.selectbox("기업", ["전체"]+sorted(df_show['기업명'].unique().tolist()))
             filtered = df_show[df_show['관련도'].isin(filter_stars)]
             if filter_co != "전체": filtered = filtered[filtered['기업명']==filter_co]
-            if 'review_state' not in st.session_state: st.session_state['review_state'] = {}
+            if 'review_state'  not in st.session_state: st.session_state['review_state']  = {}
+            if 'ai_analysis'   not in st.session_state: st.session_state['ai_analysis']   = {}
+            if 'custom_deadline' not in st.session_state: st.session_state['custom_deadline'] = {}
+
             ap = sum(1 for v in st.session_state['review_state'].values() if v=="○")
             rj = sum(1 for v in st.session_state['review_state'].values() if v=="✕")
-            st.caption(f"총 {len(filtered)}건  |  ✅ 승인 {ap}건  |  ❌ 제외 {rj}건")
+            ai_done = len(st.session_state['ai_analysis'])
+
+            col_stat1, col_stat2 = st.columns([3,1])
+            with col_stat1:
+                st.caption(
+                    f"총 {len(filtered)}건  |  ✅ 승인 {ap}건  |  ❌ 제외 {rj}건"
+                    f"  |  🤖 AI분석 {ai_done}건"
+                )
+            with col_stat2:
+                with st.expander("🤖 전체 AI 분석"):
+                    st.caption(f"⚠️ {len(filtered)}건 전체 분석 — 비용 발생")
+                    confirm = st.text_input("확인코드 입력 (분석실행)",
+                        key="bulk_ai_confirm", placeholder="분석실행")
+                    if st.button("전체 분석 시작", key="bulk_ai_btn", type="primary"):
+                        if confirm == "분석실행":
+                            prog_ai = st.progress(0, text="AI 분석 중...")
+                            for ai_i, (_, ai_row) in enumerate(filtered.iterrows()):
+                                ai_key = f"{ai_row['기업명']}_{ai_row.get('공고ID','')}"
+                                if ai_key not in st.session_state['ai_analysis']:
+                                    co_info = {}
+                                    if 'df_companies_cache' in st.session_state:
+                                        df_co = st.session_state['df_companies_cache']
+                                        co_rows = df_co[df_co['기업명']==ai_row['기업명']]
+                                        if not co_rows.empty:
+                                            co_info = co_rows.iloc[0].to_dict()
+                                    co_info['기업명'] = ai_row['기업명']
+                                    result = claude_analyze(co_info, ai_row.to_dict())
+                                    st.session_state['ai_analysis'][ai_key] = result
+                                prog_ai.progress(
+                                    (ai_i+1)/len(filtered),
+                                    text=f"AI 분석 중... {ai_i+1}/{len(filtered)}"
+                                )
+                            st.success(f"전체 분석 완료 — {len(filtered)}건")
+                            st.rerun()
+                        else:
+                            st.error("확인코드가 틀렸습니다 ('분석실행' 입력)")
+
             st.divider()
-            # 마감일 직접 입력 상태 초기화
-            if 'custom_deadline' not in st.session_state:
-                st.session_state['custom_deadline'] = {}
+            # (custom_deadline 위에서 초기화됨)
 
             for i,(idx,row) in enumerate(filtered.iterrows()):
                 key      = f"{row['기업명']}_{row.get('공고ID','')}"
