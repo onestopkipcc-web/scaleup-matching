@@ -867,9 +867,10 @@ code {color:#63FFA8 !important; background:#1A2940 !important; font-size:13px !i
 .stError   {background:#2B0A0A !important; border-left:4px solid #FF6363 !important;}
 .stInfo    {background:#0A1A2B !important; border-left:4px solid #4A9EFF !important;}
 
-/* ── 사이드바 항상 노출 (접기 버튼 숨김) ── */
+/* ── 사이드바 항상 노출 ── */
+/* 사이드바 안의 닫기(X) 버튼만 숨김 */
 [data-testid="stSidebarCollapseButton"] {display:none !important;}
-[data-testid="collapsedControl"]        {display:none !important;}
+/* 사이드바가 닫혔을 때 열기 버튼은 보여야 함 → collapsedControl 숨기지 않음 */
 
 /* ── 툴팁·도움말 완전 제거 ── */
 .stTooltipIcon {display:none !important;}
