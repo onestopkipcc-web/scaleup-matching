@@ -488,7 +488,7 @@ def score_notice(notice, row, already_sent, HIGH, MID):
     if dl and dl < datetime.today().strftime("%Y-%m-%d"): return None
     if str(row.get('수출실적',''))=='아니오' and '수출' in str(notice.get('분야','')): return None
 
-    text = " ".join([str(notice.get(k,'')) for k in ['공고명','사업개요','해시태그','주관기관','지원대상']])
+    text = " ".join([str(notice.get(k,'')) for k in ['공고명','사업개요','전문내용','해시태그','주관기관','지원대상']])
 
     # ── TRL 필터: 8-9단계 기업은 R&D 공고 제외 ──────
     trl = str(row.get('TRL단계',''))
@@ -1336,8 +1336,9 @@ elif page == "공고 수집":
                     "세부분야":item.get('pldirSportRealmMlsfcCodeNm',''),
                     "접수기간":item.get('reqstBeginEndDe',''),"마감일":pdl(item.get('reqstBeginEndDe','')),
                     "지원대상":item.get('trgetNm',''),
-                    "사업개요":strip_html(item.get('bsnsSumryCn',''))[:500],
+                    "사업개요":strip_html(item.get('bsnsSumryCn','')),  # API 전체 반환값 저장
                     "해시태그":item.get('hashtags',''),"공고링크":item.get('pblancUrl',''),
+                    "전문내용":"",  # 크롤링 후 채워짐
                     "수정일":item.get('updtPnttm',''),"수집일":datetime.today().strftime("%Y-%m-%d")}
 
         today = datetime.today().strftime("%Y-%m-%d")
@@ -1587,7 +1588,7 @@ elif page == "매칭 결과":
                         d = detail_map[pid]
                         # 사업개요를 전문으로 교체 (있을 때만)
                         if d.get('전문내용','') and len(d.get('전문내용','')) > len(n_dict.get('사업개요','')):
-                            n_dict['사업개요'] = d.get('전문내용','')[:500]
+                            n_dict['사업개요'] = d.get('전문내용','')
                             n_dict['전문내용'] = d.get('전문내용','')
                         n_dict['지원금액'] = d.get('지원금액','')
                         n_dict['선정규모'] = d.get('선정규모','')
