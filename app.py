@@ -48,6 +48,7 @@ SELECTED_FILE    = "선정기업_명단.xlsx"   # ← 핵심 변경
 NOTICES_FILE     = "notices_db.xlsx"
 HISTORY_FILE     = "send_history.xlsx"
 KEYWORDS_FILE    = "keywords.json"
+DETAIL_FILE      = "notices_detail.xlsx"  # 크롤링 전문 DB
 CALID_FILE       = "calendar_id.txt"
 CATCAL_FILE      = "category_calendars.json"
 INDCAL_FILE      = "individual_calendars.json"
@@ -1040,9 +1041,10 @@ if page == "대시보드":
 
     st.divider()
     st.subheader("드라이브 파일 현황")
-    fcols = st.columns(5)
+    fcols = st.columns(6)
     for col,(fname,label) in zip(fcols,{
         SELECTED_FILE:"선정기업 명단", NOTICES_FILE:"공고 DB",
+        DETAIL_FILE:"공고 전문 DB",
         HISTORY_FILE:"발송 이력", CALID_FILE:"캘린더 ID", KEYWORDS_FILE:"키워드"
     }.items()):
         fid = drive_file_id(drive, fname)
@@ -1388,6 +1390,145 @@ elif page == "공고 수집":
         cols = [c for c in ["공고명","주관기관","분야","접수기간","마감일"] if c in df_n.columns]
         st.dataframe(df_n[cols].head(20), use_container_width=True, hide_index=True)
 
+    st.divider()
+    st.subheader("📄 공고 전문 크롤링")
+
+    with st.spinner("전문 DB 현황 확인 중..."):
+        df_detail = load_excel(drive, DETAIL_FILE)
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("전문 수집 건수", f"{len(df_detail):,}건" if not df_detail.empty else "0건")
+    c2.metric("자동 실행", "매주 수요일 10시")
+
+    if not df_detail.empty and '크롤링일' in df_detail.columns:
+        c3.metric("마지막 크롤링", df_detail['크롤링일'].max())
+    else:
+        c3.metric("마지막 크롤링", "—")
+
+    col_a, col_b = st.columns([2,1])
+    with col_a:
+        st.caption("공고 전문(지원자격·지원금액 등)을 크롤링하여 매칭 정확도를 높입니다. GitHub Actions로 매주 수요일 자동 실행됩니다.")
+    with col_b:
+        crawl_toggle = st.toggle("수동 크롤링 활성화", value=False, key="crawl_toggle")
+
+    if crawl_toggle:
+        st.warning("⚠️ 수동 크롤링 — 공고 수에 따라 수십 분 소요될 수 있습니다.")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            crawl_limit = st.number_input(
+                "최대 크롤링 건수 (0 = 전체)",
+                min_value=0, max_value=500, value=50,
+                help="테스트 시 50건 권장, 전체는 0 입력"
+            )
+        with col2:
+            crawl_delay = st.selectbox(
+                "요청 간격",
+                ["빠름 (0.5초)", "보통 (1.2초)", "느림 (2초)"],
+                index=1
+            )
+            delay_map = {"빠름 (0.5초)": 0.5, "보통 (1.2초)": 1.2, "느림 (2초)": 2.0}
+            delay_sec = delay_map[crawl_delay]
+
+        if st.button("🕷️ 지금 크롤링 실행", type="primary", key="crawl_btn"):
+            import time as _time
+            from bs4 import BeautifulSoup
+
+            today = datetime.today().strftime('%Y-%m-%d')
+
+            # 크롤링 대상 필터
+            already = set(df_detail['pblancId'].tolist()) if not df_detail.empty else set()
+            df_target = df_n[
+                (~df_n['pblancId'].isin(already)) &
+                ((df_n['마감일'] == '') | (df_n['마감일'] >= today))
+            ].copy()
+
+            if crawl_limit > 0:
+                df_target = df_target.head(crawl_limit)
+
+            st.info(f"크롤링 대상: {len(df_target)}건")
+            prog = st.progress(0); log_area = st.empty()
+            logs = []; new_records = []; success = fail = 0
+
+            HEADERS = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept-Language": "ko-KR,ko;q=0.9",
+                "Referer": "https://www.bizinfo.go.kr/",
+            }
+
+            for i, (_, row) in enumerate(df_target.iterrows()):
+                url = row.get('공고링크','')
+                pid = row.get('pblancId','')
+                name = row.get('공고명','')[:25]
+                if not url or not pid: continue
+
+                try:
+                    _time.sleep(delay_sec)
+                    resp = requests.get(url, headers=HEADERS, timeout=20)
+                    if resp.status_code == 200:
+                        soup = BeautifulSoup(resp.text, 'html.parser')
+                        full_text = ""
+                        for sel in ['.view-content','.detail-content','#bizSumryCn',
+                                    '.bbs-view-content','#content','.board-view']:
+                            el = soup.select_one(sel)
+                            if el:
+                                full_text = el.get_text(separator=' ', strip=True)
+                                if len(full_text) > 200: break
+                        if len(full_text) < 100:
+                            body = soup.find('body')
+                            if body:
+                                for tag in body.find_all(['nav','header','footer','script','style']):
+                                    tag.decompose()
+                                full_text = body.get_text(separator=' ', strip=True)
+
+                        import re as _re
+                        amount = ""
+                        for pat in [r'지원.{0,3}(?:금액|한도)[^0-9]*([0-9][0-9,억만원 ]+)', r'최대.{0,2}([0-9][0-9,억만원 ]+)']:
+                            m = _re.search(pat, full_text)
+                            if m: amount = m.group(0)[:30]; break
+                        scale = ""
+                        for pat in [r'([0-9]+).{0,2}개.{0,3}(?:사|업체|기업).{0,4}(?:내외|이내|선정)', r'선정.{0,4}(?:규모|예정)[^0-9]*([0-9]+)']:
+                            m = _re.search(pat, full_text)
+                            if m: scale = m.group(0)[:30]; break
+
+                        new_records.append({'pblancId':pid,'전문내용':full_text[:3000],
+                                           '지원금액':amount,'선정규모':scale,
+                                           '크롤링일':today,'크롤링성공':'Y'})
+                        success += 1
+                        logs.append(f"✅ {name}")
+                    else:
+                        new_records.append({'pblancId':pid,'전문내용':'','지원금액':'',
+                                           '선정규모':'','크롤링일':today,'크롤링성공':'N'})
+                        fail += 1
+                        logs.append(f"❌ {name} (HTTP {resp.status_code})")
+                except Exception as e:
+                    new_records.append({'pblancId':pid,'전문내용':'','지원금액':'',
+                                       '선정규모':'','크롤링일':today,'크롤링성공':'N'})
+                    fail += 1
+                    logs.append(f"❌ {name} ({str(e)[:30]})")
+
+                prog.progress((i+1)/len(df_target))
+                log_area.code("\n".join(logs[-10:]))
+
+            # 드라이브 저장
+            if new_records:
+                df_new = pd.DataFrame(new_records)
+                df_out = pd.concat([df_detail, df_new], ignore_index=True) if not df_detail.empty else df_new
+                with st.spinner("드라이브 저장 중..."):
+                    buf = io.BytesIO()
+                    with pd.ExcelWriter(buf, engine='openpyxl') as w:
+                        df_out.to_excel(w, index=False)
+                    save_ok = drive_upload(drive, DETAIL_FILE, buf.getvalue(),
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+                if save_ok:
+                    st.success(f"✅ 크롤링 완료 — 성공 {success}건 / 실패 {fail}건 → notices_detail.xlsx 저장")
+                    st.rerun()
+                else:
+                    st.error("드라이브 저장 실패")
+            else:
+                st.info("새로 크롤링할 공고 없음")
+
 
 # ══════════════════════════════════════════════════════
 # 매칭 결과
@@ -1418,10 +1559,19 @@ elif page == "매칭 결과":
         max_per = st.slider("기업당 최대 추천 건수", 5, 20, 12)
         if st.button("🔗 매칭 실행", type="primary"):
             with st.spinner("드라이브 데이터 로딩 중..."):
-                df_c  = load_excel(drive, SELECTED_FILE)
-                df_n  = load_excel(drive, NOTICES_FILE)
-                df_h  = load_excel(drive, HISTORY_FILE)
+                df_c    = load_excel(drive, SELECTED_FILE)
+                df_n    = load_excel(drive, NOTICES_FILE)
+                df_h    = load_excel(drive, HISTORY_FILE)
+                df_detail = load_excel(drive, DETAIL_FILE)  # 전문 DB
                 HIGH, MID = load_keywords(drive)
+
+                # 공고 전문 DB를 notices_db에 병합
+                if not df_detail.empty and 'pblancId' in df_detail.columns:
+                    detail_map = df_detail.set_index('pblancId').to_dict('index')
+                else:
+                    detail_map = {}
+
+                notice_detail_count = len(detail_map)
             if df_n.empty: st.error("notices_db 없음 → 공고 수집 먼저"); st.stop()
             if df_c.empty: st.error("선정기업 명단 없음 → 기업 관리에서 업로드"); st.stop()
             if '수신거부' in df_c.columns: df_c = df_c[df_c['수신거부']!='Y']
@@ -1430,8 +1580,21 @@ elif page == "매칭 결과":
             notice_recommend_count = {}  # 공고별 추천 횟수 추적
 
             for idx,(_,row) in enumerate(df_c.iterrows()):
+                def enrich_notice(n_dict):
+                    """전문 DB에서 추가 내용 병합"""
+                    pid = n_dict.get('pblancId','')
+                    if pid in detail_map:
+                        d = detail_map[pid]
+                        # 사업개요를 전문으로 교체 (있을 때만)
+                        if d.get('전문내용','') and len(d.get('전문내용','')) > len(n_dict.get('사업개요','')):
+                            n_dict['사업개요'] = d.get('전문내용','')[:500]
+                            n_dict['전문내용'] = d.get('전문내용','')
+                        n_dict['지원금액'] = d.get('지원금액','')
+                        n_dict['선정규모'] = d.get('선정규모','')
+                    return n_dict
+
                 scored = [r for _,n in df_n.iterrows()
-                          if (r:=score_notice(n.to_dict(),row,already_sent,HIGH,MID))]
+                          if (r:=score_notice(enrich_notice(n.to_dict()),row,already_sent,HIGH,MID))]
 
                 # 다양성 점수 적용: 이미 많이 추천된 공고는 점수 하향
                 for r in scored:
@@ -1461,8 +1624,9 @@ elif page == "매칭 결과":
                 cnt = notice_recommend_count.get(pid, 1)
                 r['공고유형'] = '공통' if cnt >= 4 else '맞춤' 
             st.session_state['match_results'] = all_results
-            st.session_state['df_companies_cache'] = df_c  # 검토 화면에서 기업 정보 표시용
-            st.success(f"매칭 완료 — 총 {len(all_results)}건 → '검토 & 승인' 탭으로 이동")
+            st.session_state['df_companies_cache'] = df_c
+            detail_msg = f" (전문 DB {notice_detail_count:,}건 활용)" if notice_detail_count else " (전문 DB 없음 — GitHub Actions 확인)"
+            st.success(f"매칭 완료 — 총 {len(all_results)}건{detail_msg} → '검토 & 승인' 탭으로 이동")
 
     with tab2:
         results = st.session_state.get('match_results', [])
@@ -1593,6 +1757,10 @@ elif page == "매칭 결과":
                         else:
                             st.markdown(f"- **지역제한:** 전국 공고")
                         st.markdown(f"- **주관기관:** {row.get('주관기관','—')}")
+                        if row.get('지원금액',''):
+                            st.markdown(f"- **지원금액:** {row.get('지원금액','')}")
+                        if row.get('선정규모',''):
+                            st.markdown(f"- **선정규모:** {row.get('선정규모','')}")
                         st.markdown(f"- **지원대상:** {row.get('지원대상','—')}")
                         st.markdown(f"- **접수기간:** {row.get('접수기간','—')}")
                         st.markdown(f"- **마감일:** {deadline_display}")
@@ -2336,32 +2504,50 @@ elif page == "시스템 명세":
 | 단계 | 시점 | 담당 | 내용 |
 |------|------|------|------|
 | ① 공고 수집 | 매주 월요일 | 자동 | bizinfo API → 8개 분야 전체 수집 → notices_db.xlsx 갱신 |
-| ② 매칭 실행 | 매주 화요일 | 자동 | 선정기업 × 공고 교차 매칭 → 후보 목록 추출 |
-| ③ 담당자 검토 | 격주 화~수 | 수동 | ○/✕ 클릭, 소재지·업종·근거 확인 후 판단 |
-| ④ 발송 | 격주 목요일 | 자동 | 승인 건 → HTML 메일 + 캘린더 D-day 등록 |
-| ⑤ 성과 입력 | 분기 1회 | 수동 | 신청여부·선정결과 발송 이력에 입력 |
+| ② 전문 크롤링 | 매주 수요일 | 자동 | GitHub Actions → 공고 원문 크롤링 → notices_detail.xlsx 저장 |
+| ③ 매칭 실행 | 매주 수요일 | 수동 | 앱에서 매칭 실행 → 전문 내용 + 키워드 스코어링 |
+| ④ 담당자 검토 | 격주 수~목 | 수동 | ○/✕ 클릭, AI 분석 버튼 활용, 소재지·업종 확인 |
+| ⑤ 발송 | 격주 목요일 | 자동 | 맞춤공고 + 공통공고 HTML 메일 + 캘린더 D-day 등록 |
+| ⑥ 성과 입력 | 분기 1회 | 수동 | 신청여부·선정결과 발송 이력에 입력 |
         """)
 
         st.divider()
         st.subheader("시스템 구조도")
         st.markdown("""
 ```
-WALLA 신청서 (선정기업 명단)
-        ↓
-[구글 드라이브] 스케일업_매칭시스템 폴더
-├── 선정기업_명단.xlsx   ← 기업 DB (기업 관리에서 수정)
-├── notices_db.xlsx      ← 공고 DB (공고 수집에서 자동 갱신)
-├── send_history.xlsx    ← 발송 이력 (발송 후 자동 기록)
-├── keywords.json        ← 매칭 키워드 (설정에서 수정)
-├── calendar_id.txt      ← 공통 캘린더 ID
-└── category_calendars.json ← 분야별 캘린더
-        ↓
+WALLA 신청서
+    ↓ walla_to_selected.py (로컬 1회)
+선정기업_명단.xlsx → 구글 드라이브
+
+bizinfo API (매주 월요일, Streamlit 앱)
+    ↓
+notices_db.xlsx → 구글 드라이브
+
+기업마당 크롤링 (매주 수요일, GitHub Actions 자동)
+    ↓
+notices_detail.xlsx → 구글 드라이브
+
 [Streamlit 웹앱] scaleup-matching.streamlit.app
-        ↓
-Gmail API (메일 발송) + Calendar API (D-day 등록)
-        ↓
-기업 담당자 수신
+    ↓ 매칭 실행 (전문 내용 활용)
+    ↓ 담당자 검토 + AI 분석
+    ↓
+Gmail API → 기업별 HTML 메일 (맞춤 + 공통 공고)
+Calendar API → D-7·D-3·마감 캘린더 등록
 ```
+        """)
+
+        st.divider()
+        st.subheader("GitHub Actions 크롤링")
+        st.markdown("""
+**자동 실행 일정**: 매주 수요일 오전 10시 (KST)
+
+**설정 방법**
+1. GitHub 저장소 → Settings → Secrets → `GOOGLE_TOKEN_JSON` 추가
+2. token.json 파일 내용을 그대로 붙여넣기
+3. 이후 매주 수요일 자동 실행
+
+**수동 실행**
+GitHub 저장소 → Actions 탭 → `공고 전문 크롤링` → Run workflow
         """)
 
         st.divider()
@@ -2447,12 +2633,12 @@ Gmail API (메일 발송) + Calendar API (D-day 등록)
         st.markdown("""
 | 파일명 | 역할 | 생성 방법 |
 |--------|------|-----------|
-| 선정기업_명단.xlsx | 기업 DB | 담당자 직접 업로드 |
-| notices_db.xlsx | 공고 DB | 공고 수집 버튼 실행 시 자동 생성 |
+| 선정기업_명단.xlsx | 기업 DB | walla_to_selected.py 로컬 실행 |
+| notices_db.xlsx | 공고 DB | 공고 수집 버튼 (매주 월요일) |
+| **notices_detail.xlsx** | **공고 전문 DB** | **GitHub Actions 자동 (매주 수요일)** |
 | send_history.xlsx | 발송 이력 | 발송 실행 시 자동 기록 |
 | keywords.json | 매칭 키워드 | 설정 탭에서 저장 시 자동 생성 |
 | calendar_id.txt | 공통 캘린더 ID | create_common_calendar.py 실행 |
-| category_calendars.json | 분야별 캘린더 | create_category_calendars.py 실행 |
 | individual_calendars.json | 기업별 캘린더 | create_individual_calendars.py 실행 |
         """)
 
@@ -2463,10 +2649,9 @@ Gmail API (메일 발송) + Calendar API (D-day 등록)
 |--------|------|
 | app.py | Streamlit 웹앱 메인 |
 | requirements.txt | 라이브러리 목록 |
-| collect_notices.py | 공고 수집 (로컬 실행용) |
-| matching.py | 매칭 (로컬 실행용) |
-| send.py | 발송 (로컬 실행용) |
-| create_category_calendars.py | 분야별 캘린더 생성 (최초 1회) |
+| **crawl_notices.py** | **공고 전문 크롤러 (GitHub Actions 자동 실행)** |
+| **walla_to_selected.py** | **WALLA → 선정기업 명단 변환 (선정 후 1회)** |
+| .github/workflows/crawl.yml | GitHub Actions 스케줄러 |
 | create_individual_calendars.py | 기업별 캘린더 생성 (선정 후) |
 | auth_test.py | 구글 인증 (최초 1회) |
 | logo.png | 혁신제품지원센터 CI |
