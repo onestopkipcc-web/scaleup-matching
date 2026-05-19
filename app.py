@@ -1239,7 +1239,9 @@ elif page == "공고 수집":
 
     if not df_n.empty:
         c1,c2,c3 = st.columns(3)
-        c1.metric("현재 DB", f"{len(df_n):,}건")
+        # 방금 수집한 경우 세션 값 우선 표시
+        db_count = st.session_state.get('notices_count', len(df_n))
+        c1.metric("현재 DB", f"{db_count:,}건")
         c2.metric("마지막 수집일", df_n['수집일'].max() if '수집일' in df_n.columns else "—")
         c3.metric("마감일 파싱 성공",
                   f"{(df_n['마감일']!='').sum()}건" if '마감일' in df_n.columns else "—")
@@ -1334,11 +1336,19 @@ elif page == "공고 수집":
             df_final = pd.DataFrame(new_rows)
 
         with st.spinner("드라이브 저장 중..."):
-            save_excel(drive, df_final, NOTICES_FILE, "공고DB", "00897B")
+            save_ok = save_excel(drive, df_final, NOTICES_FILE, "공고DB", "00897B")
 
         prog.progress(1.0)
-        st.success(f"수집 완료 — 총 {len(df_final):,}건 (신규 {len(new_rows)} / 업데이트 {len(upd_rows)}) → notices_db.xlsx 저장")
-        st.rerun()
+        if save_ok:
+            # 세션에 최신 건수 저장 (rerun 후에도 유지)
+            st.session_state['notices_count'] = len(df_final)
+            st.session_state['notices_new']   = len(new_rows)
+            st.session_state['notices_upd']   = len(upd_rows)
+            st.success(f"✅ 수집 및 저장 완료 — 총 {len(df_final):,}건 (신규 {len(new_rows)} / 업데이트 {len(upd_rows)})")
+            st.rerun()
+        else:
+            st.error("❌ 드라이브 저장 실패 — 인증 상태 또는 권한 확인 필요")
+            st.info(f"수집은 완료됨: 총 {len(df_final):,}건 (신규 {len(new_rows)} / 업데이트 {len(upd_rows)})")
 
     if not df_n.empty:
         st.divider()
