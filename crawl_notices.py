@@ -37,7 +37,8 @@ def drive_file_id(creds, filename):
     params = {'q': f"name='{filename}' and '{DRIVE_FOLDER_ID}' in parents and trashed=false",
               'fields': 'files(id,name)', 'orderBy': 'modifiedTime desc'}
     resp = gapi('GET', 'https://www.googleapis.com/drive/v3/files', creds, params=params)
-    return resp.json().get('files', [{}])[0].get('id') if resp.ok else None
+    files = resp.json().get('files', []) if resp.ok else []
+    return files[0].get('id') if files else None
 
 def drive_download(creds, filename):
     fid = drive_file_id(creds, filename)
