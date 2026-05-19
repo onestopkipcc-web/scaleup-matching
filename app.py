@@ -721,6 +721,7 @@ def score_notice(notice, row, already_sent, HIGH, MID):
         "매칭근거":     _build_reason(stars, matched_target, matched_type, matched_co,
                                 matched_demand, location_score, matched_industry),
         "공고링크":     notice.get('공고링크',''),
+        "공고유형":     "맞춤",   # 매칭 실행 시 공통/맞춤 재분류됨
         "담당자검토":   "",
         "검토의견":     "",
     }
@@ -1426,13 +1427,39 @@ elif page == "매칭 결과":
             if '수신거부' in df_c.columns: df_c = df_c[df_c['수신거부']!='Y']
             already_sent = set(zip(df_h['기업명'], df_h['pblancId'])) if not df_h.empty else set()
             all_results  = []; prog = st.progress(0)
+            notice_recommend_count = {}  # 공고별 추천 횟수 추적
+
             for idx,(_,row) in enumerate(df_c.iterrows()):
-                # 분야 필터 제거 → 전체 공고 대상 매칭 (키워드로 적합성 판단)
                 scored = [r for _,n in df_n.iterrows()
                           if (r:=score_notice(n.to_dict(),row,already_sent,HIGH,MID))]
+
+                # 다양성 점수 적용: 이미 많이 추천된 공고는 점수 하향
+                for r in scored:
+                    pid = r.get('공고ID','')
+                    cnt = notice_recommend_count.get(pid, 0)
+                    if cnt >= 5:
+                        r['점수'] -= 6   # 5개사 이상 추천 → 강한 페널티
+                    elif cnt >= 3:
+                        r['점수'] -= 3   # 3개사 이상 추천 → 중간 페널티
+
                 scored.sort(key=lambda x:-x['점수'])
-                all_results.extend(scored[:max_per])
+                top = scored[:max_per]
+
+                # 추천 횟수 업데이트
+                for r in top:
+                    pid = r.get('공고ID','')
+                    notice_recommend_count[pid] = notice_recommend_count.get(pid,0) + 1
+                    # 공통 여부 태깅 (나중에 메일 구성에 활용)
+                    r['_recommend_count'] = notice_recommend_count[pid]
+
+                all_results.extend(top)
                 prog.progress((idx+1)/len(df_c))
+
+            # 최종적으로 공통/맞춤 태그 부여
+            for r in all_results:
+                pid = r.get('공고ID','')
+                cnt = notice_recommend_count.get(pid, 1)
+                r['공고유형'] = '공통' if cnt >= 4 else '맞춤' 
             st.session_state['match_results'] = all_results
             st.session_state['df_companies_cache'] = df_c  # 검토 화면에서 기업 정보 표시용
             st.success(f"매칭 완료 — 총 {len(all_results)}건 → '검토 & 승인' 탭으로 이동")
@@ -1727,10 +1754,19 @@ elif page == "발송 관리":
         preview_co      = st.selectbox("기업 선택", companies)
         preview_notices = [r for r in approved if r['기업명']==preview_co]
         with st.expander(f"📧 {preview_co} 메일 미리보기"):
-            for i,n in enumerate(preview_notices,1):
-                st.markdown(f"**{i}. {n.get('관련도','')} [{n.get('공고명','')}]({n.get('공고링크','#')})**")
-                st.markdown(f"주관: {n.get('주관기관','')}  |  기간: {n.get('접수기간','')}")
-                st.caption(n.get('사업개요','')); st.divider()
+            custom_n = [n for n in preview_notices if n.get('공고유형','맞춤')=='맞춤']
+            common_n = [n for n in preview_notices if n.get('공고유형','맞춤')=='공통']
+            if custom_n:
+                st.caption("**🎯 맞춤 공고**")
+                for i,n in enumerate(custom_n,1):
+                    st.markdown(f"**{i}. {n.get('관련도','')} [{n.get('공고명','')}]({n.get('공고링크','#')})**")
+                    st.caption(f"주관: {n.get('주관기관','')}  |  기간: {n.get('접수기간','')}")
+            if common_n:
+                st.divider()
+                st.caption("**📌 공통 공고 (이런 공고도 있어요)**")
+                for i,n in enumerate(common_n,1):
+                    st.markdown(f"{i}. [{n.get('공고명','')}]({n.get('공고링크','#')})")
+                    st.caption(f"주관: {n.get('주관기관','')}  |  기간: {n.get('접수기간','')}")
 
         st.divider()
         if st.button("📤 발송 실행", type="primary"):
@@ -1748,9 +1784,37 @@ elif page == "발송 관리":
             for r in approved: grouped.setdefault(r['기업명'],[]).append(r)
 
             for idx,(company,notices) in enumerate(grouped.items()):
-                # 별점별 공고 분류
-                notices_sss = [n for n in notices if n.get('관련도','')=='★★★']
-                notices_ss  = [n for n in notices if n.get('관련도','')=='★★']
+                # 공고 분류: 맞춤(기업 전용) / 공통(여러 기업 공통)
+                notices_custom = [n for n in notices if n.get('공고유형','맞춤') == '맞춤']
+                notices_common = [n for n in notices if n.get('공고유형','맞춤') == '공통']
+                # 맞춤 내에서 별점 구분
+                notices_sss = [n for n in notices_custom if n.get('관련도','')=='★★★']
+                notices_ss  = [n for n in notices_custom if n.get('관련도','')=='★★']
+
+                def notice_card_simple(n, idx):
+                    """공통 공고용 심플 카드 (작고 간결하게)"""
+                    dl_raw = n.get('마감일','')
+                    if not dl_raw and '~' in n.get('접수기간',''):
+                        dl_raw = n.get('접수기간','').split('~')[-1].strip()
+                    return f"""
+                    <table width="100%" cellpadding="0" cellspacing="0"
+                           style="margin-bottom:6px;">
+                      <tr>
+                        <td style="padding:10px 14px;
+                                   background:rgba(255,255,255,0.02);
+                                   border:1px solid rgba(255,255,255,0.05);
+                                   border-radius:6px;">
+                          <a href="{n.get('공고링크','#')}"
+                             style="font-size:13px;font-weight:500;color:rgba(255,255,255,0.6);
+                                    text-decoration:none;display:block;">
+                            {n.get('공고명','')}
+                          </a>
+                          <p style="margin:3px 0 0;font-size:11px;color:rgba(255,255,255,0.25);">
+                            {n.get('주관기관','')} &nbsp;·&nbsp; 마감 {dl_raw}
+                          </p>
+                        </td>
+                      </tr>
+                    </table>"""
 
                 def notice_card(n, idx):
                     star = n.get('관련도','')
@@ -1788,6 +1852,8 @@ elif page == "발송 관리":
                     </table>"""
 
                 rows_html = ""
+
+                # ── 맞춤 공고 섹션 ──────────────────────
                 if notices_sss:
                     rows_html += """
                     <p style="margin:0 0 10px;font-size:10px;font-weight:700;
@@ -1804,6 +1870,21 @@ elif page == "발송 관리":
                       ★★ &nbsp;참고 추천
                     </p>"""
                     for i,n in enumerate(notices_ss): rows_html += notice_card(n, i)
+
+                # ── 공통 공고 섹션 (이런 공고도 있어요) ──
+                if notices_common:
+                    rows_html += """<div style="height:24px;"></div>"""
+                    rows_html += """
+                    <div style="border-top:1px solid rgba(255,255,255,0.08);
+                                padding-top:16px;margin-top:4px;">
+                      <p style="margin:0 0 10px;font-size:10px;font-weight:700;
+                                 color:rgba(255,255,255,0.35);letter-spacing:2px;
+                                 text-transform:uppercase;">
+                        📌 &nbsp;이런 공고도 있어요
+                      </p>"""
+                    for i,n in enumerate(notices_common):
+                        rows_html += notice_card_simple(n, i)
+                    rows_html += "</div>"
 
                 ind_link=""
                 if company in ind_cals and ind_cals[company].get('calendar_id'):
