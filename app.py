@@ -725,6 +725,73 @@ def score_notice(notice, row, already_sent, HIGH, MID):
         "검토의견":     "",
     }
 
+def claude_analyze(company_info, notice_info):
+    """Claude API로 공고-기업 적합성 분석"""
+    api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return {"error": "API 키 없음 — Secrets에 ANTHROPIC_API_KEY 추가 필요"}
+
+    prompt = f"""당신은 정부 지원사업 매칭 전문가입니다.
+아래 기업 정보와 공고 내용을 보고 적합성을 판단해주세요.
+
+## 기업 정보
+- 기업명: {company_info.get('기업명', '')}
+- 소재지: {company_info.get('소재지', '')}
+- 관심분야: {company_info.get('관심사업분야', '')}
+- 제품분야: {company_info.get('제품분야', '')}
+- 기술키워드: {company_info.get('기술키워드', '')}
+- 수출실적: {company_info.get('수출실적', '')} / {company_info.get('수출국가', '')}
+- TRL단계: {company_info.get('TRL단계', '')}
+- 핵심수요: {company_info.get('핵심수요태그', '')}
+
+## 공고 정보
+- 공고명: {notice_info.get('공고명', '')}
+- 주관기관: {notice_info.get('주관기관', '')}
+- 지원대상: {notice_info.get('지원대상', '')}
+- 사업개요: {notice_info.get('사업개요', '')}
+- 공고지역: {notice_info.get('공고지역', '') or '전국'}
+
+## 판단 기준
+1. 업종 적합성: 기업 제품/기술이 공고 대상 업종과 맞는가
+2. 자격 적합성: 지원 자격 조건을 충족할 가능성이 있는가
+3. 수요 적합성: 기업이 필요로 하는 지원과 공고 내용이 맞는가
+
+다음 형식으로만 답하세요 (JSON):
+{{
+  "적합도": "높음 또는 보통 또는 낮음",
+  "한줄요약": "20자 이내로 핵심 판단 이유",
+  "적합이유": "적합한 이유 2~3문장",
+  "주의사항": "확인이 필요한 사항 또는 없으면 없음",
+  "추천여부": "추천 또는 검토 또는 비추천"
+}}"""
+
+    try:
+        resp = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 500,
+                "messages": [{"role": "user", "content": prompt}]
+            },
+            timeout=30
+        )
+        if resp.ok:
+            text = resp.json()['content'][0]['text']
+            import re as _re
+            json_match = _re.search(r'\{.*\}', text, _re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+            return {"error": "응답 파싱 실패", "raw": text[:200]}
+        else:
+            return {"error": f"API 오류 {resp.status_code}"}
+    except Exception as e:
+        return {"error": str(e)}
+
 def _build_reason(stars, matched_target, matched_type, matched_co,
                   matched_demand=[], location_score=0, matched_industry=[]):
     parts = []
@@ -1472,15 +1539,59 @@ elif page == "매칭 결과":
                                 if f"{r['기업명']}_{r.get('공고ID','')}" == key:
                                     r['마감일'] = custom_dl; break
 
-                    # ── 승인/제외 버튼 ─────────────────────────
+                    # ── AI 분석 + 승인/제외 버튼 ──────────────
                     st.divider()
-                    bc1, bc2, bc3 = st.columns([1,1,3])
+                    bc1, bc2, bc3, bc4 = st.columns([1,1,1.2,2])
                     with bc1:
                         if st.button("○ 승인", key=f"o_{key}_{i}", type="primary"):
                             st.session_state['review_state'][key]="○"; st.rerun()
                     with bc2:
                         if st.button("✕ 제외", key=f"x_{key}_{i}"):
                             st.session_state['review_state'][key]="✕"; st.rerun()
+                    with bc3:
+                        if st.button("🤖 AI 분석", key=f"ai_{key}_{i}"):
+                            if 'ai_analysis' not in st.session_state:
+                                st.session_state['ai_analysis'] = {}
+                            with st.spinner("Claude 분석 중..."):
+                                co_info = {}
+                                if 'df_companies_cache' in st.session_state:
+                                    df_co = st.session_state['df_companies_cache']
+                                    co_rows = df_co[df_co['기업명']==row['기업명']]
+                                    if not co_rows.empty:
+                                        co_info = co_rows.iloc[0].to_dict()
+                                co_info['기업명'] = row['기업명']
+                                result = claude_analyze(co_info, row.to_dict())
+                                st.session_state['ai_analysis'][key] = result
+                            st.rerun()
+
+                    # AI 분석 결과 표시
+                    ai_result = st.session_state.get('ai_analysis', {}).get(key)
+                    if ai_result:
+                        if 'error' in ai_result:
+                            st.error(f"분석 오류: {ai_result['error']}")
+                        else:
+                            rec = ai_result.get('추천여부','')
+                            color = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
+                            fit   = ai_result.get('적합도','')
+                            fit_color = {"높음":"#63FFA8","보통":"#FFC863","낮음":"#FF6363"}.get(fit,"#E8EDF2")
+                            st.markdown(f"""
+<div style="background:rgba(74,158,255,0.08);border:1px solid rgba(74,158,255,0.2);
+            border-radius:8px;padding:12px 16px;margin-top:8px;">
+  <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#4A9EFF;letter-spacing:1px;">
+    🤖 CLAUDE 분석
+  </p>
+  <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:{fit_color};">
+    {color} {rec} &nbsp;·&nbsp; 적합도: {fit}
+  </p>
+  <p style="margin:0 0 6px;font-size:12px;color:#E8EDF2;">
+    {ai_result.get('한줄요약','')}
+  </p>
+  <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.6);line-height:1.6;">
+    {ai_result.get('적합이유','')}
+  </p>
+  {"<p style='margin:6px 0 0;font-size:11px;color:#FFC863;'>⚠️ " + ai_result.get('주의사항','') + "</p>" if ai_result.get('주의사항','') not in ['없음',''] else ''}
+</div>
+                            """, unsafe_allow_html=True)
             st.divider()
             c1,c2 = st.columns(2)
             with c1:
