@@ -1,17 +1,11 @@
 """
-기업마당 공고 전문 크롤러
+기업마당 공고 전문 크롤러 (Playwright 버전)
 GitHub Actions에서 매주 수요일 오전 10시(KST) 자동 실행
-
-전략:
-1. bizinfo API detail 엔드포인트 시도 (pblancId 파라미터)
-2. API 실패 시 HTML 크롤링 (여러 선택자 시도)
-3. 둘 다 실패 시 실패 기록
+실제 브라우저로 JS 렌더링 페이지 파싱
 """
-
 import os, json, io, time, re
 import requests
 import pandas as pd
-from bs4 import BeautifulSoup
 from datetime import datetime
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
@@ -19,19 +13,9 @@ from google.auth.transport.requests import Request
 DRIVE_FOLDER_ID = "1iWGYjaoslqST45ggDlg-IPMLaUHCYmV_"
 NOTICES_FILE    = "notices_db.xlsx"
 DETAIL_FILE     = "notices_detail.xlsx"
-API_KEY         = "Nt604D"
-API_URL         = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do"
 SCOPES          = ['https://www.googleapis.com/auth/drive']
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept-Language": "ko-KR,ko;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Referer": "https://www.bizinfo.go.kr/",
-    "Connection": "keep-alive",
-}
-
+# ── 구글 인증 ─────────────────────────────────────────
 def get_creds():
     token_json = os.environ.get('GOOGLE_TOKEN_JSON', '')
     if token_json:
@@ -53,13 +37,13 @@ def drive_file_id(creds, filename):
     params = {'q': f"name='{filename}' and '{DRIVE_FOLDER_ID}' in parents and trashed=false",
               'fields': 'files(id,name)', 'orderBy': 'modifiedTime desc'}
     resp = gapi('GET', 'https://www.googleapis.com/drive/v3/files', creds, params=params)
-    files = resp.json().get('files', [])
-    return files[0]['id'] if files else None
+    return resp.json().get('files', [{}])[0].get('id') if resp.ok else None
 
 def drive_download(creds, filename):
     fid = drive_file_id(creds, filename)
     if not fid: return None
-    resp = gapi('GET', f'https://www.googleapis.com/drive/v3/files/{fid}', creds, params={'alt':'media'})
+    resp = gapi('GET', f'https://www.googleapis.com/drive/v3/files/{fid}',
+                creds, params={'alt': 'media'})
     return resp.content if resp.ok else None
 
 def drive_upload(creds, filename, content_bytes):
@@ -67,137 +51,95 @@ def drive_upload(creds, filename, content_bytes):
     fid  = drive_file_id(creds, filename)
     bnd  = b"----MIMEBoundary"; crlf = b"\r\n"
     ct   = "multipart/related; boundary=----MIMEBoundary"
-    meta = json.dumps({"name": filename} if fid else {"name": filename, "parents": [DRIVE_FOLDER_ID]}).encode()
+    meta = json.dumps({"name": filename} if fid else
+                      {"name": filename, "parents": [DRIVE_FOLDER_ID]}).encode()
     body  = b"--" + bnd + crlf + b"Content-Type: application/json; charset=UTF-8" + crlf + crlf
     body += meta + crlf + b"--" + bnd + crlf + mime.encode() + crlf + crlf
     body += content_bytes + crlf + b"--" + bnd + b"--"
-    url   = f'https://www.googleapis.com/upload/drive/v3/files/{fid}' if fid else \
-            'https://www.googleapis.com/upload/drive/v3/files'
-    method = 'PATCH' if fid else 'POST'
-    resp  = gapi(method, url, creds, params={'uploadType':'multipart'},
-                 data=body, headers={'Content-Type': ct})
+    url    = (f'https://www.googleapis.com/upload/drive/v3/files/{fid}'
+              if fid else 'https://www.googleapis.com/upload/drive/v3/files')
+    resp   = gapi('PATCH' if fid else 'POST', url, creds,
+                  params={'uploadType': 'multipart'},
+                  data=body, headers={'Content-Type': ct})
     return resp.ok
 
-def extract_numbers(text):
-    """지원금액·선정규모 추출"""
+# ── 텍스트에서 지원금액·규모 추출 ────────────────────
+def extract_meta(text):
     amount, scale = "", ""
-    # 지원금액
-    for pat in [
-        r'지원.{0,4}(?:금액|한도)[^0-9]*([0-9][0-9,백천억만원 ]+)',
-        r'최대.{0,3}([0-9][0-9,백천억만원 ]+)',
-        r'([0-9]+억\s*원)',
-    ]:
+    for pat in [r'지원.{0,4}(?:금액|한도)[^0-9]*([0-9][0-9,백천억만원 ]+)',
+                r'최대.{0,3}([0-9][0-9,백천억만원 ]+)', r'([0-9]+억\s*원)']:
         m = re.search(pat, text)
         if m: amount = m.group(0)[:40]; break
-    # 선정규모
-    for pat in [
-        r'([0-9]+).{0,3}개.{0,5}(?:사|업체|기업).{0,6}(?:내외|이내|선정)',
-        r'선정.{0,6}(?:규모|예정)[^0-9]*([0-9]+)',
-        r'([0-9]+)\s*개사',
-    ]:
+    for pat in [r'([0-9]+).{0,3}개.{0,5}(?:사|업체|기업).{0,6}(?:내외|이내|선정)',
+                r'선정.{0,6}(?:규모|예정)[^0-9]*([0-9]+)', r'([0-9]+)\s*개사']:
         m = re.search(pat, text)
         if m: scale = m.group(0)[:40]; break
     return amount, scale
 
-def fetch_via_api(pid):
-    """방법 1: API로 단건 상세 조회"""
+# ── Playwright로 JS 렌더링 페이지 파싱 ───────────────
+def crawl_with_playwright(url, pid):
     try:
-        # 방법 1-A: pblancId 직접 파라미터
-        params = {"crtfcKey": API_KEY, "dataType": "json", "pblancId": pid}
-        resp = requests.get(API_URL, params=params, timeout=15)
-        if resp.ok:
-            data = resp.json()
-            items = data.get('jsonArray', [])
-            if items:
-                item = items[0]
-                text = item.get('bsnsSumryCn', '')
-                if text and len(text) > 100:
-                    return text, True
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            )
+            page.goto("https://www.bizinfo.go.kr/", timeout=15000)
+            page.goto(url, timeout=20000, wait_until="networkidle")
+            time.sleep(1.5)  # 추가 렌더링 대기
 
-        # 방법 1-B: 공고명으로 검색 후 매칭
-        # (API가 단건 조회를 지원하지 않을 경우 대비)
-        return "", False
-    except:
-        return "", False
+            # 전문 내용 추출 (다양한 선택자 시도)
+            full_text = ""
+            selectors = [
+                '#bizSumryCn', '.biz_sumry_cn',
+                '.view_con', '.view-con', '.view_content',
+                '.bbs_view_con', '.detail_content',
+                '#viewContent', 'article .content',
+                '.inner_content', '#content .view',
+            ]
+            for sel in selectors:
+                try:
+                    el = page.query_selector(sel)
+                    if el:
+                        text = el.inner_text()
+                        if len(text) > 200:
+                            full_text = text
+                            break
+                except:
+                    continue
 
-def fetch_via_html(url, pid):
-    """방법 2: HTML 크롤링"""
-    try:
-        session = requests.Session()
-        # 메인 페이지 먼저 방문 (쿠키 획득)
-        session.get("https://www.bizinfo.go.kr/", headers=HEADERS, timeout=10)
-        time.sleep(0.5)
+            # 선택자 실패 시 body 전체
+            if len(full_text) < 200:
+                try:
+                    full_text = page.inner_text('body')
+                except:
+                    pass
 
-        resp = session.get(url, headers=HEADERS, timeout=20)
-        if resp.status_code != 200:
-            return "", False
+            browser.close()
 
-        soup = BeautifulSoup(resp.text, 'html.parser')
-
-        # 스크립트·스타일 제거
-        for tag in soup.find_all(['script','style','nav','header','footer']):
-            tag.decompose()
-
-        full_text = ""
-
-        # 선택자 우선순위 시도
-        selectors = [
-            '#bizSumryCn', '.biz_sumry_cn', '.bizSumryCn',
-            '.view_con', '.view-con', '.view_content', '.view-content',
-            '.bbs_view_con', '.bbs-view-con',
-            '.detail_content', '.detail-content',
-            '.board_view', '.board-view',
-            '#viewContent', '.viewContent',
-            'article', 'main',
-            '#content .inner', '#content',
-        ]
-        for sel in selectors:
-            el = soup.select_one(sel)
-            if el:
-                text = el.get_text(separator=' ', strip=True)
-                if len(text) > 200:
-                    full_text = text
-                    break
-
-        # 선택자 실패 시 body 전체에서 추출
-        if len(full_text) < 100:
-            body = soup.find('body')
-            if body:
-                full_text = body.get_text(separator=' ', strip=True)
-                # 너무 짧으면 JS 렌더링 문제로 판단
-                if len(full_text) < 200:
-                    return "", False
-
-        return full_text[:3000], True
+            if len(full_text) > 200:
+                amount, scale = extract_meta(full_text)
+                return {
+                    'pblancId': pid, '전문내용': full_text[:3000],
+                    '지원금액': amount, '선정규모': scale,
+                    '크롤링방법': 'Playwright',
+                    '크롤링일': datetime.today().strftime('%Y-%m-%d'),
+                    '크롤링성공': 'Y',
+                }
     except Exception as e:
-        return "", False
-
-def crawl_notice(url, pid):
-    """API → HTML 순서로 전문 취득"""
-    # 방법 1: API 시도
-    text, ok = fetch_via_api(pid)
-    method_used = "API"
-
-    # 방법 2: HTML 크롤링
-    if not ok or len(text) < 100:
-        text, ok = fetch_via_html(url, pid)
-        method_used = "HTML"
-
-    amount, scale = extract_numbers(text) if text else ("", "")
+        print(f"    Playwright 오류: {e}")
 
     return {
-        'pblancId':   pid,
-        '전문내용':   text[:3000] if text else '',
-        '지원금액':   amount,
-        '선정규모':   scale,
-        '크롤링방법': method_used,
-        '크롤링일':   datetime.today().strftime('%Y-%m-%d'),
-        '크롤링성공': 'Y' if (ok and len(text) > 100) else 'N',
+        'pblancId': pid, '전문내용': '', '지원금액': '', '선정규모': '',
+        '크롤링방법': 'FAIL',
+        '크롤링일': datetime.today().strftime('%Y-%m-%d'),
+        '크롤링성공': 'N',
     }
 
+# ── 메인 ─────────────────────────────────────────────
 def main():
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] 크롤링 시작")
-
     creds = get_creds()
     print("✅ 구글 인증 완료")
 
@@ -211,8 +153,9 @@ def main():
     detail_content = drive_download(creds, DETAIL_FILE)
     if detail_content:
         df_detail = pd.read_excel(io.BytesIO(detail_content), dtype=str).fillna('')
-        already_crawled = set(df_detail['pblancId'].tolist())
-        print(f"✅ 기존 전문 DB: {len(df_detail):,}건")
+        # 성공한 것만 already_crawled로 처리 (실패는 재시도)
+        already_crawled = set(df_detail[df_detail['크롤링성공']=='Y']['pblancId'].tolist())
+        print(f"✅ 기존 전문 DB: {len(df_detail):,}건 (성공 {len(already_crawled)}건)")
     else:
         df_detail = pd.DataFrame()
         already_crawled = set()
@@ -223,7 +166,6 @@ def main():
         ((df_n['마감일'] == '') | (df_n['마감일'] >= today))
     ].copy()
 
-    # 환경변수로 최대 건수 제한 (GitHub Actions: 전체, 수동: 50)
     limit = int(os.environ.get('CRAWL_LIMIT', 0))
     if limit > 0:
         df_target = df_target.head(limit)
@@ -241,28 +183,36 @@ def main():
         name = row.get('공고명', '')[:30]
         if not url or not pid: continue
 
-        result = crawl_notice(url, pid)
+        result = crawl_with_playwright(url, pid)
         new_records.append(result)
 
         if result['크롤링성공'] == 'Y':
             success += 1
-            print(f"  [{i+1}/{len(df_target)}] ✅ {name} ({result['크롤링방법']}, {len(result['전문내용'])}자)")
+            print(f"  [{i+1}/{len(df_target)}] ✅ {name} ({len(result['전문내용'])}자)")
         else:
             fail += 1
             print(f"  [{i+1}/{len(df_target)}] ❌ {name}")
 
-        time.sleep(1.2)
+        time.sleep(1.0)
 
+    # 기존 실패 건 교체 + 신규 추가
     if new_records:
         df_new = pd.DataFrame(new_records)
-        df_out = pd.concat([df_detail, df_new], ignore_index=True) if not df_detail.empty else df_new
+        if not df_detail.empty:
+            new_pids = set(df_new['pblancId'].tolist())
+            df_out = pd.concat(
+                [df_detail[~df_detail['pblancId'].isin(new_pids)], df_new],
+                ignore_index=True
+            )
+        else:
+            df_out = df_new
 
         buf = io.BytesIO()
         with pd.ExcelWriter(buf, engine='openpyxl') as w:
             df_out.to_excel(w, index=False)
 
         if drive_upload(creds, DETAIL_FILE, buf.getvalue()):
-            print(f"\n✅ 저장 완료: {len(df_out):,}건 (성공 {success} / 실패 {fail})")
+            print(f"\n✅ 저장 완료 — 총 {len(df_out):,}건 (성공 {success} / 실패 {fail})")
         else:
             print("\n❌ 드라이브 저장 실패")
 
