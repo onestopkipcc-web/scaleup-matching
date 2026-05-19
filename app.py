@@ -1395,7 +1395,8 @@ elif page == "매칭 결과":
 선정기업 × 공고 DB 교차 매칭 → 담당자 검토 → 발송 승인
 
 **매칭 로직**
-- 기업 관심분야 → API 분야코드 변환 → 해당 분야 공고만 필터
+- 전체 공고 대상 매칭 (분야 필터 없음 → 숨겨진 적합 공고도 발굴)
+- 키워드 4개 축으로 적합성 판단 → 점수 높은 순 정렬
 - 이미 발송한 공고 자동 제외 (send_history 참조)
 - 마감 지난 공고 자동 제외
 - 수신거부 기업 자동 제외
@@ -1409,7 +1410,7 @@ elif page == "매칭 결과":
     tab1, tab2 = st.tabs(["매칭 실행", "검토 & 승인"])
 
     with tab1:
-        max_per = st.slider("기업당 최대 추천 건수", 3, 10, 5)
+        max_per = st.slider("기업당 최대 추천 건수", 5, 20, 12)
         if st.button("🔗 매칭 실행", type="primary"):
             with st.spinner("드라이브 데이터 로딩 중..."):
                 df_c  = load_excel(drive, SELECTED_FILE)
@@ -1422,10 +1423,9 @@ elif page == "매칭 결과":
             already_sent = set(zip(df_h['기업명'], df_h['pblancId'])) if not df_h.empty else set()
             all_results  = []; prog = st.progress(0)
             for idx,(_,row) in enumerate(df_c.iterrows()):
-                interest    = row.get('관심사업분야','')
-                realm_names = [k for k,v in REALM_CODE.items() if v in [rv for rk,rv in REALM_CODE.items() if rk in interest]]
-                filtered    = df_n[df_n['분야'].isin(realm_names)] if '분야' in df_n.columns else df_n
-                scored      = [r for _,n in filtered.iterrows() if (r:=score_notice(n.to_dict(),row,already_sent,HIGH,MID))]
+                # 분야 필터 제거 → 전체 공고 대상 매칭 (키워드로 적합성 판단)
+                scored = [r for _,n in df_n.iterrows()
+                          if (r:=score_notice(n.to_dict(),row,already_sent,HIGH,MID))]
                 scored.sort(key=lambda x:-x['점수'])
                 all_results.extend(scored[:max_per])
                 prog.progress((idx+1)/len(df_c))
