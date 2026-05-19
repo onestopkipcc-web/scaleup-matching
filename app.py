@@ -802,7 +802,11 @@ def claude_analyze(company_info, notice_info):
                 return json.loads(json_match.group())
             return {"error": "응답 파싱 실패", "raw": text[:200]}
         else:
-            return {"error": f"API 오류 {resp.status_code}"}
+            try:
+                err_detail = resp.json().get('error', {}).get('message', resp.text[:300])
+            except:
+                err_detail = resp.text[:300]
+            return {"error": f"API 오류 {resp.status_code}: {err_detail}"}
     except Exception as e:
         return {"error": str(e)}
 
