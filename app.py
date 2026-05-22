@@ -1387,6 +1387,7 @@ elif page == "공고 수집":
             st.session_state['notices_count'] = len(df_final)
             st.session_state['notices_new']   = len(new_rows)
             st.session_state['notices_upd']   = len(upd_rows)
+            st.session_state['pending_crawl'] = True  # 크롤링 필요 플래그
             st.success(
                 f"✅ 수집 완료 — 총 {len(df_final):,}건 "
                 f"(신규 {len(new_rows)} / 업데이트 {len(upd_rows)} / 중복유지 {dup_count})"
@@ -1408,20 +1409,40 @@ elif page == "공고 수집":
     with st.spinner("전문 DB 현황 확인 중..."):
         df_detail = load_excel(drive, DETAIL_FILE)
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("전문 수집 건수", f"{len(df_detail):,}건" if not df_detail.empty else "0건")
-    c2.metric("자동 실행", "매주 수요일 10시")
+    today_str = datetime.today().strftime('%Y-%m-%d')
+    FRESHNESS_DAYS = 7  # 7일 이내 크롤링 = 최신
 
     if not df_detail.empty and '크롤링일' in df_detail.columns:
-        c3.metric("마지막 크롤링", df_detail['크롤링일'].max())
+        df_detail['크롤링일'] = df_detail['크롤링일'].astype(str)
+        fresh   = df_detail[df_detail['크롤링일'] >= (datetime.today() - timedelta(days=FRESHNESS_DAYS)).strftime('%Y-%m-%d')]
+        stale   = df_detail[df_detail['크롤링일'] <  (datetime.today() - timedelta(days=FRESHNESS_DAYS)).strftime('%Y-%m-%d')]
+        ok_pids = set(df_detail[df_detail['크롤링성공']=='Y']['pblancId'].tolist())
     else:
-        c3.metric("마지막 크롤링", "—")
+        fresh = stale = pd.DataFrame(); ok_pids = set()
+
+    # 최신화 필요 공고 계산
+    if not df_n.empty:
+        active_pids = set(df_n[
+            (df_n['마감일'] == '') | (df_n['마감일'] >= today_str)
+        ]['pblancId'].tolist())
+        need_crawl_pids = active_pids - ok_pids
+    else:
+        active_pids = need_crawl_pids = set()
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("전문 수집", f"{len(ok_pids):,}건")
+    c2.metric("7일 이내 최신", f"{len(fresh):,}건")
+    c3.metric("갱신 필요", f"{len(stale):,}건")
+    c4.metric("미수집 (활성공고)", f"{len(need_crawl_pids):,}건")
+
+    if st.session_state.get('pending_crawl'):
+        st.info(f"💡 공고 수집 완료 — 전문 크롤링을 실행하면 매칭 정확도가 높아져요.")
 
     col_a, col_b = st.columns([2,1])
     with col_a:
-        st.caption("공고 전문(지원자격·지원금액 등)을 크롤링하여 매칭 정확도를 높입니다. GitHub Actions로 매주 수요일 자동 실행됩니다.")
+        st.caption(f"7일 이내 수집된 전문은 재수집 안 함. 미수집 {len(need_crawl_pids)}건 + 갱신필요 {len(stale)}건 대상.")
     with col_b:
-        crawl_toggle = st.toggle("수동 크롤링 활성화", value=False, key="crawl_toggle")
+        crawl_toggle = st.toggle("크롤링 실행", value=bool(st.session_state.get('pending_crawl')), key="crawl_toggle")
 
     if crawl_toggle:
         st.warning("⚠️ 수동 크롤링 — 공고 수에 따라 수십 분 소요될 수 있습니다.")
@@ -1449,9 +1470,11 @@ elif page == "공고 수집":
             today = datetime.today().strftime('%Y-%m-%d')
 
             # 크롤링 대상 필터
-            already = set(df_detail['pblancId'].tolist()) if not df_detail.empty else set()
+            # 날짜 기반 최신화: 미수집 + 7일 초과 갱신필요 + 마감 안 지난 것
+            stale_pids = set(stale['pblancId'].tolist()) if not stale.empty else set()
+            fresh_pids = set(fresh[fresh['크롤링성공']=='Y']['pblancId'].tolist()) if not fresh.empty else set()
             df_target = df_n[
-                (~df_n['pblancId'].isin(already)) &
+                (~df_n['pblancId'].isin(fresh_pids)) &  # 최신 성공 건 제외
                 ((df_n['마감일'] == '') | (df_n['마감일'] >= today))
             ].copy()
 
@@ -1650,26 +1673,13 @@ elif page == "매칭 결과":
             st.success(f"✅ 1차 매칭 완료 — 총 {len(all_results)}건 / 크롤링 대상 {len(candidate_pids)}건")
             st.info("아래 Step 2에서 후보 공고 전문을 크롤링하세요.")
 
-        # ── Step 2: 후보 공고 크롤링 ─────────────────
+        # ── Step 2: 전문 반영 최종 매칭 (크롤링은 공고수집 탭에서) ──
         st.divider()
-        st.subheader("Step 2 — 후보 공고 전문 크롤링")
+        st.subheader("Step 2 — 전문 반영 최종 매칭")
+        st.caption("공고 수집 탭에서 전문 크롤링 완료 후 실행하세요.")
 
-        candidate_urls = st.session_state.get('candidate_urls', {})
-        df_detail = load_excel(drive, DETAIL_FILE)
-        already_ok = set(df_detail[df_detail['크롤링성공']=='Y']['pblancId'].tolist()) if not df_detail.empty and '크롤링성공' in df_detail.columns else set()
-        need_crawl = {pid:url for pid,url in candidate_urls.items() if pid not in already_ok}
-
-        c1, c2 = st.columns(2)
-        c1.metric("후보 공고", f"{len(candidate_urls)}건")
-        c2.metric("크롤링 필요", f"{len(need_crawl)}건")
-
-        if not candidate_urls:
-            st.caption("Step 1 매칭 먼저 실행하세요.")
-        elif not need_crawl:
-            st.success("✅ 모든 후보 공고 전문 수집 완료 → Step 3으로 이동")
-        else:
-            st.caption(f"약 {len(need_crawl) * 15 // 60}분 {len(need_crawl) * 15 % 60}초 소요 예상")
-            if st.button("🕷️ 후보 공고 크롤링", type="primary", key="step2_crawl"):
+        if False:  # 하위 호환용 더미
+            if st.button("dummy", key="step2_crawl"):
                 from bs4 import BeautifulSoup
                 import time as _time, re as _re
 
@@ -1733,7 +1743,7 @@ elif page == "매칭 결과":
 
         # ── Step 3: 전문 반영 최종 매칭 ──────────────
         st.divider()
-        st.subheader("Step 3 — 전문 반영 최종 매칭")
+        st.subheader("Step 2 — 전문 반영 최종 매칭")
 
         if not st.session_state.get('match_results'):
             st.caption("Step 1 매칭 먼저 실행하세요.")
@@ -1752,6 +1762,9 @@ elif page == "매칭 결과":
 
                     detail_map = {}
                     if not df_det2.empty and 'pblancId' in df_det2.columns:
+                        # 중복 제거 (성공 건 우선, 최신 건 유지)
+                        df_det2 = df_det2.sort_values('크롤링성공', ascending=False)
+                        df_det2 = df_det2.drop_duplicates(subset='pblancId', keep='first')
                         detail_map = df_det2.set_index('pblancId').to_dict('index')
 
                 if df_c2.empty or df_n2.empty:
@@ -1797,6 +1810,7 @@ elif page == "매칭 결과":
                 st.session_state['df_companies_cache'] = df_c2
                 used = sum(1 for r in all_results if r.get('전문내용',''))
                 st.success(f"✅ 최종 매칭 완료 — 총 {len(all_results)}건 (전문 활용 {used}건) → '검토 & 승인' 탭으로 이동")
+                st.session_state['step2_done'] = True
 
     with tab2:
         results = st.session_state.get('match_results', [])
