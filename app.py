@@ -738,9 +738,21 @@ def score_notice(notice, row, already_sent, HIGH, MID):
         "검토의견":     "",
     }
 
+# Claude API 비용 상수 (claude-sonnet-4-5 기준)
+CLAUDE_INPUT_COST  = 3.0 / 1_000_000   # $3 per 1M input tokens
+CLAUDE_OUTPUT_COST = 15.0 / 1_000_000  # $15 per 1M output tokens
+USD_TO_KRW         = 1380
+
+def estimate_cost(n_notices):
+    """n건 분석 시 예상 비용 계산"""
+    avg_input  = 800   # 토큰 (기업정보 300 + 공고내용 500)
+    avg_output = 300   # 토큰 (JSON 응답)
+    total_usd  = n_notices * (avg_input * CLAUDE_INPUT_COST + avg_output * CLAUDE_OUTPUT_COST)
+    total_krw  = total_usd * USD_TO_KRW
+    return total_usd, total_krw
+
 def claude_analyze(company_info, notice_info):
     """Claude API로 공고-기업 적합성 분석"""
-    # 여러 방식으로 API 키 탐색
     api_key = ""
     try:
         api_key = st.secrets["ANTHROPIC_API_KEY"]
@@ -751,45 +763,61 @@ def claude_analyze(company_info, notice_info):
             pass
 
     if not api_key:
-        # 디버깅: 어떤 키가 있는지 확인
         try:
             available = list(st.secrets.keys())
         except:
             available = []
-        return {"error": f"API 키 없음 — 현재 Secrets 키 목록: {available}"}
+        return {"error": f"API 키 없음 — Secrets 키 목록: {available}"}
+
+    # 전문 내용 우선 활용
+    notice_content = (
+        notice_info.get('전문내용','') or
+        notice_info.get('사업개요','')
+    )[:1500]
 
     prompt = f"""당신은 정부 지원사업 매칭 전문가입니다.
-아래 기업 정보와 공고 내용을 보고 적합성을 판단해주세요.
+아래 기업 정보와 공고를 보고 이 기업이 이 공고에 지원하는 게 적합한지 판단하세요.
 
 ## 기업 정보
-- 기업명: {company_info.get('기업명', '')}
-- 소재지: {company_info.get('소재지', '')}
-- 관심분야: {company_info.get('관심사업분야', '')}
-- 제품분야: {company_info.get('제품분야', '')}
-- 기술키워드: {company_info.get('기술키워드', '')}
-- 수출실적: {company_info.get('수출실적', '')} / {company_info.get('수출국가', '')}
-- TRL단계: {company_info.get('TRL단계', '')}
-- 핵심수요: {company_info.get('핵심수요태그', '')}
+- 기업명: {company_info.get('기업명','')}
+- 소재지: {company_info.get('소재지','')}
+- 기업유형: {company_info.get('기업유형','')}
+- 관심분야: {company_info.get('관심사업분야','')}
+- 제품/기술 분야: {company_info.get('제품분야','')}
+- 기술키워드: {company_info.get('기술키워드','')}
+- 핵심수요: {company_info.get('핵심수요태그','')}
+- 희망서비스: {company_info.get('희망서비스요약','')}
+- 수출실적: {company_info.get('수출실적','')} | 수출국가: {company_info.get('수출국가','')}
+- TRL단계: {company_info.get('TRL단계','')}
+- 매출규모: {company_info.get('매출규모','')}
 
 ## 공고 정보
-- 공고명: {notice_info.get('공고명', '')}
-- 주관기관: {notice_info.get('주관기관', '')}
-- 지원대상: {notice_info.get('지원대상', '')}
-- 사업개요: {notice_info.get('사업개요', '')}
-- 공고지역: {notice_info.get('공고지역', '') or '전국'}
+- 공고명: {notice_info.get('공고명','')}
+- 주관기관: {notice_info.get('주관기관','')}
+- 지원대상: {notice_info.get('지원대상','')}
+- 지원금액: {notice_info.get('지원금액','')}
+- 선정규모: {notice_info.get('선정규모','')}
+- 지역제한: {notice_info.get('공고지역','') or '전국'}
+- 공고내용: {notice_content}
 
-## 판단 기준
-1. 업종 적합성: 기업 제품/기술이 공고 대상 업종과 맞는가
-2. 자격 적합성: 지원 자격 조건을 충족할 가능성이 있는가
-3. 수요 적합성: 기업이 필요로 하는 지원과 공고 내용이 맞는가
+## 판단 항목 (각각 구체적으로)
+1. 업종일치: 기업 제품/기술이 이 공고가 원하는 업종/분야와 맞는가
+2. 자격충족: 지원 자격(기업유형·매출·수출실적 등) 충족 가능성
+3. 지역적합: 소재지와 공고 지역이 맞는가
+4. 수요일치: 기업이 원하는 지원(핵심수요태그)과 공고 내용이 맞는가
+5. 경쟁력: 이 기업이 선정될 가능성이 있는가
 
-다음 형식으로만 답하세요 (JSON):
+JSON 형식으로만 답하세요:
 {{
+  "추천여부": "추천 또는 검토 또는 비추천",
   "적합도": "높음 또는 보통 또는 낮음",
-  "한줄요약": "20자 이내로 핵심 판단 이유",
-  "적합이유": "적합한 이유 2~3문장",
-  "주의사항": "확인이 필요한 사항 또는 없으면 없음",
-  "추천여부": "추천 또는 검토 또는 비추천"
+  "한줄요약": "15자 이내 핵심",
+  "업종일치": "O 또는 X 또는 △",
+  "자격충족": "O 또는 X 또는 △",
+  "지역적합": "O 또는 X 또는 △",
+  "수요일치": "O 또는 X 또는 △",
+  "판단근거": "3~4문장으로 구체적 근거 (기업의 어떤 특성이 공고의 어떤 조건과 맞거나 안 맞는지)",
+  "주의사항": "신청 전 반드시 확인할 사항 (없으면 없음)"
 }}"""
 
     try:
@@ -802,7 +830,7 @@ def claude_analyze(company_info, notice_info):
             },
             json={
                 "model": "claude-sonnet-4-5",
-                "max_tokens": 500,
+                "max_tokens": 600,
                 "messages": [{"role": "user", "content": prompt}]
             },
             timeout=30
@@ -810,7 +838,7 @@ def claude_analyze(company_info, notice_info):
         if resp.ok:
             text = resp.json()['content'][0]['text']
             import re as _re
-            json_match = _re.search(r'\{.*\}', text, _re.DOTALL)
+            json_match = _re.search(r'[{].*[}]', text, _re.DOTALL)
             if json_match:
                 return json.loads(json_match.group())
             return {"error": "응답 파싱 실패", "raw": text[:200]}
@@ -1839,7 +1867,9 @@ elif page == "매칭 결과":
                 )
             with col_stat2:
                 with st.expander("🤖 전체 AI 분석"):
-                    st.caption(f"⚠️ {len(filtered)}건 전체 분석 — 비용 발생")
+                    usd, krw = estimate_cost(len(filtered))
+                    st.caption(f"⚠️ {len(filtered)}건 전체 분석")
+                    st.caption(f"예상 비용: ${usd:.3f} (약 {krw:.0f}원)")
                     confirm = st.text_input("확인코드 입력 (분석실행)",
                         key="bulk_ai_confirm", placeholder="분석실행")
                     if st.button("전체 분석 시작", key="bulk_ai_btn", type="primary"):
@@ -2006,7 +2036,8 @@ elif page == "매칭 결과":
                         if st.button("✕ 제외", key=f"x_{key}_{i}"):
                             st.session_state['review_state'][key]="✕"; st.rerun()
                     with bc3:
-                        if st.button("🤖 AI 분석", key=f"ai_{key}_{i}"):
+                        _usd, _krw = estimate_cost(1)
+                        if st.button(f"🤖 AI 분석 (~{_krw:.0f}원)", key=f"ai_{key}_{i}"):
                             if 'ai_analysis' not in st.session_state:
                                 st.session_state['ai_analysis'] = {}
                             with st.spinner("Claude 분석 중..."):
@@ -2027,26 +2058,40 @@ elif page == "매칭 결과":
                         if 'error' in ai_result:
                             st.error(f"분석 오류: {ai_result['error']}")
                         else:
-                            rec = ai_result.get('추천여부','')
-                            color = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
-                            fit   = ai_result.get('적합도','')
+                            rec       = ai_result.get('추천여부','')
+                            fit       = ai_result.get('적합도','')
+                            rec_color = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
                             fit_color = {"높음":"#63FFA8","보통":"#FFC863","낮음":"#FF6363"}.get(fit,"#E8EDF2")
+                            icon_map  = {"O":"✅","X":"❌","△":"⚠️"}
+
+                            checks = {
+                                "업종일치": ai_result.get('업종일치','—'),
+                                "자격충족": ai_result.get('자격충족','—'),
+                                "지역적합": ai_result.get('지역적합','—'),
+                                "수요일치": ai_result.get('수요일치','—'),
+                            }
+                            check_html = "".join([
+                                f"<span style='margin-right:12px;font-size:12px;'>"
+                                f"{icon_map.get(v,'—')} {k}</span>"
+                                for k,v in checks.items()
+                            ])
+
                             st.markdown(f"""
 <div style="background:rgba(74,158,255,0.08);border:1px solid rgba(74,158,255,0.2);
-            border-radius:8px;padding:12px 16px;margin-top:8px;">
-  <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#4A9EFF;letter-spacing:1px;">
-    🤖 CLAUDE 분석
-  </p>
-  <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:{fit_color};">
-    {color} {rec} &nbsp;·&nbsp; 적합도: {fit}
-  </p>
-  <p style="margin:0 0 6px;font-size:12px;color:#E8EDF2;">
+            border-radius:8px;padding:14px 16px;margin-top:8px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+    <span style="font-size:11px;font-weight:700;color:#4A9EFF;letter-spacing:1px;">🤖 CLAUDE 분석</span>
+    <span style="font-size:13px;font-weight:700;color:{fit_color};">{rec_color} {rec}</span>
+    <span style="font-size:12px;color:rgba(255,255,255,0.5);">적합도: {fit}</span>
+  </div>
+  <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#E8EDF2;">
     {ai_result.get('한줄요약','')}
   </p>
-  <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.6);line-height:1.6;">
-    {ai_result.get('적합이유','')}
+  <div style="margin-bottom:10px;">{check_html}</div>
+  <p style="margin:0 0 6px;font-size:12px;color:rgba(255,255,255,0.65);line-height:1.7;">
+    {ai_result.get('판단근거', ai_result.get('적합이유',''))}
   </p>
-  {"<p style='margin:6px 0 0;font-size:11px;color:#FFC863;'>⚠️ " + ai_result.get('주의사항','') + "</p>" if ai_result.get('주의사항','') not in ['없음',''] else ''}
+  {"<p style=\'margin:8px 0 0;font-size:11px;color:#FFC863;\'>⚠️ " + ai_result.get('주의사항','') + "</p>" if ai_result.get('주의사항','') not in ['없음','','nan'] else ''}
 </div>
                             """, unsafe_allow_html=True)
             st.divider()
