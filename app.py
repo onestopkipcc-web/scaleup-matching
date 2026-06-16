@@ -1565,30 +1565,37 @@ elif page == "공고 수집":
                     return drive_upload(drive, DETAIL_FILE, buf.getvalue(),
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-            for i, (_, row) in enumerate(df_target.iterrows()):
-                url = row.get('공고링크','')
-                pid = row.get('pblancId','')
-                name = row.get('공고명','')[:25]
-                if not url or not pid: continue
+            # bizinfo 상세페이지는 SPA(JS 렌더링) 구조라 requests로는 빈 body만 받아온다
+            # (실측: html 8~9만자, body 자식태그 0개 — 진단 확정됨) → Playwright로 브라우저를 띄워 렌더링 후 텍스트 추출
+            from playwright.sync_api import sync_playwright
 
-                try:
-                    _time.sleep(delay_sec)
-                    resp = requests.get(url, headers=HEADERS, timeout=20)
-                    if resp.status_code == 200:
-                        soup = BeautifulSoup(resp.text, 'html.parser')
+            with sync_playwright() as pw:
+                browser = pw.chromium.launch(headless=True)
+                page = browser.new_page(user_agent=HEADERS["User-Agent"])
+
+                for i, (_, row) in enumerate(df_target.iterrows()):
+                    url = row.get('공고링크','')
+                    pid = row.get('pblancId','')
+                    name = row.get('공고명','')[:25]
+                    if not url or not pid: continue
+
+                    try:
+                        _time.sleep(delay_sec)
+                        page.goto(url, timeout=20000, wait_until="networkidle")
                         full_text = ""
                         for sel in ['.view-content','.detail-content','#bizSumryCn',
                                     '.bbs-view-content','#content','.board-view']:
-                            el = soup.select_one(sel)
-                            if el:
-                                full_text = el.get_text(separator=' ', strip=True)
-                                if len(full_text) > 200: break
+                            try:
+                                el = page.query_selector(sel)
+                                if el:
+                                    t = el.inner_text()
+                                    if len(t) > 200:
+                                        full_text = t
+                                        break
+                            except Exception:
+                                continue
                         if len(full_text) < 100:
-                            body = soup.find('body')
-                            if body:
-                                for tag in body.find_all(['nav','header','footer','script','style']):
-                                    tag.decompose()
-                                full_text = body.get_text(separator=' ', strip=True)
+                            full_text = page.inner_text('body')
 
                         full_text = clean_notice_text(full_text)
 
@@ -1609,55 +1616,39 @@ elif page == "공고 수집":
                             m = re.search(pat, full_text)
                             if m: scale = m.group(0)[:30]; break
 
-                        # HTTP 200이어도 본문이 충분히 확보되지 않으면 실패로 처리
                         MIN_TEXT_LEN = 200
                         ok = len(full_text) >= MIN_TEXT_LEN
                         if ok:
                             new_records.append({'pblancId':pid,'전문내용':full_text[:4000],
-                                               '지원금액':amount,'선정규모':scale,'크롤링방법':'requests',
+                                               '지원금액':amount,'선정규모':scale,'크롤링방법':'Playwright',
                                                '크롤링일':today,'크롤링성공':'Y'})
                             success += 1
                             logs.append(f"✅ {name} ({len(full_text)}자)")
                         else:
-                            # 진단용: 원인 파악을 위해 body 내부 구조를 직접 확인
-                            raw_title = soup.title.string.strip() if soup.title and soup.title.string else ''
-                            body_tag = soup.find('body')
-                            if body_tag:
-                                body_html_snippet = str(body_tag)[:1500]
-                                body_children_count = len(body_tag.find_all())
-                            else:
-                                body_html_snippet = '(body 태그 없음)'
-                                body_children_count = -1
-                            diag = (f"[진단] html={len(resp.text)}자 title='{raw_title[:40]}' "
-                                    f"body_text={len(full_text)}자 body자식태그={body_children_count}개 "
-                                    f"body_snippet={body_html_snippet!r}")
-                            new_records.append({'pblancId':pid,'전문내용':diag[:3000],
-                                               '지원금액':'','선정규모':'','크롤링방법':'requests-diag',
+                            new_records.append({'pblancId':pid,'전문내용':f"[진단] Playwright 렌더링 후에도 본문 {len(full_text)}자",
+                                               '지원금액':'','선정규모':'','크롤링방법':'Playwright-diag',
                                                '크롤링일':today,'크롤링성공':'N'})
                             fail += 1
-                            logs.append(f"❌ {name} (본문 {len(full_text)}자, body자식{body_children_count}개)")
-                    else:
-                        new_records.append({'pblancId':pid,'전문내용':f"[진단] HTTP {resp.status_code}",'지원금액':'',
-                                           '선정규모':'','크롤링방법':'requests','크롤링일':today,'크롤링성공':'N'})
+                            logs.append(f"❌ {name} (본문 {len(full_text)}자 — 렌더링 후에도 부족)")
+                    except Exception as e:
+                        new_records.append({'pblancId':pid,'전문내용':f"[진단] 예외: {str(e)[:100]}",'지원금액':'',
+                                           '선정규모':'','크롤링방법':'Playwright','크롤링일':today,'크롤링성공':'N'})
                         fail += 1
-                        logs.append(f"❌ {name} (HTTP {resp.status_code})")
-                except Exception as e:
-                    new_records.append({'pblancId':pid,'전문내용':f"[진단] 예외: {str(e)[:100]}",'지원금액':'',
-                                       '선정규모':'','크롤링방법':'requests','크롤링일':today,'크롤링성공':'N'})
-                    fail += 1
-                    logs.append(f"❌ {name} ({str(e)[:30]})")
+                        logs.append(f"❌ {name} ({str(e)[:30]})")
 
-                prog.progress((i+1)/len(df_target))
-                log_area.code("\n".join(logs[-10:]))
+                    prog.progress((i+1)/len(df_target))
+                    log_area.code("\n".join(logs[-10:]))
 
-                # ── 배치 단위 중간 저장 ──────────────────
-                if len(new_records) >= batch_size:
-                    if save_batch(new_records):
-                        total_saved += len(new_records)
-                        batch_status.success(f"💾 중간 저장 완료 — 누적 {total_saved}건 ({i+1}/{len(df_target)} 진행)")
-                        new_records = []  # 저장된 건 비우고 다음 배치 시작
-                    else:
-                        batch_status.error("⚠️ 중간 저장 실패 — 다음 배치에서 재시도")
+                    # ── 배치 단위 중간 저장 ──────────────────
+                    if len(new_records) >= batch_size:
+                        if save_batch(new_records):
+                            total_saved += len(new_records)
+                            batch_status.success(f"💾 중간 저장 완료 — 누적 {total_saved}건 ({i+1}/{len(df_target)} 진행)")
+                            new_records = []  # 저장된 건 비우고 다음 배치 시작
+                        else:
+                            batch_status.error("⚠️ 중간 저장 실패 — 다음 배치에서 재시도")
+
+                browser.close()
 
             # 잔여분(배치 크기 미만으로 남은 마지막 묶음) 저장
             if new_records:
