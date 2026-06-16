@@ -1642,6 +1642,12 @@ elif page == "매칭 결과":
         with col2:
             candidate_per = st.slider("기업당 1차 후보 건수 (크롤링 대상)", 10, 30, 20)
 
+        st.markdown("**발송 대상 그룹**")
+        target_group = st.radio(
+            "발송 대상 그룹", ["선정 50개사", "예비 20개사", "전체 70개사"],
+            horizontal=True, label_visibility="collapsed", key="match_target_group"
+        )
+
         if st.button("🔍 1차 매칭 실행", type="primary"):
             with st.spinner("드라이브 데이터 로딩 중..."):
                 df_c    = load_excel(drive, SELECTED_FILE)
@@ -1652,6 +1658,16 @@ elif page == "매칭 결과":
                 notice_detail_count = 0
             if df_n.empty: st.error("notices_db 없음 → 공고 수집 먼저"); st.stop()
             if df_c.empty: st.error("선정기업 명단 없음 → 기업 관리에서 업로드"); st.stop()
+            if '선정구분' in df_c.columns:
+                if target_group == "선정 50개사":
+                    df_c = df_c[df_c['선정구분'] == '선정']
+                elif target_group == "예비 20개사":
+                    df_c = df_c[df_c['선정구분'] == '예비']
+                # "전체 70개사"는 필터 없음
+            else:
+                st.warning("선정기업 명단에 '선정구분' 컬럼이 없어 전체 기업으로 매칭합니다.")
+            if df_c.empty:
+                st.error(f"'{target_group}' 대상 기업이 없습니다."); st.stop()
             if '수신거부' in df_c.columns: df_c = df_c[df_c['수신거부']!='Y']
             already_sent = set(zip(df_h['기업명'], df_h['pblancId'])) if not df_h.empty else set()
             all_results  = []; prog = st.progress(0)
@@ -2134,10 +2150,12 @@ elif page == "발송 관리":
 
     results  = st.session_state.get('match_results', [])
     approved = [r for r in results if r.get('담당자검토')=='○']
+    matched_group = st.session_state.get('match_target_group', '미확인')
 
     if not approved:
         st.warning("승인된 공고 없음 — '매칭 결과'에서 검토 완료 후 진행")
     else:
+        st.info(f"📌 현재 매칭 대상 그룹: **{matched_group}** (다른 그룹 발송 시 '매칭 결과'에서 그룹 변경 후 재매칭 필요)")
         companies = list(set(r['기업명'] for r in approved))
         c1,c2,c3  = st.columns(3)
         c1.metric("승인 건수", f"{len(approved)}건")
