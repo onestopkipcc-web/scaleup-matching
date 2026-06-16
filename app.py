@@ -1610,25 +1610,31 @@ elif page == "공고 수집":
                             if m: scale = m.group(0)[:30]; break
 
                         # HTTP 200이어도 본문이 충분히 확보되지 않으면 실패로 처리
-                        # (JS 렌더링 페이지는 requests로 빈 껍데기만 받아오는 경우가 있음)
                         MIN_TEXT_LEN = 200
                         ok = len(full_text) >= MIN_TEXT_LEN
-                        new_records.append({'pblancId':pid,'전문내용':full_text[:4000],
-                                           '지원금액':amount,'선정규모':scale,'크롤링방법':'requests',
-                                           '크롤링일':today,'크롤링성공':'Y' if ok else 'N'})
                         if ok:
+                            new_records.append({'pblancId':pid,'전문내용':full_text[:4000],
+                                               '지원금액':amount,'선정규모':scale,'크롤링방법':'requests',
+                                               '크롤링일':today,'크롤링성공':'Y'})
                             success += 1
                             logs.append(f"✅ {name} ({len(full_text)}자)")
                         else:
+                            # 진단용: 원인 파악을 위해 raw HTML 일부와 body 길이를 남긴다
+                            # (정상 매칭에는 쓰이지 않도록 크롤링성공=N 유지, 단 내용으로 원인 추정 가능)
+                            raw_title = soup.title.string.strip() if soup.title and soup.title.string else ''
+                            diag = f"[진단] raw_html_len={len(resp.text)} title='{raw_title[:50]}' body_text_len={len(full_text)} raw_snippet={resp.text[:200]!r}"
+                            new_records.append({'pblancId':pid,'전문내용':diag[:1000],
+                                               '지원금액':'','선정규모':'','크롤링방법':'requests-diag',
+                                               '크롤링일':today,'크롤링성공':'N'})
                             fail += 1
-                            logs.append(f"❌ {name} (본문 {len(full_text)}자 — JS 렌더링 페이지 추정)")
+                            logs.append(f"❌ {name} (본문 {len(full_text)}자, html {len(resp.text)}자, title='{raw_title[:20]}')")
                     else:
-                        new_records.append({'pblancId':pid,'전문내용':'','지원금액':'',
+                        new_records.append({'pblancId':pid,'전문내용':f"[진단] HTTP {resp.status_code}",'지원금액':'',
                                            '선정규모':'','크롤링방법':'requests','크롤링일':today,'크롤링성공':'N'})
                         fail += 1
                         logs.append(f"❌ {name} (HTTP {resp.status_code})")
                 except Exception as e:
-                    new_records.append({'pblancId':pid,'전문내용':'','지원금액':'',
+                    new_records.append({'pblancId':pid,'전문내용':f"[진단] 예외: {str(e)[:100]}",'지원금액':'',
                                        '선정규모':'','크롤링방법':'requests','크롤링일':today,'크롤링성공':'N'})
                     fail += 1
                     logs.append(f"❌ {name} ({str(e)[:30]})")
