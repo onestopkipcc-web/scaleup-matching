@@ -1473,13 +1473,13 @@ elif page == "공고 수집":
         crawl_toggle = st.toggle("크롤링 실행", value=bool(st.session_state.get('pending_crawl')), key="crawl_toggle")
 
     if crawl_toggle:
-        st.warning("⚠️ 수동 크롤링 — 공고 수에 따라 수십 분 소요될 수 있습니다.")
+        st.warning("⚠️ 수동 크롤링 — 공고 수에 따라 수십 분 소요될 수 있습니다. 설정한 건수마다 자동 중간 저장되어, 중간에 끊겨도 이미 처리한 건은 보존됩니다. 끊기면 그냥 다시 실행하면 미수집분부터 이어집니다.")
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             crawl_limit = st.number_input(
                 "최대 크롤링 건수 (0 = 전체)",
-                min_value=0, max_value=500, value=50,
+                min_value=0, max_value=2000, value=50,
                 help="테스트 시 50건 권장, 전체는 0 입력"
             )
         with col2:
@@ -1490,6 +1490,12 @@ elif page == "공고 수집":
             )
             delay_map = {"빠름 (0.5초)": 0.5, "보통 (1.2초)": 1.2, "느림 (2초)": 2.0}
             delay_sec = delay_map[crawl_delay]
+        with col3:
+            batch_size = st.number_input(
+                "중간 저장 단위 (건)",
+                min_value=10, max_value=200, value=30,
+                help="이 건수마다 드라이브에 저장 → 중간에 끊겨도 이전 작업 보존"
+            )
 
         if st.button("🕷️ 지금 크롤링 실행", type="primary", key="crawl_btn"):
             import time as _time
@@ -1509,15 +1515,33 @@ elif page == "공고 수집":
             if crawl_limit > 0:
                 df_target = df_target.head(crawl_limit)
 
-            st.info(f"크롤링 대상: {len(df_target)}건")
-            prog = st.progress(0); log_area = st.empty()
+            st.info(f"크롤링 대상: {len(df_target)}건 (총 {-(-len(df_target)//batch_size)}개 배치, {batch_size}건씩 저장)")
+            prog = st.progress(0); log_area = st.empty(); batch_status = st.empty()
             logs = []; new_records = []; success = fail = 0
+            total_saved = 0
 
             HEADERS = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "Accept-Language": "ko-KR,ko;q=0.9",
                 "Referer": "https://www.bizinfo.go.kr/",
             }
+
+            def save_batch(records_to_save):
+                """new_records를 notices_detail.xlsx에 누적 저장. 매번 드라이브에서 최신본을 다시 읽어 합친다."""
+                if not records_to_save:
+                    return True
+                with st.spinner(f"드라이브 저장 중... (누적 {total_saved + len(records_to_save)}건)"):
+                    df_latest = load_excel(drive, DETAIL_FILE)  # 다른 배치/실행과 충돌 방지 위해 매번 최신본 로드
+                    df_new_batch = pd.DataFrame(records_to_save)
+                    df_merged = pd.concat([df_latest, df_new_batch], ignore_index=True) if not df_latest.empty else df_new_batch
+                    # pblancId 중복 시 가장 마지막(최신) 레코드만 유지
+                    if 'pblancId' in df_merged.columns:
+                        df_merged = df_merged.drop_duplicates('pblancId', keep='last')
+                    buf = io.BytesIO()
+                    with pd.ExcelWriter(buf, engine='openpyxl') as w:
+                        df_merged.to_excel(w, index=False)
+                    return drive_upload(drive, DETAIL_FILE, buf.getvalue(),
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
             for i, (_, row) in enumerate(df_target.iterrows()):
                 url = row.get('공고링크','')
@@ -1573,22 +1597,26 @@ elif page == "공고 수집":
                 prog.progress((i+1)/len(df_target))
                 log_area.code("\n".join(logs[-10:]))
 
-            # 드라이브 저장
-            if new_records:
-                df_new = pd.DataFrame(new_records)
-                df_out = pd.concat([df_detail, df_new], ignore_index=True) if not df_detail.empty else df_new
-                with st.spinner("드라이브 저장 중..."):
-                    buf = io.BytesIO()
-                    with pd.ExcelWriter(buf, engine='openpyxl') as w:
-                        df_out.to_excel(w, index=False)
-                    save_ok = drive_upload(drive, DETAIL_FILE, buf.getvalue(),
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                # ── 배치 단위 중간 저장 ──────────────────
+                if len(new_records) >= batch_size:
+                    if save_batch(new_records):
+                        total_saved += len(new_records)
+                        batch_status.success(f"💾 중간 저장 완료 — 누적 {total_saved}건 ({i+1}/{len(df_target)} 진행)")
+                        new_records = []  # 저장된 건 비우고 다음 배치 시작
+                    else:
+                        batch_status.error("⚠️ 중간 저장 실패 — 다음 배치에서 재시도")
 
-                if save_ok:
-                    st.success(f"✅ 크롤링 완료 — 성공 {success}건 / 실패 {fail}건 → notices_detail.xlsx 저장")
+            # 잔여분(배치 크기 미만으로 남은 마지막 묶음) 저장
+            if new_records:
+                if save_batch(new_records):
+                    total_saved += len(new_records)
+                    st.success(f"✅ 크롤링 완료 — 성공 {success}건 / 실패 {fail}건 / 총 저장 {total_saved}건 → notices_detail.xlsx")
                     st.rerun()
                 else:
-                    st.error("드라이브 저장 실패")
+                    st.error(f"드라이브 저장 실패 — 단, 이전 배치 {total_saved}건은 이미 저장되어 있습니다.")
+            elif total_saved > 0:
+                st.success(f"✅ 크롤링 완료 — 성공 {success}건 / 실패 {fail}건 / 총 저장 {total_saved}건 → notices_detail.xlsx")
+                st.rerun()
             else:
                 st.info("새로 크롤링할 공고 없음")
 
