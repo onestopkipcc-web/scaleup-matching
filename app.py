@@ -1619,15 +1619,23 @@ elif page == "공고 수집":
                             success += 1
                             logs.append(f"✅ {name} ({len(full_text)}자)")
                         else:
-                            # 진단용: 원인 파악을 위해 raw HTML 일부와 body 길이를 남긴다
-                            # (정상 매칭에는 쓰이지 않도록 크롤링성공=N 유지, 단 내용으로 원인 추정 가능)
+                            # 진단용: 원인 파악을 위해 body 내부 구조를 직접 확인
                             raw_title = soup.title.string.strip() if soup.title and soup.title.string else ''
-                            diag = f"[진단] raw_html_len={len(resp.text)} title='{raw_title[:50]}' body_text_len={len(full_text)} raw_snippet={resp.text[:200]!r}"
-                            new_records.append({'pblancId':pid,'전문내용':diag[:1000],
+                            body_tag = soup.find('body')
+                            if body_tag:
+                                body_html_snippet = str(body_tag)[:1500]
+                                body_children_count = len(body_tag.find_all())
+                            else:
+                                body_html_snippet = '(body 태그 없음)'
+                                body_children_count = -1
+                            diag = (f"[진단] html={len(resp.text)}자 title='{raw_title[:40]}' "
+                                    f"body_text={len(full_text)}자 body자식태그={body_children_count}개 "
+                                    f"body_snippet={body_html_snippet!r}")
+                            new_records.append({'pblancId':pid,'전문내용':diag[:3000],
                                                '지원금액':'','선정규모':'','크롤링방법':'requests-diag',
                                                '크롤링일':today,'크롤링성공':'N'})
                             fail += 1
-                            logs.append(f"❌ {name} (본문 {len(full_text)}자, html {len(resp.text)}자, title='{raw_title[:20]}')")
+                            logs.append(f"❌ {name} (본문 {len(full_text)}자, body자식{body_children_count}개)")
                     else:
                         new_records.append({'pblancId':pid,'전문내용':f"[진단] HTTP {resp.status_code}",'지원금액':'',
                                            '선정규모':'','크롤링방법':'requests','크롤링일':today,'크롤링성공':'N'})
