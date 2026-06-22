@@ -1074,64 +1074,127 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════
 if page == "대시보드":
     drive = _get_drive()
-    st.title("대시보드")
-    info_box("운영 흐름",
-        """
-**운영 사이클 (격주)**
-1. **공고 수집** (월) — bizinfo API 전체 공고 수집 → notices_db.xlsx 갱신
-2. **매칭 실행** (화) — 선정기업 × 공고 교차 매칭 → 후보 목록 추출
-3. **담당자 검토** (화~수) — ○/✕ 클릭으로 발송 여부 결정
-4. **발송** (목) — 승인 건만 메일 + 캘린더 자동 처리
-5. **성과 집계** (분기) — 신청·선정 결과 입력 및 보고
+    st.title("📊 운영 대시보드")
 
-**드라이브 연동** — 모든 데이터 구글 드라이브 자동 저장, 팀 공유
-        """)
+    with st.spinner("데이터 로딩 중..."):
+        df_c  = load_excel(drive, SELECTED_FILE)
+        df_n  = load_excel(drive, NOTICES_FILE)
+        df_h  = load_excel(drive, HISTORY_FILE)
+        df_det = load_excel(drive, DETAIL_FILE)
 
-    drive = _get_drive()
-    with st.spinner("드라이브 데이터 로딩 중..."):
-        df_c = load_excel(drive, SELECTED_FILE)
-        df_n = load_excel(drive, NOTICES_FILE)
-        df_h = load_excel(drive, HISTORY_FILE)
+    # ── 상단 핵심 지표 4개 ─────────────────────────────
+    m1, m2, m3, m4 = st.columns(4)
 
-    c1,c2,c3,c4 = st.columns(4)
-    c1.metric("선정 기업",  f"{len(df_c)}개사")
-    c2.metric("수집 공고",  f"{len(df_n):,}건")
-    c3.metric("발송 이력",  f"{len(df_h)}건")
-    c4.metric("운영 모드",  "테스트" if test_mode else "실제")
+    # 선정 기업
+    total_co = len(df_c)
+    sel_co   = (df_c['선정구분']=='선정').sum() if '선정구분' in df_c.columns else total_co
+    res_co   = (df_c['선정구분']=='예비').sum() if '선정구분' in df_c.columns else 0
+    m1.metric("선정 기업", f"{sel_co}개사", f"예비 {res_co}개사")
+
+    # 공고 DB
+    active_n = 0
+    if not df_n.empty and '마감일' in df_n.columns:
+        today_str = datetime.today().strftime('%Y-%m-%d')
+        active_n = (df_n['마감일'] >= today_str).sum()
+    m2.metric("활성 공고", f"{active_n:,}건", f"전체 {len(df_n):,}건")
+
+    # 전문 크롤링
+    crawl_ok = 0
+    crawl_fail = 0
+    if not df_det.empty and '크롤링성공' in df_det.columns:
+        crawl_ok   = (df_det['크롤링성공']=='Y').sum()
+        crawl_fail = (df_det['크롤링성공']!='Y').sum()
+    m3.metric("전문 수집", f"{crawl_ok}건", f"실패 {crawl_fail}건")
+
+    # 발송 이력
+    this_month_h = 0
+    if not df_h.empty and '발송일' in df_h.columns:
+        this_month = datetime.today().strftime('%Y-%m')
+        this_month_h = df_h['발송일'].astype(str).str.startswith(this_month).sum()
+    m4.metric("이번 달 발송", f"{this_month_h}건", f"누적 {len(df_h)}건")
 
     st.divider()
-    st.subheader("이번 주 진행 단계")
-    cols = st.columns(5)
-    steps = [
-        ("① 공고 수집",   "✅" if not df_n.empty else "⬜"),
-        ("② 매칭 실행",   "🔵"),
-        ("③ 담당자 검토", "⬜"),
-        ("④ 발송",        "⬜"),
-        ("⑤ 이력 기록",   "⬜"),
+
+    # ── 이번 주 할 일 체크리스트 ───────────────────────
+    st.subheader("🗂 이번 주 운영 체크리스트")
+
+    # 각 단계 상태 자동 판단
+    last_collect = "—"
+    if not df_n.empty and '수정일' in df_n.columns:
+        last_collect = df_n['수정일'].max()[:10] if df_n['수정일'].max() else "—"
+
+    last_crawl = "—"
+    need_crawl_cnt = 0
+    if not df_det.empty and '크롤링일' in df_det.columns:
+        last_crawl = df_det['크롤링일'].max()[:10] if df_det['크롤링일'].max() else "—"
+    if not df_n.empty and not df_det.empty and 'pblancId' in df_n.columns and 'pblancId' in df_det.columns:
+        crawled_pids = set(df_det[df_det.get('크롤링성공',pd.Series(''))=='Y']['pblancId']) if '크롤링성공' in df_det.columns else set()
+        need_crawl_cnt = len(set(df_n['pblancId']) - crawled_pids)
+
+    results      = st.session_state.get('match_results', [])
+    review_state = st.session_state.get('review_state', {})
+    approved     = sum(1 for v in review_state.values() if v=="○")
+    pending_rev  = len(results) - sum(1 for v in review_state.values() if v in ["○","✕"])
+
+    steps_data = [
+        {
+            "step": "① 공고 수집",
+            "status": "완료" if not df_n.empty else "필요",
+            "ok": not df_n.empty,
+            "detail": f"마지막 수집: {last_collect} / 활성 공고 {active_n}건" if not df_n.empty else "공고 수집 탭에서 실행 필요",
+            "action": "공고 수집"
+        },
+        {
+            "step": "② 전문 크롤링",
+            "status": "완료" if need_crawl_cnt == 0 else f"{need_crawl_cnt}건 대기",
+            "ok": need_crawl_cnt == 0,
+            "detail": f"수집 완료 {crawl_ok}건 / 미수집 {need_crawl_cnt}건" if not df_det.empty else "크롤링 미실행",
+            "action": "공고 수집"
+        },
+        {
+            "step": "③ 매칭 실행",
+            "status": "완료" if results else "미실행",
+            "ok": bool(results),
+            "detail": f"매칭 결과 {len(results)}건 로드됨" if results else "매칭 결과 탭에서 실행 필요",
+            "action": "매칭 결과"
+        },
+        {
+            "step": "④ 검토 & 승인",
+            "status": "완료" if (results and pending_rev==0) else (f"{pending_rev}건 미검토" if results else "매칭 후 진행"),
+            "ok": results and pending_rev == 0,
+            "detail": f"승인 {approved}건 / 미검토 {pending_rev}건" if results else "매칭 실행 후 가능",
+            "action": "매칭 결과"
+        },
+        {
+            "step": "⑤ 발송",
+            "status": "발송 가능" if approved > 0 else "승인 후 진행",
+            "ok": False,
+            "detail": f"승인된 공고 {approved}건 발송 대기" if approved > 0 else "검토 승인 후 발송 가능",
+            "action": "발송 관리"
+        },
     ]
-    for col,(name,icon) in zip(cols,steps):
-        col.markdown(f"**{name}**\n\n{icon}")
+
+    for s in steps_data:
+        icon = "✅" if s['ok'] else ("🟡" if "대기" in s['status'] or "가능" in s['status'] else "⬜")
+        c1, c2, c3 = st.columns([2, 4, 2])
+        with c1:
+            st.write(f"{icon} **{s['step']}**")
+        with c2:
+            st.caption(s['detail'])
+        with c3:
+            badge_color = "#63FFA8" if s['ok'] else ("#FFC863" if icon=="🟡" else "rgba(255,255,255,0.2)")
+            st.markdown(
+                f"<span style='background:{badge_color};color:#000;padding:2px 10px;"
+                f"border-radius:10px;font-size:11px;font-weight:700;'>{s['status']}</span>",
+                unsafe_allow_html=True
+            )
 
     st.divider()
-    st.subheader("드라이브 파일 현황")
-    fcols = st.columns(6)
-    for col,(fname,label) in zip(fcols,{
-        SELECTED_FILE:"선정기업 명단", NOTICES_FILE:"공고 DB",
-        DETAIL_FILE:"공고 전문 DB",
-        HISTORY_FILE:"발송 이력", CALID_FILE:"캘린더 ID", KEYWORDS_FILE:"키워드"
-    }.items()):
-        fid = drive_file_id(drive, fname)
-        col.metric(label, "✅" if fid else "❌")
 
-    # ── 차트 섹션 ──────────────────────────────────────
-    st.divider()
-    st.subheader("📊 현황 분석")
+    # ── 현황 분석 탭 ────────────────────────────────────
+    st.subheader("📈 현황 분석")
+    tab_c1, tab_c2, tab_c3, tab_c4 = st.tabs(["분야별 공고", "기업 관심분야", "매칭 현황", "발송 추이"])
 
-    tab_c1, tab_c2, tab_c3, tab_c4 = st.tabs([
-        "분야별 공고", "기업 관심분야", "매칭 점수", "발송 추이"
-    ])
-
-    # ① 분야별 공고 현황
     with tab_c1:
         if df_n.empty:
             st.info("공고 수집 후 확인 가능")
@@ -1142,54 +1205,62 @@ if page == "대시보드":
             st.bar_chart(realm_count.set_index('분야'), height=300)
             st.caption(f"총 {len(df_n):,}건 / {len(realm_count)}개 분야")
         else:
-            st.info("분야 컬럼 없음 — 공고 재수집 필요")
+            st.info("분야 컬럼 없음")
 
-    # ② 기업 관심분야 분포
     with tab_c2:
         if df_c.empty:
             st.info("선정기업 명단 업로드 후 확인 가능")
-        elif '관심사업분야' in df_c.columns:
-            all_interests = []
-            for val in df_c['관심사업분야']:
-                for item in str(val).split(','):
-                    item = item.strip()
-                    if item and item != 'nan':
-                        all_interests.append(item)
-            interest_count = pd.Series(all_interests).value_counts().reset_index()
-            interest_count.columns = ['관심분야', '기업 수']
-            st.bar_chart(interest_count.set_index('관심분야'), height=280)
-            st.dataframe(interest_count, use_container_width=True, hide_index=True)
         else:
-            st.info("관심사업분야 컬럼 없음")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if '관심사업분야' in df_c.columns:
+                    all_interests = []
+                    for val in df_c['관심사업분야']:
+                        for item in str(val).split(','):
+                            item = item.strip()
+                            if item and item != 'nan':
+                                all_interests.append(item)
+                    interest_count = pd.Series(all_interests).value_counts().reset_index()
+                    interest_count.columns = ['관심분야', '기업 수']
+                    st.caption("관심사업분야 분포")
+                    st.bar_chart(interest_count.set_index('관심분야'), height=250)
+            with col_b:
+                if '소재지' in df_c.columns:
+                    region_count = df_c['소재지'].value_counts().reset_index()
+                    region_count.columns = ['소재지', '기업 수']
+                    st.caption("소재지 분포")
+                    st.bar_chart(region_count.set_index('소재지'), height=250)
 
-    # ③ 매칭 점수 분포
     with tab_c3:
-        results = st.session_state.get('match_results', [])
         if not results:
             st.info("매칭 실행 후 확인 가능")
         else:
             df_r = pd.DataFrame(results)
-            if '관련도' in df_r.columns:
-                star_count = df_r['관련도'].value_counts().reset_index()
-                star_count.columns = ['관련도', '건수']
-                total_r = len(df_r)
-                c1,c2 = st.columns(2)
-                with c1:
-                    st.bar_chart(star_count.set_index('관련도'), height=220)
-                with c2:
-                    for _, row in star_count.iterrows():
-                        st.metric(row['관련도'], f"{row['건수']}건",
-                                  f"{row['건수']/total_r*100:.1f}%")
-            if '기업명' in df_r.columns:
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if '관련도' in df_r.columns:
+                    star_count = df_r['관련도'].value_counts().reset_index()
+                    star_count.columns = ['관련도', '건수']
+                    st.caption("별점 분포")
+                    st.bar_chart(star_count.set_index('관련도'), height=200)
+            with col_b:
+                if '공고명' in df_r.columns:
+                    top_notices = df_r.groupby('공고명').size().sort_values(ascending=False).head(10).reset_index()
+                    top_notices.columns = ['공고명', '추천 기업 수']
+                    top_notices['공고명'] = top_notices['공고명'].str[:20] + '...'
+                    st.caption("공고별 추천 기업 수 (상위 10)")
+                    st.bar_chart(top_notices.set_index('공고명'), height=200)
+            if '공고유형' in df_r.columns:
                 st.divider()
-                co_count = df_r.groupby('기업명').size().reset_index(name='매칭 건수')
-                co_count = co_count.sort_values('매칭 건수', ascending=False)
-                st.dataframe(co_count, use_container_width=True, hide_index=True)
+                type_count = df_r['공고유형'].value_counts()
+                c1, c2, c3 = st.columns(3)
+                c1.metric("맞춤 공고", f"{type_count.get('맞춤', 0)}건")
+                c2.metric("공통 공고", f"{type_count.get('공통', 0)}건")
+                c3.metric("기업당 평균", f"{len(df_r)/df_r['기업명'].nunique():.1f}건")
 
-    # ④ 발송 추이
     with tab_c4:
         if df_h.empty:
-            st.info("발송 이력 쌓이면 확인 가능")
+            st.info("발송 이력이 쌓이면 확인 가능")
         else:
             if '발송일' in df_h.columns:
                 df_h2 = df_h.copy()
@@ -1197,17 +1268,15 @@ if page == "대시보드":
                 df_h2['월'] = df_h2['발송일'].dt.to_period('M').astype(str)
                 monthly = df_h2.groupby('월').size().reset_index(name='발송 건수')
                 st.line_chart(monthly.set_index('월'), height=220)
-            if '신청여부' in df_h.columns and '선정결과' in df_h.columns:
-                st.divider()
-                c1,c2,c3 = st.columns(3)
-                total_h  = len(df_h)
-                applied  = (df_h['신청여부']=='Y').sum()
+            col_a, col_b, col_c = st.columns(3)
+            col_a.metric("총 발송", f"{len(df_h)}건")
+            if '신청여부' in df_h.columns:
+                applied = (df_h['신청여부']=='Y').sum()
+                col_b.metric("신청 건", f"{applied}건",
+                             f"{applied/len(df_h)*100:.1f}%" if len(df_h) else "")
+            if '선정결과' in df_h.columns:
                 selected = (df_h['선정결과']=='선정').sum()
-                c1.metric("총 발송", f"{total_h}건")
-                c2.metric("신청 건", f"{applied}건",
-                          f"{applied/total_h*100:.1f}%" if total_h else "")
-                c3.metric("선정 건", f"{selected}건",
-                          f"{selected/applied*100:.1f}%" if applied else "")
+                col_c.metric("선정 건", f"{selected}건")
 
 
 # ══════════════════════════════════════════════════════
@@ -1871,19 +1940,50 @@ elif page == "매칭 결과":
             st.info("매칭 실행 탭에서 먼저 실행 필요")
         else:
             df_show = pd.DataFrame(results)
-            c1,c2   = st.columns(2)
-            with c1: filter_stars = st.multiselect("관련도", ["★★★","★★"], default=["★★★","★★"])
-            with c2: filter_co    = st.selectbox("기업", ["전체"]+sorted(df_show['기업명'].unique().tolist()))
-            filtered = df_show[df_show['관련도'].isin(filter_stars)]
-            if filter_co != "전체": filtered = filtered[filtered['기업명']==filter_co]
             if 'review_state'  not in st.session_state: st.session_state['review_state']  = {}
             if 'ai_analysis'   not in st.session_state: st.session_state['ai_analysis']   = {}
             if 'custom_deadline' not in st.session_state: st.session_state['custom_deadline'] = {}
 
-            ap = sum(1 for v in st.session_state['review_state'].values() if v=="○")
-            rj = sum(1 for v in st.session_state['review_state'].values() if v=="✕")
+            # ── 검토 상태 저장/불러오기 ─────────────────────
+            sv1, sv2, sv3 = st.columns([2, 2, 4])
+            with sv1:
+                if st.button("💾 검토 상태 저장", help="드라이브에 현재 검토 상태를 저장합니다"):
+                    import json
+                    review_data = {
+                        'review_state': st.session_state['review_state'],
+                        'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M')
+                    }
+                    drive_upload(drive, "review_state.json",
+                                 json.dumps(review_data, ensure_ascii=False).encode('utf-8'),
+                                 "application/json")
+                    st.success("검토 상태 저장 완료")
+            with sv2:
+                if st.button("📂 검토 상태 불러오기", help="드라이브에서 이전에 저장한 검토 상태를 불러옵니다"):
+                    import json
+                    saved = load_json(drive, "review_state.json")
+                    if saved and 'review_state' in saved:
+                        st.session_state['review_state'] = saved['review_state']
+                        st.success(f"불러오기 완료 ({saved.get('saved_at','날짜 미상')} 저장본)")
+                        st.rerun()
+                    else:
+                        st.warning("저장된 검토 상태가 없습니다")
+            with sv3:
+                saved_json = load_json(drive, "review_state.json")
+                if saved_json:
+                    st.caption(f"마지막 저장: {saved_json.get('saved_at','—')}")
+
+            st.divider()
+
+            # ── 필터 ────────────────────────────────────────
+            c1, c2 = st.columns(2)
+            with c1: filter_stars = st.multiselect("관련도", ["★★★","★★"], default=["★★★","★★"])
+            with c2: filter_co    = st.selectbox("기업", ["전체"]+sorted(df_show['기업명'].unique().tolist()))
+            filtered = df_show[df_show['관련도'].isin(filter_stars)]
+            if filter_co != "전체": filtered = filtered[filtered['기업명']==filter_co]
+
+            ap      = sum(1 for v in st.session_state['review_state'].values() if v=="○")
+            rj      = sum(1 for v in st.session_state['review_state'].values() if v=="✕")
             pending = len(filtered) - ap - rj
-            ai_done = len(st.session_state['ai_analysis'])
 
             # ── 상단 진행 현황 ──────────────────────────────
             c1,c2,c3,c4 = st.columns(4)
@@ -1947,11 +2047,37 @@ elif page == "매칭 결과":
                 ]
                 co_map = dict(zip(co_labels, companies_in_result))
 
-                selected_label = st.selectbox(
-                    "기업 선택",
-                    co_labels,
-                    key="review_co_select"
-                )
+                # 이전/다음 네비게이션
+                if 'review_co_idx' not in st.session_state:
+                    st.session_state['review_co_idx'] = 0
+                current_idx = st.session_state['review_co_idx']
+                current_idx = max(0, min(current_idx, len(co_labels)-1))
+
+                nav1, nav2, nav3, nav4 = st.columns([1, 5, 1, 2])
+                with nav1:
+                    if st.button("◀ 이전", disabled=current_idx==0):
+                        st.session_state['review_co_idx'] = current_idx - 1
+                        st.rerun()
+                with nav2:
+                    selected_label = st.selectbox(
+                        "기업 선택",
+                        co_labels,
+                        index=current_idx,
+                        key="review_co_select",
+                        label_visibility="collapsed"
+                    )
+                    # 드롭다운으로 직접 선택 시 인덱스 동기화
+                    new_idx = co_labels.index(selected_label)
+                    if new_idx != current_idx:
+                        st.session_state['review_co_idx'] = new_idx
+                        st.rerun()
+                with nav3:
+                    if st.button("다음 ▶", disabled=current_idx==len(co_labels)-1):
+                        st.session_state['review_co_idx'] = current_idx + 1
+                        st.rerun()
+                with nav4:
+                    st.caption(f"{current_idx+1} / {len(co_labels)}개사")
+
                 selected_co = co_map[selected_label]
 
                 # 선택 기업 공고 필터 + 점수순 정렬
