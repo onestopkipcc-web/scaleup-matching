@@ -1024,7 +1024,7 @@ with st.sidebar:
     st.divider()
     page = st.radio("메뉴", [
         "대시보드", "기업 관리", "공고 수집",
-        "매칭 결과", "발송 관리",
+        "매칭 결과", "발송 관리", "안내 메일",
         "발송 이력", "성과 집계", "설정", "시스템 명세"
     ], label_visibility="collapsed")
     st.divider()
@@ -1214,13 +1214,20 @@ elif page == "기업 관리":
         for col in ['키워드보완','수신거부','메모','구글계정']:
             if col not in df_c.columns: df_c[col] = ''
 
-        c1,c2,c3 = st.columns(3)
-        c1.metric("선정 기업",   f"{len(df_c)}개사")
-        c2.metric("수신거부",    f"{(df_c['수신거부']=='Y').sum()}개사")
-        c3.metric("키워드 보완", f"{(df_c['키워드보완']!='').sum()}개사")
+        # ── 선정/예비 구분 ─────────────────────────────────
+        has_status = '선정구분' in df_c.columns
+        df_선정 = df_c[df_c['선정구분']=='선정'] if has_status else df_c
+        df_예비 = df_c[df_c['선정구분']=='예비'] if has_status else pd.DataFrame()
+
+        # ── 상단 메트릭 ────────────────────────────────────
+        c1,c2,c3,c4 = st.columns(4)
+        c1.metric("전체", f"{len(df_c)}개사")
+        c2.metric("선정", f"{len(df_선정)}개사")
+        c3.metric("예비", f"{len(df_예비)}개사")
+        c4.metric("수신거부", f"{(df_c['수신거부']=='Y').sum()}개사")
         st.divider()
 
-        # 파일 교체 버튼
+        # ── 파일 교체 ──────────────────────────────────────
         with st.expander("📁 선정기업 명단 파일 교체"):
             uploaded = st.file_uploader("새 파일 업로드", type=["xlsx"], key="replace")
             if uploaded:
@@ -1230,47 +1237,67 @@ elif page == "기업 관리":
                 if save_excel(drive, df_new, SELECTED_FILE, "선정기업명단", "1F4E79"):
                     st.success("교체 완료!"); st.rerun()
 
-        # 컬럼명 확인 및 안내
         if '기업명' not in df_c.columns:
             st.error(f"'기업명' 컬럼을 찾을 수 없음 — 현재 컬럼: {', '.join(df_c.columns.tolist())}")
-            st.info("선정기업_명단.xlsx의 첫 번째 컬럼명이 '기업명'인지 확인하세요.")
             st.stop()
 
-        search = st.text_input("🔍 기업명 검색")
-        df_show = df_c[df_c['기업명'].str.contains(search, na=False)] if search else df_c
+        # ── 탭 분리 ────────────────────────────────────────
+        if has_status:
+            tab_labels = [f"🟢 선정 {len(df_선정)}개사", f"🟡 예비 {len(df_예비)}개사", f"📋 전체 {len(df_c)}개사"]
+        else:
+            tab_labels = [f"📋 전체 {len(df_c)}개사"]
+        tabs = st.tabs(tab_labels)
 
-        for idx, row in df_show.iterrows():
-            unsub = str(row.get('수신거부','')) == 'Y'
-            icon  = "🚫" if unsub else "🏢"
-            with st.expander(f"{icon} **{row.get('기업명','')}**  |  {row.get('사업자등록번호','')}  |  {row.get('관심사업분야','')}"):
-                c1,c2 = st.columns(2)
-                with c1:
-                    st.markdown(f"**소재지:** {row.get('소재지','')}")
-                    st.markdown(f"**이메일:** {row.get('이메일','')}")
-                    st.markdown(f"**관심분야:** {row.get('관심사업분야','')}")
-                    st.markdown(f"**수출:** {row.get('수출실적','')} / {row.get('수출국가','')}")
-                    st.markdown(f"**TRL단계:** {row.get('TRL단계','')}")
-                with c2:
-                    st.markdown(f"**제품분야:** {row.get('제품분야','')}")
-                    st.markdown(f"**기술키워드:** {row.get('기술키워드','')}")
-                    st.markdown(f"**핵심수요태그:** {row.get('핵심수요태그','')}")
-                    st.markdown(f"**사업자번호:** {row.get('사업자등록번호','')}")
+        def render_company_list(df_target, tab_key):
+            search = st.text_input("🔍 기업명 검색", key=f"search_{tab_key}")
+            df_show = df_target[df_target['기업명'].str.contains(search, na=False)] if search else df_target
 
-                extra_kw = st.text_input("키워드 보완", value=row.get('키워드보완',''),
-                    key=f"kw_{idx}", placeholder="예: 스마트팜, IoT")
-                google_acc = st.text_input("구글계정", value=row.get('구글계정',''),
-                    key=f"ga_{idx}", placeholder="example@gmail.com")
-                unsub_cb = st.checkbox("수신거부", value=unsub, key=f"unsub_{idx}")
-                memo     = st.text_input("메모", value=row.get('메모',''), key=f"memo_{idx}")
+            for idx, row in df_show.iterrows():
+                unsub = str(row.get('수신거부','')) == 'Y'
+                icon  = "🚫" if unsub else "🏢"
+                status_badge = f"[{row.get('선정구분','')}]" if has_status and row.get('선정구분','') else ""
+                score_badge  = f"총점 {row.get('평가_총점','')}점" if row.get('평가_총점','') else ""
 
-                if st.button("💾 저장", key=f"save_{idx}"):
-                    df_c.at[idx,'키워드보완']   = extra_kw
-                    df_c.at[idx,'구글계정']     = google_acc
-                    df_c.at[idx,'수신거부']     = 'Y' if unsub_cb else ''
-                    df_c.at[idx,'메모']         = memo
-                    with st.spinner("드라이브 저장 중..."):
-                        if save_excel(drive, df_c, SELECTED_FILE, "선정기업명단", "1F4E79"):
-                            st.success(f"{row['기업명']} 저장 완료!")
+                with st.expander(f"{icon} **{row.get('기업명','')}**  {status_badge}  |  {row.get('소재지','')}  |  {score_badge}"):
+                    c1,c2 = st.columns(2)
+                    with c1:
+                        st.markdown(f"**소재지:** {row.get('소재지','')}")
+                        st.markdown(f"**이메일:** {row.get('이메일','')}")
+                        st.markdown(f"**관심분야:** {row.get('관심사업분야','')}")
+                        st.markdown(f"**수출:** {row.get('수출실적','')} / {row.get('수출국가','')}")
+                        st.markdown(f"**TRL단계:** {row.get('TRL단계','')}")
+                        if row.get('평가_총점',''):
+                            st.markdown(f"**평가점수:** 정량 {row.get('평가_정량점수','')}점 / 총점 {row.get('평가_총점','')}점")
+                    with c2:
+                        st.markdown(f"**제품분야:** {row.get('제품분야','')}")
+                        st.markdown(f"**기술키워드:** {row.get('기술키워드','')}")
+                        st.markdown(f"**핵심수요태그:** {row.get('핵심수요태그','')}")
+                        st.markdown(f"**사업자번호:** {row.get('사업자등록번호','')}")
+                        if row.get('평가_내부논의',''):
+                            st.markdown(f"**평가의견:** {row.get('평가_내부논의','')}")
+
+                    extra_kw   = st.text_input("키워드 보완", value=row.get('키워드보완',''),
+                                    key=f"kw_{tab_key}_{idx}", placeholder="예: 스마트팜, IoT")
+                    google_acc = st.text_input("구글계정", value=row.get('구글계정',''),
+                                    key=f"ga_{tab_key}_{idx}", placeholder="example@gmail.com")
+                    unsub_cb   = st.checkbox("수신거부", value=unsub, key=f"unsub_{tab_key}_{idx}")
+                    memo       = st.text_input("메모", value=row.get('메모',''), key=f"memo_{tab_key}_{idx}")
+
+                    if st.button("💾 저장", key=f"save_{tab_key}_{idx}"):
+                        df_c.at[idx,'키워드보완'] = extra_kw
+                        df_c.at[idx,'구글계정']   = google_acc
+                        df_c.at[idx,'수신거부']   = 'Y' if unsub_cb else ''
+                        df_c.at[idx,'메모']       = memo
+                        with st.spinner("드라이브 저장 중..."):
+                            if save_excel(drive, df_c, SELECTED_FILE, "선정기업명단", "1F4E79"):
+                                st.success(f"{row['기업명']} 저장 완료!")
+
+        if has_status:
+            with tabs[0]: render_company_list(df_선정, "sel")
+            with tabs[1]: render_company_list(df_예비, "res")
+            with tabs[2]: render_company_list(df_c,   "all")
+        else:
+            with tabs[0]: render_company_list(df_c, "all")
 
 
 # ══════════════════════════════════════════════════════
@@ -2585,9 +2612,390 @@ elif page == "발송 관리":
 
 
 # ══════════════════════════════════════════════════════
-# 발송 이력
+# 안내 메일
 # ══════════════════════════════════════════════════════
-elif page == "발송 이력":
+elif page == "안내 메일":
+    drive = _get_drive()
+    st.title("안내 메일")
+    info_box("안내 메일",
+        """
+공고 매칭과 무관한 일반 안내 메일을 선정/예비 기업에게 발송합니다.
+
+**활용 예시**
+- 선정 기업 축하 및 프로그램 안내
+- 교육 프로그램 수요조사 안내 (구글 폼 링크 포함)
+- 성과집계 조사 요청
+- 서류 제출 안내 및 일정 공지
+        """,
+        "발송 대상 선택 → 제목/내용 작성 → 미리보기 확인 → 발송")
+
+    with st.spinner("기업 명단 로딩 중..."):
+        df_c = load_excel(drive, SELECTED_FILE)
+
+    if df_c.empty:
+        st.warning("선정기업 명단이 없습니다. 기업 관리 탭에서 먼저 업로드하세요.")
+        st.stop()
+
+    for col in ['수신거부','선정구분']:
+        if col not in df_c.columns: df_c[col] = ''
+
+    st.subheader("① 발송 대상 선택")
+    has_status = '선정구분' in df_c.columns and df_c['선정구분'].str.strip().ne('').any()
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if has_status:
+            target_group = st.radio(
+                "발송 그룹",
+                ["선정 50개사", "예비 20개사", "전체 70개사", "직접 선택"],
+                horizontal=False, key="notice_mail_group"
+            )
+        else:
+            target_group = "전체"
+
+    # 대상 기업 필터링
+    df_active = df_c[df_c['수신거부'] != 'Y'].copy()
+    if has_status:
+        if target_group == "선정 50개사":
+            df_target = df_active[df_active['선정구분'] == '선정']
+        elif target_group == "예비 20개사":
+            df_target = df_active[df_active['선정구분'] == '예비']
+        elif target_group == "직접 선택":
+            selected_names = st.multiselect(
+                "기업 직접 선택", df_active['기업명'].tolist(), key="notice_mail_select"
+            )
+            df_target = df_active[df_active['기업명'].isin(selected_names)]
+        else:
+            df_target = df_active
+    else:
+        df_target = df_active
+
+    with col2:
+        st.metric("발송 대상", f"{len(df_target)}개사")
+        if not df_target.empty:
+            email_count = df_target['이메일'].str.strip().ne('').sum()
+            st.metric("이메일 보유", f"{email_count}개사")
+
+    st.divider()
+    st.subheader("② 메일 내용 작성")
+
+    # 템플릿 선택
+    template_choice = st.selectbox("템플릿 선택 (직접 수정 가능)", [
+        "직접 작성",
+        "선정 기업 축하 및 프로그램 안내",
+        "교육 프로그램 수요조사",
+        "성과집계 조사 요청",
+        "서류 제출 안내",
+    ], key="notice_mail_template")
+
+    TEMPLATES = {
+        "선정 기업 축하 및 프로그램 안내": {
+            "subject": "[원스톱 스케일업] 2026 선정 기업 안내드립니다",
+            "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
+
+이번 2026 원스톱 스케일업 프로그램에 선정되신 것을 진심으로 축하드립니다.
+
+앞으로 저희 팀은 귀사의 해외 판로 개척 및 조달 시장 진출을 위해 맞춤형 지원을 제공해드릴 예정입니다.
+
+주요 지원 내용은 다음과 같습니다:
+- 맞춤형 지원사업 공고 매칭 및 안내
+- 해외조달시장 진출 컨설팅
+- 역량 강화 교육 프로그램
+
+향후 일정 및 세부 안내는 순차적으로 말씀드리겠습니다.
+감사합니다.""",
+        },
+        "교육 프로그램 수요조사": {
+            "subject": "[원스톱 스케일업] 교육 프로그램 수요조사 안내",
+            "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
+
+더 나은 교육 프로그램 제공을 위해 수요조사를 진행하고자 합니다.
+아래 링크를 통해 응답해 주시면 감사하겠습니다.
+
+📋 수요조사 링크: [링크를 여기에 입력하세요]
+
+응답 기한: [날짜 입력]
+
+귀한 시간 내어 응답해 주시는 모든 분께 감사드립니다.""",
+        },
+        "성과집계 조사 요청": {
+            "subject": "[원스톱 스케일업] 성과집계 자료 제출 요청",
+            "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
+
+프로그램 운영 성과 집계를 위해 아래 양식으로 자료 제출을 부탁드립니다.
+
+📋 제출 양식: [링크 또는 첨부파일 안내]
+제출 기한: [날짜 입력]
+제출 방법: 이 메일로 회신 또는 위 양식 작성
+
+궁금하신 사항은 아래 연락처로 문의 주십시오.""",
+        },
+        "서류 제출 안내": {
+            "subject": "[원스톱 스케일업] 서류 제출 안내",
+            "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
+
+아래 서류를 기한 내에 제출해 주시기 바랍니다.
+
+제출 서류:
+1. [서류명 1]
+2. [서류명 2]
+
+제출 기한: [날짜 입력]
+제출 방법: [방법 입력]
+
+기한 내 미제출 시 불이익이 발생할 수 있으니 유의해 주시기 바랍니다.""",
+        },
+    }
+
+    if template_choice != "직접 작성" and template_choice in TEMPLATES:
+        default_subject = TEMPLATES[template_choice]["subject"]
+        default_body    = TEMPLATES[template_choice]["body"]
+    else:
+        default_subject = ""
+        default_body    = ""
+
+    mail_subject = st.text_input("제목", value=default_subject, key="notice_mail_subject")
+    mail_body    = st.text_area("본문", value=default_body, height=300, key="notice_mail_body",
+                                help="수신자 이름은 자동으로 '[기업명] 담당자님'으로 삽입됩니다.")
+    form_link    = st.text_input("📋 구글 폼 링크 (선택사항)", placeholder="https://forms.gle/...",
+                                 key="notice_mail_form")
+
+    st.divider()
+    st.subheader("③ 발송 미리보기")
+
+    if df_target.empty:
+        st.warning("발송 대상 기업이 없습니다.")
+    elif not mail_subject or not mail_body:
+        st.info("제목과 본문을 작성하면 미리보기가 표시됩니다.")
+    else:
+        sample_company = df_target.iloc[0]['기업명'] if not df_target.empty else "샘플기업"
+        today_str = datetime.today().strftime('%Y.%m.%d')
+
+        form_section = ""
+        if form_link:
+            form_section = f"""
+            <div style="background:rgba(74,158,255,0.1);border:1px solid rgba(74,158,255,0.3);
+                        border-radius:8px;padding:16px 18px;margin:16px 0;">
+              <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#4A9EFF;letter-spacing:1.5px;">
+                📋 설문/폼 링크
+              </p>
+              <a href="{form_link}" style="font-size:13px;color:#4A9EFF;">{form_link}</a>
+            </div>"""
+
+        body_html = mail_body.replace('\n', '<br>')
+
+        sample_html = f"""<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F2F4F7;
+             font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F2F4F7;padding:36px 0 52px;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0">
+  <tr>
+    <td style="background:#ffffff;border-radius:14px 14px 0 0;
+               padding:20px 28px;border-bottom:1px solid #E8ECF0;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td valign="middle">
+            <span style="font-size:15px;font-weight:700;color:#1F4E79;">혁신제품지원센터</span>
+          </td>
+          <td align="right" valign="middle">
+            <p style="margin:0;font-size:11px;color:#A0ADB8;">{today_str}</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="background:#0F1D2E;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="padding:28px 28px 20px;
+                     background:linear-gradient(150deg,#0D1B2A 0%,#132B47 100%);
+                     border-bottom:1px solid rgba(255,255,255,0.06);">
+            <p style="margin:0 0 2px;font-size:10px;font-weight:700;letter-spacing:2.5px;
+                       color:rgba(255,255,255,0.3);text-transform:uppercase;">
+              원스톱 스케일업 안내
+            </p>
+            <h1 style="margin:6px 0 0;font-size:22px;font-weight:800;color:#FFFFFF;line-height:1.3;">
+              {mail_subject}
+            </h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 28px;background:#0F1D2E;">
+            <div style="padding:14px 18px;background:rgba(255,255,255,0.05);
+                        border-radius:8px;border-left:3px solid #4A9EFF;margin-bottom:20px;">
+              <p style="margin:0;font-size:14px;font-weight:600;color:#FFFFFF;">
+                {sample_company}
+                <span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);margin-left:4px;">담당자님</span>
+              </p>
+            </div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.9;">
+              {body_html}
+            </div>
+            {form_section}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="background:#ffffff;border-radius:0 0 14px 14px;
+               padding:18px 28px;border-top:1px solid #E8ECF0;">
+      <p style="margin:0;font-size:12px;color:#8A96A3;line-height:1.9;">
+        혁신제품지원센터 원스톱 스케일업 운영팀<br>
+        <a href="mailto:onestop.kipcc@gmail.com"
+           style="color:#1F4E79;text-decoration:none;font-weight:600;">
+          onestop.kipcc@gmail.com
+        </a>
+      </p>
+    </td>
+  </tr>
+</table>
+</td></tr></table>
+</body></html>"""
+
+        with st.expander(f"📧 미리보기 — {sample_company}", expanded=True):
+            st.components.v1.html(sample_html, height=500, scrolling=True)
+
+        st.divider()
+        st.subheader("④ 발송 실행")
+
+        c1, c2 = st.columns(2)
+        with c1:
+            st.info(f"**발송 대상:** {target_group if has_status else '전체'} ({len(df_target)}개사)")
+        with c2:
+            no_email = df_target[df_target['이메일'].str.strip() == '']
+            if not no_email.empty:
+                st.warning(f"이메일 없는 기업 {len(no_email)}개사는 발송 제외됩니다.")
+
+        if test_mode:
+            st.warning("⚠️ 테스트 모드 — 본인 메일로만 발송됩니다.")
+
+        if st.button("📤 안내 메일 발송", type="primary", key="notice_mail_send"):
+            from email.mime.multipart import MIMEMultipart
+            from email.mime.text import MIMEText
+            import base64
+
+            df_send = df_target[df_target['이메일'].str.strip() != '']
+            prog = st.progress(0); log_area = st.empty(); logs = []
+            ok_count = fail_count = 0
+
+            for i, (_, row) in enumerate(df_send.iterrows()):
+                company  = row['기업명']
+                to_email = row['이메일'].strip() if not test_mode else get_test_recipients()[0]
+                today_str = datetime.today().strftime('%Y.%m.%d')
+                body_html_co = mail_body.replace('\n', '<br>')
+
+                form_sec_co = ""
+                if form_link:
+                    form_sec_co = f"""
+                    <div style="background:rgba(74,158,255,0.1);border:1px solid rgba(74,158,255,0.3);
+                                border-radius:8px;padding:16px 18px;margin:16px 0;">
+                      <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#4A9EFF;letter-spacing:1.5px;">
+                        📋 설문/폼 링크
+                      </p>
+                      <a href="{form_link}" style="font-size:13px;color:#4A9EFF;">{form_link}</a>
+                    </div>"""
+
+                html_body = f"""<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F2F4F7;
+             font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F2F4F7;padding:36px 0 52px;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0">
+  <tr>
+    <td style="background:#ffffff;border-radius:14px 14px 0 0;
+               padding:20px 28px;border-bottom:1px solid #E8ECF0;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td valign="middle">
+            <span style="font-size:15px;font-weight:700;color:#1F4E79;">혁신제품지원센터</span>
+          </td>
+          <td align="right">
+            <p style="margin:0;font-size:11px;color:#A0ADB8;">{today_str}</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="background:#0F1D2E;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="padding:28px 28px 20px;
+                     background:linear-gradient(150deg,#0D1B2A 0%,#132B47 100%);
+                     border-bottom:1px solid rgba(255,255,255,0.06);">
+            <p style="margin:0 0 2px;font-size:10px;font-weight:700;letter-spacing:2.5px;
+                       color:rgba(255,255,255,0.3);text-transform:uppercase;">
+              원스톱 스케일업 안내
+            </p>
+            <h1 style="margin:6px 0 0;font-size:22px;font-weight:800;color:#FFFFFF;line-height:1.3;">
+              {mail_subject}
+            </h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 28px;background:#0F1D2E;">
+            <div style="padding:14px 18px;background:rgba(255,255,255,0.05);
+                        border-radius:8px;border-left:3px solid #4A9EFF;margin-bottom:20px;">
+              <p style="margin:0;font-size:14px;font-weight:600;color:#FFFFFF;">
+                {company}
+                <span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);margin-left:4px;">담당자님</span>
+              </p>
+            </div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.9;">
+              {body_html_co}
+            </div>
+            {form_sec_co}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="background:#ffffff;border-radius:0 0 14px 14px;
+               padding:18px 28px;border-top:1px solid #E8ECF0;">
+      <p style="margin:0;font-size:12px;color:#8A96A3;line-height:1.9;">
+        혁신제품지원센터 원스톱 스케일업 운영팀<br>
+        <a href="mailto:onestop.kipcc@gmail.com"
+           style="color:#1F4E79;text-decoration:none;font-weight:600;">
+          onestop.kipcc@gmail.com
+        </a>
+      </p>
+    </td>
+  </tr>
+</table>
+</td></tr></table>
+</body></html>"""
+
+                try:
+                    msg = MIMEMultipart('alternative')
+                    msg['Subject'] = mail_subject if not test_mode else f"[TEST] {mail_subject}"
+                    msg['From']    = "onestop.kipcc@gmail.com"
+                    msg['To']      = to_email
+                    msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+                    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+                    gmail_send(raw)
+                    ok_count += 1
+                    logs.append(f"✅ {company} → {to_email}")
+                except Exception as e:
+                    fail_count += 1
+                    logs.append(f"❌ {company} — {str(e)[:40]}")
+
+                prog.progress((i+1)/len(df_send))
+                log_area.code("\n".join(logs[-10:]))
+
+            if ok_count > 0:
+                st.success(f"✅ 발송 완료 — 성공 {ok_count}건 / 실패 {fail_count}건")
+            if fail_count > 0:
+                st.error(f"실패 {fail_count}건 — 로그를 확인하세요.")
+
+
+
     drive = _get_drive()
     st.title("발송 이력")
     info_box("발송 이력",
