@@ -608,6 +608,32 @@ def score_notice(notice, row, already_sent, HIGH, MID):
     co_kws = [k.strip() for k in raw.split(',') if k.strip() and k.strip()!='nan']
     matched_co = [kw for kw in co_kws if kw in text]
 
+    # ── 기술키워드 역매핑 확장: 기업 키워드 → INDUSTRY_KW 카테고리 → 공고 키워드 검색 ──
+    # 예: 기업 키워드 "스마트사이니지" → "전기·전자" 카테고리 → "디스플레이","LED" 등이 공고에 있으면 매칭
+    tech_kws = [k.strip() for k in str(row.get('기술키워드','')).split(',') if k.strip() and k.strip()!='nan']
+    expanded_industry_hits = []
+    for tech_kw in tech_kws:
+        kw_lower = tech_kw.lower().replace(' ', '')
+        if len(kw_lower) < 3:
+            continue  # 너무 짧은 키워드는 오매칭 위험
+        for ind_cat, ind_kws in INDUSTRY_KW.items():
+            matched_cat = False
+            for ind_kw in ind_kws:
+                ind_lower = ind_kw.lower().replace(' ', '')
+                if len(ind_lower) >= 3 and (ind_lower in kw_lower or kw_lower in ind_lower):
+                    matched_cat = True
+                    break
+            if matched_cat:
+                cat_hits = [k for k in ind_kws if k in text and len(k) >= 2]
+                for h in cat_hits[:2]:  # 카테고리당 최대 2개
+                    if h not in expanded_industry_hits:
+                        expanded_industry_hits.append(h)
+
+    # 확장 매칭 결과를 matched_co에 추가 (중복 제거)
+    for h in expanded_industry_hits:
+        if h not in matched_co:
+            matched_co.append(h)
+
     # 핵심수요태그는 가중치 높게
     demand_tags = [t.strip() for t in str(row.get('핵심수요태그','')).split(',') if t.strip() and t.strip()!='nan']
     matched_demand = [kw for kw in demand_tags if kw in text]
