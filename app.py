@@ -609,7 +609,12 @@ def score_notice(notice, row, already_sent, HIGH, MID):
     matched_co = [kw for kw in co_kws if kw in text]
 
     # ── 기술키워드 역매핑 확장: 기업 키워드 → INDUSTRY_KW 카테고리 → 공고 키워드 검색 ──
-    # 예: 기업 키워드 "스마트사이니지" → "전기·전자" 카테고리 → "디스플레이","LED" 등이 공고에 있으면 매칭
+    # 너무 일반적인 단어는 역매핑에서 제외 (거의 모든 공고에 등장해 변별력 없음)
+    GENERIC_WORDS = {
+        '시스템','솔루션','서비스','플랫폼','기술','개발','소프트웨어','SW',
+        'IT','ICT','디지털','스마트','데이터','네트워크','클라우드','AI',
+        '관리','지원','운영','구축','통합','연계','자동화','혁신',
+    }
     tech_kws = [k.strip() for k in str(row.get('기술키워드','')).split(',') if k.strip() and k.strip()!='nan']
     expanded_industry_hits = []
     for tech_kw in tech_kws:
@@ -624,12 +629,15 @@ def score_notice(notice, row, already_sent, HIGH, MID):
                     matched_cat = True
                     break
             if matched_cat:
-                cat_hits = [k for k in ind_kws if k in text and len(k) >= 2]
-                for h in cat_hits[:2]:  # 카테고리당 최대 2개
+                # 일반 단어 제외 후 카테고리 키워드만 추출
+                cat_hits = [
+                    k for k in ind_kws
+                    if k in text and len(k) >= 2 and k not in GENERIC_WORDS
+                ]
+                for h in cat_hits[:2]:
                     if h not in expanded_industry_hits:
                         expanded_industry_hits.append(h)
 
-    # 확장 매칭 결과를 matched_co에 추가 (중복 제거)
     for h in expanded_industry_hits:
         if h not in matched_co:
             matched_co.append(h)
@@ -1826,8 +1834,11 @@ elif page == "매칭 결과":
                 for r in scored:
                     pid = r.get('공고ID','')
                     cnt = notice_recommend_count.get(pid, 0)
-                    if cnt >= 5: r['점수'] -= 6
-                    elif cnt >= 3: r['점수'] -= 3
+                    if cnt >= 15:   r['점수'] -= 20  # 15개사 이상: 사실상 차단
+                    elif cnt >= 10: r['점수'] -= 15  # 10개사 이상: 강한 페널티
+                    elif cnt >= 7:  r['점수'] -= 10  # 7개사 이상: 중강 페널티
+                    elif cnt >= 4:  r['점수'] -= 6   # 4개사 이상: 중간 페널티
+                    elif cnt >= 2:  r['점수'] -= 3   # 2개사 이상: 약한 페널티
 
                 scored.sort(key=lambda x: -x['점수'])
                 top = scored[:max_per]
