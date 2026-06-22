@@ -2134,18 +2134,32 @@ elif page == "매칭 결과":
                 nav1, nav2, nav3, nav4 = st.columns([1, 5, 1, 2])
                 with nav1:
                     if st.button("◀ 이전", disabled=current_idx==0):
-                        st.session_state['review_co_name'] = companies_in_result[current_idx - 1]
+                        next_name = companies_in_result[current_idx - 1]
+                        st.session_state['review_co_name'] = next_name
+                        # selectbox key도 함께 갱신해서 충돌 방지
+                        next_label = next((l for l, c in co_map.items() if c == next_name), None)
+                        if next_label:
+                            st.session_state['review_co_select'] = next_label
                         st.rerun()
                 with nav2:
-                    selected_label = st.selectbox("기업 선택", co_labels, index=current_idx,
-                                                  key="review_co_select", label_visibility="collapsed")
-                    sel_name = co_map[selected_label]
+                    selected_label = st.selectbox(
+                        "기업 선택", co_labels,
+                        index=current_idx,
+                        key="review_co_select",
+                        label_visibility="collapsed"
+                    )
+                    sel_name = co_map.get(selected_label, cur_name)
                     if sel_name != cur_name:
                         st.session_state['review_co_name'] = sel_name
                         st.rerun()
                 with nav3:
                     if st.button("다음 ▶", disabled=current_idx==len(co_labels)-1):
-                        st.session_state['review_co_name'] = companies_in_result[current_idx + 1]
+                        next_name = companies_in_result[current_idx + 1]
+                        st.session_state['review_co_name'] = next_name
+                        # selectbox key도 함께 갱신
+                        next_label = next((l for l, c in co_map.items() if c == next_name), None)
+                        if next_label:
+                            st.session_state['review_co_select'] = next_label
                         st.rerun()
                 with nav4:
                     st.caption(f"{current_idx+1} / {len(co_labels)}개사")
@@ -2277,11 +2291,17 @@ elif page == "매칭 결과":
                         ri     = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
                         ai_txt = f"{ri} {ai_res.get('한줄요약','')[:40]}"
 
-                    # 공고 행: 별점 / 공고명+주관기관 / 매칭근거+AI요약 / 마감+소재지 / 승인 / 제외 / AI
-                    c_star, c_name, c_reason, c_meta, c_ok, c_ng, c_ai = st.columns([1, 3, 3, 2, 1.2, 1.2, 1.5])
+                    # 공고 행: 별점+AI배지 / 공고명+주관기관 / 매칭근거+AI요약 / 마감+소재지 / 승인 / 제외 / AI
+                    c_star, c_name, c_reason, c_meta, c_ok, c_ng, c_ai = st.columns([1.5, 3, 3, 2, 1.2, 1.2, 1.5])
 
                     with c_star:
                         st.write(star)
+                        # AI 분석 결과 배지
+                        if ai_res and not ai_res.get('error'):
+                            rec = ai_res.get('추천여부','')
+                            badge = {"추천":"🟢 추천", "검토":"🟡 검토", "비추천":"🔴 비추천"}.get(rec,"")
+                            if badge:
+                                st.caption(badge)
                     with c_name:
                         nm = row.get('공고명','')
                         st.write(f"**{nm[:22]}**" + ("..." if len(nm)>22 else ""))
