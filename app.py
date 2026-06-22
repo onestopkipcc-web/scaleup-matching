@@ -1761,18 +1761,26 @@ elif page == "매칭 결과":
             # 전문내용 enrich 맵 구성
             detail_map = {}
             if not df_det.empty and 'pblancId' in df_det.columns:
-                df_det_ok = df_det[df_det.get('크롤링성공', pd.Series('')) == 'Y'] if '크롤링성공' in df_det.columns else df_det
+                # 버그 수정: df.get()은 컬럼 Series를 반환 → == 'Y' 비교 시 항상 빈 결과
+                # 올바른 방식: df['컬럼'] == 'Y'
+                if '크롤링성공' in df_det.columns:
+                    df_det_ok = df_det[df_det['크롤링성공'] == 'Y']
+                else:
+                    df_det_ok = df_det
                 df_det_ok = df_det_ok.drop_duplicates(subset='pblancId', keep='last')
                 detail_map = df_det_ok.set_index('pblancId').to_dict('index')
+                st.caption(f"📄 전문 DB 로드: {len(detail_map)}건 → 매칭에 반영")
 
             def enrich(n_dict):
-                """공고 dict에 전문내용을 병합해 매칭 정확도를 높인다."""
+                """공고 dict에 전문내용을 병합해 매칭 정확도를 높인다.
+                score_notice()는 '사업개요'와 '전문내용' 두 필드를 모두 읽으므로 양쪽에 반영."""
                 pid = n_dict.get('pblancId','')
                 if pid in detail_map:
                     d = detail_map[pid]
                     full = str(d.get('전문내용',''))
-                    if len(full) > len(str(n_dict.get('사업개요',''))):
-                        n_dict['전문내용'] = full
+                    if len(full) >= 200:
+                        n_dict['전문내용'] = full   # score_notice 502줄에서 직접 읽힘
+                        n_dict['사업개요'] = full   # 소재지 판정(578줄)에도 전문 내용 반영
                     n_dict['지원금액'] = d.get('지원금액','')
                     n_dict['선정규모'] = d.get('선정규모','')
                 return n_dict
