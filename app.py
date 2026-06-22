@@ -2197,7 +2197,7 @@ elif page == "매칭 결과":
                     with c_ai:
                         st.caption(status_txt)
                         if not ai_res:
-                            if st.button("🤖", key=f"ai_{key}_{i}", help="AI 분석"):
+                            if st.button("🤖 AI분석", key=f"ai_{key}_{i}", help="AI 분석 실행"):
                                 with st.spinner("분석 중..."):
                                     co_info = {}
                                     if 'df_companies_cache' in st.session_state:
@@ -2209,6 +2209,56 @@ elif page == "매칭 결과":
                                         st.session_state['ai_analysis'] = {}
                                     st.session_state['ai_analysis'][key] = claude_analyze(co_info, row.to_dict())
                                 st.rerun()
+                        else:
+                            st.caption("🤖 분석완료")
+
+                    # AI 분석 결과 펼침 — 분석된 건만 행 아래에 표시
+                    if ai_res and not ai_res.get('error'):
+                        rec       = ai_res.get('추천여부', '')
+                        fit       = ai_res.get('적합도', '')
+                        summary   = ai_res.get('한줄요약', '')
+                        reason_ai = ai_res.get('판단근거', ai_res.get('적합이유', ''))
+                        caution   = ai_res.get('주의사항', '')
+                        checks    = {
+                            "업종일치": ai_res.get('업종일치','—'),
+                            "자격충족": ai_res.get('자격충족','—'),
+                            "지역적합": ai_res.get('지역적합','—'),
+                            "수요일치": ai_res.get('수요일치','—'),
+                        }
+                        icon_map  = {"O":"✅","X":"❌","△":"⚠️"}
+                        rec_icon  = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
+                        fit_color = {"높음":"#63FFA8","보통":"#FFC863","낮음":"#FF6363"}.get(fit,"inherit")
+
+                        with st.container():
+                            ai_c1, ai_c2, ai_c3 = st.columns([1, 5, 2])
+                            with ai_c1:
+                                st.markdown(f"**{rec_icon} {rec}**")
+                                st.caption(f"적합도: {fit}")
+                            with ai_c2:
+                                st.caption(f"**{summary}**")
+                                st.caption(reason_ai[:120] + ("..." if len(reason_ai)>120 else ""))
+                                if caution and caution not in ['없음','','nan']:
+                                    st.caption(f"⚠️ {caution[:80]}")
+                                check_str = "  ".join([
+                                    f"{icon_map.get(v,'—')} {k}"
+                                    for k, v in checks.items()
+                                ])
+                                st.caption(check_str)
+                            with ai_c3:
+                                # AI 결과 보고 바로 승인/제외
+                                qa1, qa2 = st.columns(2)
+                                with qa1:
+                                    lbl = "✅" if current != "○" else "↩️"
+                                    if st.button(lbl, key=f"ai_o_{key}_{i}",
+                                                 help="승인" if current!="○" else "승인 취소"):
+                                        st.session_state['review_state'][key] = "" if current=="○" else "○"
+                                        st.rerun()
+                                with qa2:
+                                    lbl = "❌" if current != "✕" else "↩️"
+                                    if st.button(lbl, key=f"ai_x_{key}_{i}",
+                                                 help="제외" if current!="✕" else "제외 취소"):
+                                        st.session_state['review_state'][key] = "" if current=="✕" else "✕"
+                                        st.rerun()
 
                     st.divider()
 
