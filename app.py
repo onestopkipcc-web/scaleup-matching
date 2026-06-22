@@ -541,14 +541,14 @@ def score_notice(notice, row, already_sent, HIGH, MID):
             str(notice.get('사업개요','')),
             str(notice.get('지원대상','')),
             str(notice.get('해시태그','')),
+            str(notice.get('전문내용','')),  # 전문내용도 소재지 판단에 반영
         ])
         co_region = next((r for r in REGIONS if r in location), None)
 
         import re as _re
 
-        # ① 공고명 [] 패턴 최우선 (신뢰도 최고)
-        #    예: [경기] 중소기업 수출지원, [서울·경기] 스케일업 지원
-        bracket_match = _re.search('[[]([^]]+)[]]', notice_name)
+        # ① 공고명 [] 패턴 최우선
+        bracket_match = _re.search(r'\[([^\]]+)\]', notice_name)
         if bracket_match:
             bracket_text = bracket_match.group(1)
             bracket_regions = [r for r in REGIONS if r in bracket_text]
@@ -557,39 +557,46 @@ def score_notice(notice, row, already_sent, HIGH, MID):
                 if co_region:
                     aliases = REGION_ALIAS.get(co_region, [co_region])
                     if any(a in bracket_text for a in aliases):
-                        location_score = 3   # 일치 → 가산
+                        location_score = 3
                     else:
-                        location_score = -5  # 불일치 → 강한 감산
-            # [] 안에 지역명 없으면 공고 유형 태그 → 소재지 무관
+                        location_score = -5
 
-        # ② 주관기관이 지방자치단체이면 해당 지역 공고
-        #    예: 충청남도, 경기도청, 서울특별시 → 지역 제한
+        # ② 주관기관이 지방자치단체
         elif co_region:
             organizer = str(notice.get('주관기관',''))
             org_regions = [r for r in REGIONS if r in organizer]
             if org_regions:
-                notice_region_tag = f"주관기관({organizer})"
+                notice_region_tag = f"주관기관({organizer[:10]})"
                 aliases = REGION_ALIAS.get(co_region, [co_region])
                 if any(a in organizer for a in aliases):
                     location_score = 2
                 else:
-                    location_score = -3
+                    location_score = -5  # -3 → -5 강화
 
-        # ③ 사업개요에 "○○ 소재 기업" 명시 패턴
-        #    "전국"이 포함되면 지역 제한 없음으로 처리
+        # ③ 전문내용 포함 전체 텍스트에서 "○○ 소재 기업" 패턴
         elif co_region:
-            summary = str(notice.get('사업개요',''))
-            if '전국' not in summary and '전 지역' not in summary:
-                sojaepat = _re.findall(r'([가-힣]{2,4}(?:도|시|군|구))\s*소재', summary)
+            if '전국' not in notice_full and '전 지역' not in notice_full:
+                sojaepat = _re.findall(r'([가-힣]{2,4}(?:도|시|군|구))\s*소재', notice_full)
                 if sojaepat:
                     notice_region_tag = ", ".join(sojaepat[:2])
                     aliases = REGION_ALIAS.get(co_region, [co_region])
                     if any(any(a in s for a in aliases) for s in sojaepat):
                         location_score = 2
                     else:
-                        location_score = -3
+                        location_score = -5  # -3 → -5 강화
 
-        # 지역 제한 없는 공고 → 중립 (0점)
+                # ④ 신규: 전문에서 지역 직접 언급 패턴
+                # "광주 소재", "경남 지역", "○○시에 위치한" 등
+                if location_score == 0:
+                    region_mentions = [r for r in REGIONS
+                                       if _re.search(rf'{r}.{{0,6}}(?:소재|지역|소속|위치|관내|내)', notice_full)]
+                    if region_mentions:
+                        notice_region_tag = ", ".join(region_mentions[:2])
+                        aliases = REGION_ALIAS.get(co_region, [co_region])
+                        if any(any(a in rm for a in aliases) for rm in region_mentions):
+                            location_score = 2
+                        else:
+                            location_score = -3
 
     # ── 축1: 지원대상 매칭 ────────────────────────────
     matched_target = {}
@@ -729,6 +736,15 @@ def score_notice(notice, row, already_sent, HIGH, MID):
     # 매칭 없음
     if not stars:
         return None
+
+    # ── 소재지 불일치 시 별점 강등 ───────────────────────
+    # 지역 공고(location_score < 0)인데 기업 소재지가 다르면 별점 강등
+    # 매칭 자체는 유지하되 점수 하단으로 밀어내 검토 순위를 낮춤
+    if location_score < 0:
+        if stars == "★★★":
+            stars = "★★"   # ★★★ → ★★ 강등
+        elif stars == "★★":
+            stars = "★"    # ★★ → ★ 강등 (이후 필터에서 걸러짐)
 
     # ── 점수 계산 (정렬용) ────────────────────────────
     score = (
