@@ -1703,257 +1703,118 @@ elif page == "매칭 결과":
 선정기업 × 공고 DB 교차 매칭 → 담당자 검토 → 발송 승인
 
 **매칭 로직**
-- 전체 공고 대상 매칭 (분야 필터 없음 → 숨겨진 적합 공고도 발굴)
-- 키워드 4개 축으로 적합성 판단 → 점수 높은 순 정렬
-- 이미 발송한 공고 자동 제외 (send_history 참조)
-- 마감 지난 공고 자동 제외
-- 수신거부 기업 자동 제외
-- 키워드 스코어링 → 점수 높은 순 정렬 → 기업당 최대 N건 추출
+- 공고 전문(크롤링 완료 건) + API 사업개요를 통합 반영해 한 번에 매칭
+- 키워드 4개 축 × 별점 판정 → 점수 높은 순 정렬 → 기업당 최대 N건 추출
+- 이미 발송한 공고 / 마감 지난 공고 / 수신거부 기업 자동 제외
 
 **검토 방법** — ○ 승인 / ✕ 제외 클릭 → 공고 원문 링크로 내용 확인 후 판단
 ★★★ 위주 먼저 검토 권장
         """,
         "기업당 건수 → 슬라이더 조정 / 키워드 → 설정 메뉴에서 변경")
 
-    tab1, tab2 = st.tabs(["매칭 실행", "검토 & 승인"])
+    tab1, tab2 = st.tabs(["▶ 매칭 실행", "🔍 검토 & 승인"])
 
     with tab1:
-        # ── Step 표시 ────────────────────────────────
-        st.markdown("""
-        <div style="display:flex;gap:8px;margin-bottom:20px;">
-          <div style="background:#4A9EFF;color:#fff;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;">Step 1 · 1차 매칭</div>
-          <div style="color:#A0AEC0;font-size:12px;padding:6px 4px;">→</div>
-          <div style="background:#1A2940;color:#A0AEC0;border-radius:20px;padding:6px 14px;font-size:12px;">Step 2 · 전문 크롤링</div>
-          <div style="color:#A0AEC0;font-size:12px;padding:6px 4px;">→</div>
-          <div style="background:#1A2940;color:#A0AEC0;border-radius:20px;padding:6px 14px;font-size:12px;">Step 3 · 최종 매칭</div>
-          <div style="color:#A0AEC0;font-size:12px;padding:6px 4px;">→</div>
-          <div style="background:#1A2940;color:#A0AEC0;border-radius:20px;padding:6px 14px;font-size:12px;">Step 4 · 검토 & 발송</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # ── Step 1: 1차 매칭 ─────────────────────────
-        st.subheader("Step 1 — 1차 매칭")
-        st.caption("API 사업개요 기반으로 후보 공고를 추출합니다. 기업당 20건 후보 → 크롤링 후 최종 10~12건으로 압축")
-
         col1, col2 = st.columns(2)
         with col1:
-            max_per = st.slider("기업당 최대 추천 건수 (최종)", 5, 20, 12)
+            max_per = st.slider("기업당 최대 추천 건수", 5, 20, 12)
         with col2:
-            candidate_per = st.slider("기업당 1차 후보 건수 (크롤링 대상)", 10, 30, 20)
+            st.markdown("**발송 대상 그룹**")
+            target_group = st.radio(
+                "발송 대상 그룹", ["선정 50개사", "예비 20개사", "전체 70개사"],
+                horizontal=True, label_visibility="collapsed", key="match_target_group"
+            )
 
-        st.markdown("**발송 대상 그룹**")
-        target_group = st.radio(
-            "발송 대상 그룹", ["선정 50개사", "예비 20개사", "전체 70개사"],
-            horizontal=True, label_visibility="collapsed", key="match_target_group"
-        )
+        # 전문 수집 현황 미리 표시
+        df_det_check = load_excel(drive, DETAIL_FILE)
+        detail_ok_count = 0
+        if not df_det_check.empty and '크롤링성공' in df_det_check.columns:
+            detail_ok_count = (df_det_check['크롤링성공']=='Y').sum()
+        if detail_ok_count > 0:
+            st.success(f"📄 전문 수집 완료: {detail_ok_count}건 — 매칭에 자동 반영됩니다.")
+        else:
+            st.info("📄 전문 미수집 — API 사업개요만으로 매칭합니다. '공고 수집' 탭에서 크롤링 후 재실행하면 정확도가 높아집니다.")
 
-        if st.button("🔍 1차 매칭 실행", type="primary"):
+        if st.button("🔍 매칭 실행", type="primary"):
             with st.spinner("드라이브 데이터 로딩 중..."):
                 df_c    = load_excel(drive, SELECTED_FILE)
                 df_n    = load_excel(drive, NOTICES_FILE)
                 df_h    = load_excel(drive, HISTORY_FILE)
+                df_det  = load_excel(drive, DETAIL_FILE)
                 HIGH, MID = load_keywords(drive)
-                detail_map = {}
-                notice_detail_count = 0
+
             if df_n.empty: st.error("notices_db 없음 → 공고 수집 먼저"); st.stop()
             if df_c.empty: st.error("선정기업 명단 없음 → 기업 관리에서 업로드"); st.stop()
+
+            # 발송 대상 필터
             if '선정구분' in df_c.columns:
                 if target_group == "선정 50개사":
                     df_c = df_c[df_c['선정구분'] == '선정']
                 elif target_group == "예비 20개사":
                     df_c = df_c[df_c['선정구분'] == '예비']
-                # "전체 70개사"는 필터 없음
             else:
                 st.warning("선정기업 명단에 '선정구분' 컬럼이 없어 전체 기업으로 매칭합니다.")
             if df_c.empty:
                 st.error(f"'{target_group}' 대상 기업이 없습니다."); st.stop()
             if '수신거부' in df_c.columns: df_c = df_c[df_c['수신거부']!='Y']
+
+            # 전문내용 enrich 맵 구성
+            detail_map = {}
+            if not df_det.empty and 'pblancId' in df_det.columns:
+                df_det_ok = df_det[df_det.get('크롤링성공', pd.Series('')) == 'Y'] if '크롤링성공' in df_det.columns else df_det
+                df_det_ok = df_det_ok.drop_duplicates(subset='pblancId', keep='last')
+                detail_map = df_det_ok.set_index('pblancId').to_dict('index')
+
+            def enrich(n_dict):
+                """공고 dict에 전문내용을 병합해 매칭 정확도를 높인다."""
+                pid = n_dict.get('pblancId','')
+                if pid in detail_map:
+                    d = detail_map[pid]
+                    full = str(d.get('전문내용',''))
+                    if len(full) > len(str(n_dict.get('사업개요',''))):
+                        n_dict['전문내용'] = full
+                    n_dict['지원금액'] = d.get('지원금액','')
+                    n_dict['선정규모'] = d.get('선정규모','')
+                return n_dict
+
             already_sent = set(zip(df_h['기업명'], df_h['pblancId'])) if not df_h.empty else set()
             all_results  = []; prog = st.progress(0)
-            notice_recommend_count = {}  # 공고별 추천 횟수 추적
+            notice_recommend_count = {}
 
-            for idx,(_,row) in enumerate(df_c.iterrows()):
-                scored = [r for _,n in df_n.iterrows()
-                          if (r:=score_notice(n.to_dict(),row,already_sent,HIGH,MID))]
+            for idx, (_, row) in enumerate(df_c.iterrows()):
+                scored = [r for _, n in df_n.iterrows()
+                          if (r := score_notice(enrich(n.to_dict()), row, already_sent, HIGH, MID))]
 
-                # 다양성 점수 적용: 이미 많이 추천된 공고는 점수 하향
                 for r in scored:
                     pid = r.get('공고ID','')
                     cnt = notice_recommend_count.get(pid, 0)
-                    if cnt >= 5:
-                        r['점수'] -= 6   # 5개사 이상 추천 → 강한 페널티
-                    elif cnt >= 3:
-                        r['점수'] -= 3   # 3개사 이상 추천 → 중간 페널티
+                    if cnt >= 5: r['점수'] -= 6
+                    elif cnt >= 3: r['점수'] -= 3
 
-                scored.sort(key=lambda x:-x['점수'])
+                scored.sort(key=lambda x: -x['점수'])
                 top = scored[:max_per]
 
-                # 추천 횟수 업데이트
                 for r in top:
                     pid = r.get('공고ID','')
-                    notice_recommend_count[pid] = notice_recommend_count.get(pid,0) + 1
-                    # 공통 여부 태깅 (나중에 메일 구성에 활용)
+                    notice_recommend_count[pid] = notice_recommend_count.get(pid, 0) + 1
                     r['_recommend_count'] = notice_recommend_count[pid]
 
                 all_results.extend(top)
                 prog.progress((idx+1)/len(df_c))
 
-            # 최종적으로 공통/맞춤 태그 부여
             for r in all_results:
-                pid = r.get('공고ID','')
-                cnt = notice_recommend_count.get(pid, 1)
-                r['공고유형'] = '공통' if cnt >= 4 else '맞춤' 
+                r['공고유형'] = '공통' if notice_recommend_count.get(r.get('공고ID',''), 1) >= 4 else '맞춤'
+
+            enriched_count = sum(1 for r in all_results if r.get('전문내용',''))
             st.session_state['match_results'] = all_results
             st.session_state['df_companies_cache'] = df_c
-            st.session_state['step1_done'] = True
-            # 크롤링 대상 URL 수집
-            candidate_pids = list({r.get('공고ID','') for r in all_results})
-            candidate_urls = {}
-            for _, n in df_n.iterrows():
-                if n.get('pblancId','') in candidate_pids:
-                    candidate_urls[n['pblancId']] = n.get('공고링크','')
-            st.session_state['candidate_urls'] = candidate_urls
-            st.success(f"✅ 1차 매칭 완료 — 총 {len(all_results)}건 / 크롤링 대상 {len(candidate_pids)}건")
-            st.info("아래 Step 2에서 후보 공고 전문을 크롤링하세요.")
-
-        # ── Step 2: 전문 반영 최종 매칭 (크롤링은 공고수집 탭에서) ──
-        st.divider()
-        st.subheader("Step 2 — 전문 반영 최종 매칭")
-        st.caption("공고 수집 탭에서 전문 크롤링 완료 후 실행하세요.")
-
-        if False:  # 하위 호환용 더미
-            if st.button("dummy", key="step2_crawl"):
-                from bs4 import BeautifulSoup
-                import time as _time, re as _re
-
-                HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                           "Accept-Language": "ko-KR,ko;q=0.9", "Referer": "https://www.bizinfo.go.kr/"}
-                today = datetime.today().strftime('%Y-%m-%d')
-                prog = st.progress(0); log_area = st.empty(); logs = []
-                new_records = []; success = fail = 0
-
-                for i, (pid, url) in enumerate(need_crawl.items()):
-                    try:
-                        from playwright.sync_api import sync_playwright
-                        with sync_playwright() as p:
-                            browser = p.chromium.launch(headless=True)
-                            page = browser.new_page(user_agent=HEADERS["User-Agent"])
-                            page.goto(url, timeout=20000, wait_until="networkidle")
-                            _time.sleep(1)
-                            full_text = ""
-                            for sel in ['#bizSumryCn','.view_con','.view-content','.bbs_view_con','#content']:
-                                try:
-                                    el = page.query_selector(sel)
-                                    if el:
-                                        t = el.inner_text()
-                                        if len(t) > 200: full_text = t; break
-                                except: continue
-                            if len(full_text) < 200:
-                                full_text = page.inner_text('body')
-                            browser.close()
-                        amount, scale = "", ""
-                        for pat in [r'지원.{0,4}(?:금액|한도)[^0-9]*([0-9][0-9,백천억만원 ]+)']:
-                            m = _re.search(pat, full_text)
-                            if m: amount = m.group(0)[:40]; break
-                        for pat in [r'([0-9]+).{0,3}개.{0,5}(?:사|업체|기업)']:
-                            m = _re.search(pat, full_text)
-                            if m: scale = m.group(0)[:40]; break
-                        ok = len(full_text) > 200
-                        new_records.append({'pblancId':pid,'전문내용':full_text[:3000],
-                            '지원금액':amount,'선정규모':scale,'크롤링방법':'Playwright',
-                            '크롤링일':today,'크롤링성공':'Y' if ok else 'N'})
-                        if ok: success+=1; logs.append(f"✅ {pid[:20]} ({len(full_text)}자)")
-                        else: fail+=1; logs.append(f"❌ {pid[:20]}")
-                    except Exception as e:
-                        fail+=1; logs.append(f"❌ {pid[:20]} ({str(e)[:30]})")
-                        new_records.append({'pblancId':pid,'전문내용':'','지원금액':'','선정규모':'',
-                            '크롤링방법':'FAIL','크롤링일':today,'크롤링성공':'N'})
-                    prog.progress((i+1)/len(need_crawl))
-                    log_area.code("\n".join(logs[-8:]))
-                    _time.sleep(1.0)
-
-                if new_records:
-                    df_new = pd.DataFrame(new_records)
-                    df_out = pd.concat([df_detail, df_new], ignore_index=True) if not df_detail.empty else df_new
-                    buf = io.BytesIO()
-                    with pd.ExcelWriter(buf, engine='openpyxl') as w: df_out.to_excel(w, index=False)
-                    if drive_upload(drive, DETAIL_FILE, buf.getvalue(),
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"):
-                        st.success(f"✅ 크롤링 완료 — 성공 {success}건 / 실패 {fail}건")
-                        st.session_state['step2_done'] = True
-                        st.rerun()
-                    else: st.error("드라이브 저장 실패")
-
-        # ── Step 3: 전문 반영 최종 매칭 ──────────────
-        st.divider()
-        st.subheader("Step 2 — 전문 반영 최종 매칭")
-
-        if not st.session_state.get('match_results'):
-            st.caption("Step 1 매칭 먼저 실행하세요.")
-        else:
-            df_detail_cur = load_excel(drive, DETAIL_FILE)
-            detail_ok = len(df_detail_cur[df_detail_cur['크롤링성공']=='Y']) if not df_detail_cur.empty and '크롤링성공' in df_detail_cur.columns else 0
-            st.metric("전문 수집 완료", f"{detail_ok}건")
-
-            if st.button("🔗 전문 반영 최종 매칭", type="primary", key="step3_btn"):
-                with st.spinner("전문 DB 반영 중..."):
-                    df_n2   = load_excel(drive, NOTICES_FILE)
-                    df_c2   = load_excel(drive, SELECTED_FILE)
-                    df_h2   = load_excel(drive, HISTORY_FILE)
-                    df_det2 = load_excel(drive, DETAIL_FILE)
-                    HIGH, MID = load_keywords(drive)
-
-                    detail_map = {}
-                    if not df_det2.empty and 'pblancId' in df_det2.columns:
-                        # 중복 제거 (성공 건 우선, 최신 건 유지)
-                        df_det2 = df_det2.sort_values('크롤링성공', ascending=False)
-                        df_det2 = df_det2.drop_duplicates(subset='pblancId', keep='first')
-                        detail_map = df_det2.set_index('pblancId').to_dict('index')
-
-                if df_c2.empty or df_n2.empty:
-                    st.error("기업 또는 공고 데이터 없음"); st.stop()
-
-                if '수신거부' in df_c2.columns: df_c2 = df_c2[df_c2['수신거부']!='Y']
-                already_sent = set(zip(df_h2['기업명'], df_h2['pblancId'])) if not df_h2.empty else set()
-                all_results = []; prog = st.progress(0)
-                notice_recommend_count = {}
-
-                for idx,(_,row) in enumerate(df_c2.iterrows()):
-                    def enrich(n_dict):
-                        pid = n_dict.get('pblancId','')
-                        if pid in detail_map:
-                            d = detail_map[pid]
-                            if d.get('전문내용','') and len(str(d.get('전문내용',''))) > len(str(n_dict.get('사업개요',''))):
-                                n_dict['사업개요'] = str(d.get('전문내용',''))
-                                n_dict['전문내용'] = str(d.get('전문내용',''))
-                            n_dict['지원금액'] = d.get('지원금액','')
-                            n_dict['선정규모'] = d.get('선정규모','')
-                        return n_dict
-
-                    scored = [r for _,n in df_n2.iterrows()
-                              if (r:=score_notice(enrich(n.to_dict()),row,already_sent,HIGH,MID))]
-                    for r in scored:
-                        pid = r.get('공고ID','')
-                        cnt = notice_recommend_count.get(pid,0)
-                        if cnt >= 5: r['점수'] -= 6
-                        elif cnt >= 3: r['점수'] -= 3
-                    scored.sort(key=lambda x:-x['점수'])
-                    top = scored[:max_per]
-                    for r in top:
-                        pid = r.get('공고ID','')
-                        notice_recommend_count[pid] = notice_recommend_count.get(pid,0)+1
-                        r['_recommend_count'] = notice_recommend_count[pid]
-                    all_results.extend(top)
-                    prog.progress((idx+1)/len(df_c2))
-
-                for r in all_results:
-                    r['공고유형'] = '공통' if notice_recommend_count.get(r.get('공고ID',''),1) >= 4 else '맞춤'
-
-                st.session_state['match_results'] = all_results
-                st.session_state['df_companies_cache'] = df_c2
-                used = sum(1 for r in all_results if r.get('전문내용',''))
-                st.success(f"✅ 최종 매칭 완료 — 총 {len(all_results)}건 (전문 활용 {used}건) → '검토 & 승인' 탭으로 이동")
-                st.session_state['step2_done'] = True
+            st.success(
+                f"✅ 매칭 완료 — 총 {len(all_results)}건 "
+                f"(전문 반영 {enriched_count}건 / API만 {len(all_results)-enriched_count}건) "
+                f"→ '검토 & 승인' 탭으로 이동"
+            )
+            if enriched_count == 0 and detail_ok_count > 0:
+                st.warning("전문이 수집된 공고가 매칭 결과에 없습니다. 공고 수집 탭에서 크롤링을 먼저 실행하세요.")
 
     with tab2:
         results = st.session_state.get('match_results', [])
@@ -2690,60 +2551,80 @@ elif page == "안내 메일":
 
     TEMPLATES = {
         "선정 기업 축하 및 프로그램 안내": {
-            "subject": "[원스톱 스케일업] 2026 선정 기업 안내드립니다",
+            "subject": "[원스톱 스케일업] 2026년 선정 기업 안내 드립니다",
             "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
 
-이번 2026 원스톱 스케일업 프로그램에 선정되신 것을 진심으로 축하드립니다.
+귀사가 2026년 원스톱 스케일업 프로그램 참여 기업으로 선정되셨음을 진심으로 축하드립니다.
 
-앞으로 저희 팀은 귀사의 해외 판로 개척 및 조달 시장 진출을 위해 맞춤형 지원을 제공해드릴 예정입니다.
+본 프로그램은 혁신제품 지정기업, G-PASS 기업, 우수조달기업 등 조달·수출 역량을 갖춘 기업의 해외 판로 개척 및 공공조달 시장 진출을 집중 지원하기 위해 기획되었습니다.
 
-주요 지원 내용은 다음과 같습니다:
-- 맞춤형 지원사업 공고 매칭 및 안내
-- 해외조달시장 진출 컨설팅
-- 역량 강화 교육 프로그램
+▣ 주요 지원 내용
+- 맞춤형 지원사업 공고 발굴 및 정기 안내
+- 해외조달시장(G-PASS, KONEPS 연계 등) 진출 컨설팅
+- 조달·수출 분야 역량강화 교육 프로그램
+- 성과 분석 및 지속적 피드백 제공
 
-향후 일정 및 세부 안내는 순차적으로 말씀드리겠습니다.
+향후 운영 일정과 세부 안내는 순차적으로 말씀드릴 예정입니다. 프로그램 운영 기간 동안 적극적인 참여와 관심 부탁드립니다.
+
+문의사항이 있으시면 아래 연락처로 편하게 연락 주시기 바랍니다.
 감사합니다.""",
         },
         "교육 프로그램 수요조사": {
-            "subject": "[원스톱 스케일업] 교육 프로그램 수요조사 안내",
+            "subject": "[원스톱 스케일업] 역량강화 교육 프로그램 수요조사 안내",
             "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
 
-더 나은 교육 프로그램 제공을 위해 수요조사를 진행하고자 합니다.
-아래 링크를 통해 응답해 주시면 감사하겠습니다.
+2026년 하반기 역량강화 교육 프로그램 편성을 위해 수요조사를 진행합니다.
+귀사에 실질적으로 도움이 되는 교육을 기획하고자 하오니, 3분 내외의 짧은 응답 부탁드립니다.
 
-📋 수요조사 링크: [링크를 여기에 입력하세요]
+📋 수요조사 참여하기: [링크]
+응답 기한: [응답 기한]
 
-응답 기한: [날짜 입력]
+▣ 주요 조사 항목
+- 희망 교육 분야 (해외조달, 수출바우처 활용, 혁신제품 지정, IP·인증 등)
+- 선호 교육 방식 (온라인/오프라인, 집합교육/1:1 컨설팅)
+- 희망 교육 시간 및 일정
 
-귀한 시간 내어 응답해 주시는 모든 분께 감사드립니다.""",
+수요조사 결과는 교육 프로그램 편성에 직접 반영될 예정입니다.
+바쁘신 와중에도 귀한 시간 내어 주셔서 감사합니다.""",
         },
         "성과집계 조사 요청": {
-            "subject": "[원스톱 스케일업] 성과집계 자료 제출 요청",
+            "subject": "[원스톱 스케일업] 프로그램 참여 성과 자료 제출 요청",
             "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
 
-프로그램 운영 성과 집계를 위해 아래 양식으로 자료 제출을 부탁드립니다.
+2026년 원스톱 스케일업 프로그램 운영 성과 집계를 위해 참여 기업의 성과 현황 파악이 필요합니다.
+아래 안내에 따라 기한 내 자료 제출을 부탁드립니다.
 
-📋 제출 양식: [링크 또는 첨부파일 안내]
-제출 기한: [날짜 입력]
-제출 방법: 이 메일로 회신 또는 위 양식 작성
+▣ 제출 항목
+- 프로그램 참여 후 지원사업 신청·선정 현황
+- 해외 수출 계약 또는 해외조달시장 진입 실적
+- 혁신제품 지정, G-PASS 등 인증 취득 현황
+- 기타 프로그램 활용 성과
 
-궁금하신 사항은 아래 연락처로 문의 주십시오.""",
+📋 성과 입력 링크: [링크]
+제출 기한: [제출 기한]
+
+제출해 주신 자료는 프로그램 개선 및 정책 보고 목적으로만 활용되며, 개별 정보는 외부에 공개되지 않습니다.
+협조해 주셔서 감사합니다.""",
         },
         "서류 제출 안내": {
-            "subject": "[원스톱 스케일업] 서류 제출 안내",
+            "subject": "[원스톱 스케일업] 참여 확약서 및 필수 서류 제출 안내",
             "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
 
-아래 서류를 기한 내에 제출해 주시기 바랍니다.
+2026년 원스톱 스케일업 프로그램 참여를 위한 필수 서류 제출을 안내드립니다.
+아래 항목을 확인하시고 기한 내에 제출하여 주시기 바랍니다.
 
-제출 서류:
-1. [서류명 1]
-2. [서류명 2]
+▣ 제출 서류
+1. 프로그램 참여 확약서 (서명 후 스캔 또는 사진 첨부)
+2. 사업자등록증 사본
+3. 기업 소개자료 (제품 및 기술 개요 포함, A4 2페이지 이내)
 
-제출 기한: [날짜 입력]
-제출 방법: [방법 입력]
+📋 서류 제출 방법: [제출 링크 또는 이메일 안내]
+제출 기한: [제출 기한]
+제출처: onestop.kipcc@gmail.com
 
-기한 내 미제출 시 불이익이 발생할 수 있으니 유의해 주시기 바랍니다.""",
+기한 내 미제출 시 프로그램 참여가 제한될 수 있으니 반드시 기한을 준수해 주시기 바랍니다.
+서류 관련 문의사항은 아래 운영팀으로 연락 주시기 바랍니다.
+감사합니다.""",
         },
     }
 
