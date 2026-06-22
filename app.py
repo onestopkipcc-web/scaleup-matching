@@ -2084,27 +2084,33 @@ elif page == "매칭 결과":
                 ]
                 co_map = dict(zip(co_labels, companies_in_result))
 
-                if 'review_co_idx' not in st.session_state:
-                    st.session_state['review_co_idx'] = 0
-                current_idx = max(0, min(st.session_state['review_co_idx'], len(co_labels)-1))
+                # 기업명 자체를 session_state에 저장 (레이블 재생성 시 인덱스 틀어짐 방지)
+                if 'review_co_name' not in st.session_state or \
+                   st.session_state['review_co_name'] not in companies_in_result:
+                    st.session_state['review_co_name'] = companies_in_result[0]
+                cur_name    = st.session_state['review_co_name']
+                current_idx = companies_in_result.index(cur_name)
 
                 nav1, nav2, nav3, nav4 = st.columns([1, 5, 1, 2])
                 with nav1:
                     if st.button("◀ 이전", disabled=current_idx==0):
-                        st.session_state['review_co_idx'] = current_idx - 1; st.rerun()
+                        st.session_state['review_co_name'] = companies_in_result[current_idx - 1]
+                        st.rerun()
                 with nav2:
                     selected_label = st.selectbox("기업 선택", co_labels, index=current_idx,
                                                   key="review_co_select", label_visibility="collapsed")
-                    new_idx = co_labels.index(selected_label)
-                    if new_idx != current_idx:
-                        st.session_state['review_co_idx'] = new_idx; st.rerun()
+                    sel_name = co_map[selected_label]
+                    if sel_name != cur_name:
+                        st.session_state['review_co_name'] = sel_name
+                        st.rerun()
                 with nav3:
                     if st.button("다음 ▶", disabled=current_idx==len(co_labels)-1):
-                        st.session_state['review_co_idx'] = current_idx + 1; st.rerun()
+                        st.session_state['review_co_name'] = companies_in_result[current_idx + 1]
+                        st.rerun()
                 with nav4:
                     st.caption(f"{current_idx+1} / {len(co_labels)}개사")
 
-                selected_co = co_map[selected_label]
+                selected_co = st.session_state['review_co_name']
                 co_rows = filtered[filtered['기업명'] == selected_co].copy()
                 co_rows['점수_num'] = pd.to_numeric(co_rows['점수'], errors='coerce').fillna(0)
                 co_rows = co_rows.sort_values('점수_num', ascending=False)
@@ -2486,9 +2492,28 @@ elif page == "매칭 결과":
             with c2:
                 if st.button("📥 매칭결과 엑셀 저장"):
                     fname = f"매칭결과_{datetime.today().strftime('%Y%m%d')}.xlsx"
+                    ai_data = st.session_state.get('ai_analysis', {})
+                    export_rows = []
+                    for r in results:
+                        r2  = dict(r)
+                        key = f"{r2.get('기업명','')}_{r2.get('공고ID','')}"
+                        ai  = ai_data.get(key, {})
+                        if ai and not ai.get('error'):
+                            r2['AI_추천여부'] = ai.get('추천여부','')
+                            r2['AI_적합도']   = ai.get('적합도','')
+                            r2['AI_한줄요약'] = ai.get('한줄요약','')
+                            r2['AI_판단근거'] = ai.get('판단근거', ai.get('적합이유',''))
+                            r2['AI_주의사항'] = ai.get('주의사항','')
+                            r2['AI_업종일치'] = ai.get('업종일치','')
+                            r2['AI_자격충족'] = ai.get('자격충족','')
+                            r2['AI_지역적합'] = ai.get('지역적합','')
+                            r2['AI_수요일치'] = ai.get('수요일치','')
+                        export_rows.append(r2)
                     with st.spinner("드라이브 저장 중..."):
-                        save_excel(drive, pd.DataFrame(results), fname, "매칭결과", "C55A11", star_col="관련도")
-                    st.success(f"드라이브에 {fname} 저장 완료")
+                        save_excel(drive, pd.DataFrame(export_rows), fname,
+                                   "매칭결과", "C55A11", star_col="관련도")
+                    ai_cnt = sum(1 for r in export_rows if r.get('AI_추천여부',''))
+                    st.success(f"✅ {fname} 저장 완료 — AI 분석 {ai_cnt}건 포함")
             with c3:
                 with st.expander("🔄 피드백 반영 (매칭 개선)"):
                     st.caption("""제외한 공고 패턴을 분석해 다음 매칭에 자동 반영합니다.
