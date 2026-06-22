@@ -1887,7 +1887,41 @@ elif page == "매칭 결과":
                 horizontal=True, label_visibility="collapsed", key="match_target_group"
             )
 
-        # 전문 수집 현황 미리 표시
+        # ── 스마트 매칭 권고 알림 ────────────────────────
+        df_n_check = load_excel(drive, NOTICES_FILE)
+        last_match_info = st.session_state.get('last_match_info', {})
+        need_rematch    = False
+        rematch_reason  = ""
+
+        if not df_n_check.empty:
+            # 공고 DB 최신 날짜
+            latest_notice_date = ""
+            if '수정일' in df_n_check.columns:
+                latest_notice_date = df_n_check['수정일'].max()[:10] if df_n_check['수정일'].max() else ""
+
+            last_match_date    = last_match_info.get('date','')
+            last_match_notices = last_match_info.get('notice_count', 0)
+            cur_notice_count   = len(df_n_check)
+
+            if not last_match_date:
+                need_rematch  = True
+                rematch_reason = "아직 매칭을 실행한 적이 없습니다."
+            elif latest_notice_date and latest_notice_date > last_match_date:
+                new_cnt = cur_notice_count - last_match_notices
+                need_rematch  = True
+                rematch_reason = f"마지막 매칭({last_match_date}) 이후 공고 {new_cnt:+d}건 변동이 있습니다."
+            else:
+                days_since = (datetime.today() - datetime.strptime(last_match_date, '%Y-%m-%d')).days
+                if days_since >= 3:
+                    need_rematch  = True
+                    rematch_reason = f"마지막 매칭({last_match_date})으로부터 {days_since}일 경과했습니다."
+
+        if need_rematch:
+            st.warning(f"🔄 **매칭 재실행 권장** — {rematch_reason}")
+        elif last_match_info:
+            st.success(f"✅ 매칭 최신 상태 — 마지막 실행: {last_match_info.get('date','')} / {last_match_info.get('result_count',0)}건")
+
+        # 전문 수집 현황
         df_det_check = load_excel(drive, DETAIL_FILE)
         detail_ok_count = 0
         if not df_det_check.empty and '크롤링성공' in df_det_check.columns:
@@ -1895,7 +1929,7 @@ elif page == "매칭 결과":
         if detail_ok_count > 0:
             st.success(f"📄 전문 수집 완료: {detail_ok_count}건 — 매칭에 자동 반영됩니다.")
         else:
-            st.info("📄 전문 미수집 — API 사업개요만으로 매칭합니다. '공고 수집' 탭에서 크롤링 후 재실행하면 정확도가 높아집니다.")
+            st.info("📄 전문 미수집 — API 사업개요만으로 매칭합니다.")
 
         if st.button("🔍 매칭 실행", type="primary"):
             with st.spinner("드라이브 데이터 로딩 중..."):
@@ -1991,6 +2025,12 @@ elif page == "매칭 결과":
             enriched_count = len(detail_map)
             st.session_state['match_results'] = all_results
             st.session_state['df_companies_cache'] = df_c
+            # 매칭 실행 정보 저장 - 재실행 권고 판단에 활용
+            st.session_state['last_match_info'] = {
+                'date':         datetime.today().strftime('%Y-%m-%d'),
+                'notice_count': len(df_n),
+                'result_count': len(all_results),
+            }
             st.success(
                 f"✅ 매칭 완료 — 총 {len(all_results)}건 "
                 f"(전문 DB {enriched_count}건 반영 / 공고 총 {df_n.shape[0]}건 중 매칭) "
@@ -2276,7 +2316,41 @@ elif page == "매칭 결과":
                         else:
                             st.caption("🤖 분석완료")
 
-                    # AI 분석 결과 펼침
+                    # ── 공고 상세 펼침 ──────────────────────────
+                    with st.expander(f"📋 공고 상세 보기 — {nm[:20]}"):
+                        d1, d2 = st.columns(2)
+                        with d1:
+                            st.markdown("**공고명**")
+                            st.write(row.get('공고명',''))
+                            st.markdown("**주관기관**")
+                            st.write(row.get('주관기관','—'))
+                            st.markdown("**지원대상**")
+                            st.write(row.get('지원대상','—'))
+                            if row.get('지원금액',''):
+                                st.markdown("**지원금액**")
+                                st.write(row.get('지원금액',''))
+                            if row.get('선정규모',''):
+                                st.markdown("**선정규모**")
+                                st.write(row.get('선정규모',''))
+                        with d2:
+                            st.markdown("**접수기간**")
+                            st.write(row.get('접수기간','—'))
+                            st.markdown("**마감일**")
+                            st.write(dl_txt)
+                            st.markdown("**소재지**")
+                            st.write(loc_txt)
+                            if row.get('공고링크',''):
+                                st.markdown("**공고 원문**")
+                                st.link_button("🔗 원문 보러가기", row.get('공고링크',''))
+                        st.markdown("**사업개요**")
+                        overview = row.get('사업개요','')
+                        # 앞부분 네비게이션 텍스트 제거 (HOME 정책정보 ... 패턴)
+                        if 'HOME' in overview[:30]:
+                            cut = overview.find('소관부처')
+                            if cut > 0: overview = overview[cut:]
+                        st.write(overview)
+
+                    # ── AI 분석 결과 펼침 ──────────────────────
                     if ai_res and not ai_res.get('error'):
                         rec       = ai_res.get('추천여부','')
                         fit       = ai_res.get('적합도','')
@@ -2294,7 +2368,7 @@ elif page == "매칭 결과":
                             st.caption(f"적합도: {fit}")
                         with ai_c2:
                             st.markdown(f"**{summary}**")
-                            st.write(reason_ai)           # 전체 표시, 잘림 없음
+                            st.write(reason_ai)
                             if caution and caution not in ['없음','','nan']:
                                 st.warning(f"⚠️ {caution}")
                             check_str = "  ".join([f"{icon_map.get(v,'—')} {k}" for k, v in checks.items()])
