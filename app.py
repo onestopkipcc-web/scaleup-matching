@@ -2628,15 +2628,21 @@ elif page == "안내 메일":
         },
     }
 
-    if template_choice != "직접 작성" and template_choice in TEMPLATES:
-        default_subject = TEMPLATES[template_choice]["subject"]
-        default_body    = TEMPLATES[template_choice]["body"]
-    else:
-        default_subject = ""
-        default_body    = ""
+    # 템플릿 선택 시 session_state를 직접 갱신 → text_input/text_area에 즉시 반영
+    # (Streamlit에서 value= 파라미터는 최초 렌더링에만 적용되므로 session_state 방식 필요)
+    prev_template = st.session_state.get('_prev_notice_template', '')
+    if template_choice != prev_template:
+        st.session_state['_prev_notice_template'] = template_choice
+        if template_choice != "직접 작성" and template_choice in TEMPLATES:
+            st.session_state['notice_mail_subject'] = TEMPLATES[template_choice]["subject"]
+            st.session_state['notice_mail_body']    = TEMPLATES[template_choice]["body"]
+        else:
+            st.session_state['notice_mail_subject'] = ""
+            st.session_state['notice_mail_body']    = ""
+        st.rerun()
 
-    mail_subject = st.text_input("제목", value=default_subject, key="notice_mail_subject")
-    mail_body    = st.text_area("본문", value=default_body, height=300, key="notice_mail_body",
+    mail_subject = st.text_input("제목", key="notice_mail_subject")
+    mail_body    = st.text_area("본문", height=300, key="notice_mail_body",
                                 help="수신자 이름은 자동으로 '[기업명] 담당자님'으로 삽입됩니다.")
     form_link    = st.text_input("📋 구글 폼 링크 (선택사항)", placeholder="https://forms.gle/...",
                                  key="notice_mail_form")
