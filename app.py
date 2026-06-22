@@ -722,7 +722,7 @@ def score_notice(notice, row, already_sent, HIGH, MID):
         "접수기간":     notice.get('접수기간',''),
         "지원대상":     notice.get('지원대상',''),
         "마감일":       dl,
-        "사업개요":     str(notice.get('사업개요',''))[:200]+"...",
+        "사업개요":     str(notice.get('사업개요',''))[:300]+"...",
         "지원대상매칭": target_str,
         "사업성격매칭": type_str,
         "기업키워드매칭": ", ".join(matched_co),
@@ -1769,7 +1769,11 @@ elif page == "매칭 결과":
                     df_det_ok = df_det
                 df_det_ok = df_det_ok.drop_duplicates(subset='pblancId', keep='last')
                 detail_map = df_det_ok.set_index('pblancId').to_dict('index')
-                st.caption(f"📄 전문 DB 로드: {len(detail_map)}건 → 매칭에 반영")
+
+            # 진단: notices_db × notices_detail 교집합 확인
+            notice_pids_set = set(df_n['pblancId'].str.strip()) if 'pblancId' in df_n.columns else set()
+            overlap_count = len(notice_pids_set & set(detail_map.keys()))
+            st.caption(f"📄 전문 DB {len(detail_map)}건 로드 | notices_db {len(df_n)}건 | 교집합(전문 반영 가능): {overlap_count}건")
 
             def enrich(n_dict):
                 """공고 dict에 전문내용을 병합해 매칭 정확도를 높인다.
@@ -1813,16 +1817,16 @@ elif page == "매칭 결과":
             for r in all_results:
                 r['공고유형'] = '공통' if notice_recommend_count.get(r.get('공고ID',''), 1) >= 4 else '맞춤'
 
-            enriched_count = sum(1 for r in all_results if r.get('전문내용',''))
+            enriched_count = len(detail_map)
             st.session_state['match_results'] = all_results
             st.session_state['df_companies_cache'] = df_c
             st.success(
                 f"✅ 매칭 완료 — 총 {len(all_results)}건 "
-                f"(전문 반영 {enriched_count}건 / API만 {len(all_results)-enriched_count}건) "
+                f"(전문 DB {enriched_count}건 반영 / 공고 총 {df_n.shape[0]}건 중 매칭) "
                 f"→ '검토 & 승인' 탭으로 이동"
             )
             if enriched_count == 0 and detail_ok_count > 0:
-                st.warning("전문이 수집된 공고가 매칭 결과에 없습니다. 공고 수집 탭에서 크롤링을 먼저 실행하세요.")
+                st.error("⚠️ 전문 DB 로드 실패 — '공고 수집' 탭에서 크롤링 상태를 확인하세요.")
 
     with tab2:
         results = st.session_state.get('match_results', [])
