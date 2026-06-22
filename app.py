@@ -492,7 +492,7 @@ def parse_deadline(s):
         return datetime.strptime(re.sub(r'\.', '-', end), "%Y-%m-%d")
     except: return None
 
-def score_notice(notice, row, already_sent, HIGH, MID):
+def score_notice(notice, row, already_sent, HIGH, MID, feedback=None):
     pid = notice.get('pblancId', '')
     if (row['기업명'], pid) in already_sent: return None
     dl = notice.get('마감일', '')
@@ -500,6 +500,36 @@ def score_notice(notice, row, already_sent, HIGH, MID):
     if str(row.get('수출실적',''))=='아니오' and '수출' in str(notice.get('분야','')): return None
 
     text = " ".join([str(notice.get(k,'')) for k in ['공고명','사업개요','전문내용','해시태그','주관기관','지원대상']])
+
+    # ── 기업 세그먼트 자동 분류 ───────────────────────────
+    # 기업 프로파일에 따라 3개 세그먼트로 분류 → 세그먼트별 점수 보정
+    export_yn  = str(row.get('수출실적','')) not in ['아니오','','nan']
+    trl_str    = str(row.get('TRL단계',''))
+    trl_high   = any(t in trl_str for t in ['8','9'])
+    trl_low    = any(t in trl_str for t in ['4','5','6'])
+    demand     = str(row.get('핵심수요태그',''))
+    has_procurement_tag = any(k in demand for k in ['혁신제품','G-PASS','우수조달','시범구매','MAS'])
+    has_export_tag      = any(k in demand for k in ['해외조달','수출바우처','해외전시','해외진출'])
+    has_rd_tag          = any(k in demand for k in ['기술사업화','특허','R&D','기술개발'])
+
+    # 세그먼트 판정 (우선순위 순)
+    if has_procurement_tag or (trl_high and not export_yn):
+        segment = 'procurement'   # 조달강화형: 혁신제품·G-PASS 보유, 국내 조달 집중
+    elif export_yn or has_export_tag:
+        segment = 'export'        # 해외진출형: 수출 실적 있거나 해외 수요 명확
+    elif trl_low or has_rd_tag:
+        segment = 'rd'            # 기술개발형: TRL 낮거나 기술사업화 수요
+    else:
+        segment = 'general'       # 일반형
+
+    # 세그먼트별 사업성격 점수 보정값 (매칭 시 type 카테고리에 가산)
+    SEGMENT_BOOST = {
+        'procurement': {'공공조달': 4, '해외진출': 2, '기술개발': 0, '금융융자': 0},
+        'export':      {'해외진출': 4, '마케팅홍보': 2, '공공조달': 1, '인증특허': 1},
+        'rd':          {'기술개발': 4, '인증특허': 2, '금융융자': 2, '공공조달': 0},
+        'general':     {'공공조달': 1, '해외진출': 1, '기술개발': 1, '금융융자': 1},
+    }
+    seg_boost = SEGMENT_BOOST.get(segment, {})
 
     # ── TRL 필터: 8-9단계 기업은 R&D 공고 제외 ──────
     trl = str(row.get('TRL단계',''))
@@ -747,13 +777,25 @@ def score_notice(notice, row, already_sent, HIGH, MID):
             stars = "★"    # ★★ → ★ 강등 (이후 필터에서 걸러짐)
 
     # ── 점수 계산 (정렬용) ────────────────────────────
+    # 세그먼트 부스트: 해당 기업 세그먼트와 맞는 사업성격 카테고리에 가산
+    seg_score = sum(seg_boost.get(cat, 0) for cat in matched_type.keys())
+
+    # ── 피드백 페널티: 이전 검토에서 자주 제외된 사업성격 감산 ──
+    feedback_penalty = 0
+    if feedback:
+        co_feedback = feedback.get(row.get('기업명',''), {})
+        for cat in matched_type.keys():
+            reject_count = co_feedback.get(cat, 0)
+            if reject_count >= 3:   feedback_penalty -= 6   # 3회 이상 제외 → 강한 감산
+            elif reject_count >= 2: feedback_penalty -= 3   # 2회 이상 제외 → 중간 감산
+
     score = (
         len(sum(matched_target.values(), [])) * 3 +
         len(sum(matched_type.values(),   [])) * 2 +
         len(matched_co) * 2 +
-        len(matched_demand) * 3 +  # 핵심수요태그 높은 가중치
-        ind_score +                 # 제품분야 역방향 매칭
-        xs + location_score
+        len(matched_demand) * 3 +
+        ind_score +
+        xs + location_score + seg_score + feedback_penalty
     )
     if stars == "★★★": score += 5
     if score <= 0: return None
@@ -766,6 +808,7 @@ def score_notice(notice, row, already_sent, HIGH, MID):
         "기업명":       row['기업명'],
         "관련도":       stars,
         "점수":         score,
+        "세그먼트":     segment,
         "공고ID":       pid,
         "공고명":       notice.get('공고명',''),
         "주관기관":     notice.get('주관기관',''),
@@ -1912,9 +1955,15 @@ elif page == "매칭 결과":
             all_results  = []; prog = st.progress(0)
             notice_recommend_count = {}
 
+            # 피드백 로드 (이전 검토에서 제외한 패턴)
+            kw_data_fb = load_json(drive, KEYWORDS_FILE) or {}
+            feedback_map = kw_data_fb.get('feedback', {})
+            if feedback_map:
+                st.caption(f"🔄 피드백 반영 중 — {len(feedback_map)}개사 패턴 로드")
+
             for idx, (_, row) in enumerate(df_c.iterrows()):
                 scored = [r for _, n in df_n.iterrows()
-                          if (r := score_notice(enrich(n.to_dict()), row, already_sent, HIGH, MID))]
+                          if (r := score_notice(enrich(n.to_dict()), row, already_sent, HIGH, MID, feedback_map))]
 
                 for r in scored:
                     pid = r.get('공고ID','')
@@ -2087,21 +2136,21 @@ elif page == "매칭 결과":
                     # 매칭 관련 정보
                     ic1, ic2 = st.columns(2)
                     with ic1:
-                        st.caption("**관심사업분야**")
+                        st.markdown("**관심사업분야**")
                         st.write(co_info_panel.get('관심사업분야','—'))
-                        st.caption("**기술키워드**")
+                        st.markdown("**기술키워드**")
                         st.write(co_info_panel.get('기술키워드','—'))
-                        st.caption("**핵심수요태그**")
+                        st.markdown("**핵심수요태그**")
                         st.write(co_info_panel.get('핵심수요태그','—'))
                         if co_info_panel.get('키워드보완'):
-                            st.caption("**보완키워드** ✏️")
+                            st.markdown("**보완키워드** ✏️")
                             st.write(co_info_panel.get('키워드보완',''))
                     with ic2:
-                        st.caption("**제품분야**")
+                        st.markdown("**제품분야**")
                         st.write(co_info_panel.get('제품분야','—'))
-                        st.caption("**수출실적 / 수출국가**")
+                        st.markdown("**수출실적 / 수출국가**")
                         st.write(f"{co_info_panel.get('수출실적','—')} / {co_info_panel.get('수출국가','—')}")
-                        st.caption("**이메일**")
+                        st.markdown("**이메일**")
                         st.write(co_info_panel.get('이메일','—'))
 
                     # 주관식 답변 (있는 경우만 표시)
@@ -2109,20 +2158,21 @@ elif page == "매칭 결과":
                         co_info_panel.get('희망서비스요약',''),
                         co_info_panel.get('평가_서비스요청',''),
                         co_info_panel.get('평가_내부논의',''),
+                        co_info_panel.get('메모',''),
                     ])
                     if has_subjective:
                         st.divider()
                         if co_info_panel.get('희망서비스요약',''):
-                            st.caption("**📝 희망 서비스 (신청 시 작성)**")
+                            st.markdown("**📝 희망 서비스** (신청 시 작성)")
                             st.info(co_info_panel.get('희망서비스요약',''))
                         if co_info_panel.get('평가_서비스요청',''):
-                            st.caption("**📝 서비스 요청 (평가 시 작성)**")
+                            st.markdown("**📝 서비스 요청** (평가 시 작성)")
                             st.info(co_info_panel.get('평가_서비스요청',''))
                         if co_info_panel.get('평가_내부논의',''):
-                            st.caption("**📋 평가 내부 의견**")
+                            st.markdown("**📋 평가 내부 의견**")
                             st.warning(co_info_panel.get('평가_내부논의',''))
                         if co_info_panel.get('메모',''):
-                            st.caption("**🗒 운영 메모**")
+                            st.markdown("**🗒 운영 메모**")
                             st.write(co_info_panel.get('메모',''))
 
                 # ── 일괄 처리 버튼 ──────────────────────────
@@ -2237,10 +2287,10 @@ elif page == "매칭 결과":
                             st.write(f"**{rec_icon} {rec}**")
                             st.caption(f"적합도: {fit}")
                         with ai_c2:
-                            st.caption(f"**{summary}**")
-                            st.caption(reason_ai[:120] + ("..." if len(reason_ai)>120 else ""))
+                            st.markdown(f"**{summary}**")
+                            st.write(reason_ai)           # 전체 표시, 잘림 없음
                             if caution and caution not in ['없음','','nan']:
-                                st.caption(f"⚠️ {caution[:80]}")
+                                st.warning(f"⚠️ {caution}")
                             check_str = "  ".join([f"{icon_map.get(v,'—')} {k}" for k, v in checks.items()])
                             st.caption(check_str)
 
@@ -2425,11 +2475,12 @@ elif page == "매칭 결과":
 </div>
                                 """, unsafe_allow_html=True)
             st.divider()
-            c1,c2 = st.columns(2)
+            c1, c2, c3 = st.columns(3)
             with c1:
                 if st.button("✅ 검토 완료 저장", type="primary"):
                     for r in results:
-                        r['담당자검토'] = st.session_state['review_state'].get(f"{r['기업명']}_{r.get('공고ID','')}","")
+                        r['담당자검토'] = st.session_state['review_state'].get(
+                            f"{r['기업명']}_{r.get('공고ID','')}", "")
                     st.session_state['match_results'] = results
                     st.success(f"저장 완료 — 승인 {ap}건 → '발송 관리' 메뉴로 이동")
             with c2:
@@ -2438,6 +2489,45 @@ elif page == "매칭 결과":
                     with st.spinner("드라이브 저장 중..."):
                         save_excel(drive, pd.DataFrame(results), fname, "매칭결과", "C55A11", star_col="관련도")
                     st.success(f"드라이브에 {fname} 저장 완료")
+            with c3:
+                with st.expander("🔄 피드백 반영 (매칭 개선)"):
+                    st.caption("""제외한 공고 패턴을 분석해 다음 매칭에 자동 반영합니다.
+기업별로 자주 제외된 사업성격을 낮은 우선순위로 설정합니다.""")
+                    if st.button("피드백 적용", key="apply_feedback"):
+                        # 제외된 공고의 사업성격 패턴 집계
+                        rejected = [r for r in results
+                                    if st.session_state['review_state'].get(
+                                        f"{r['기업명']}_{r.get('공고ID','')}", "") == "✕"]
+
+                        # 기업별 제외 패턴
+                        co_reject_types = {}
+                        for r in rejected:
+                            co  = r.get('기업명','')
+                            typ = r.get('사업성격매칭','')
+                            if co and typ:
+                                if co not in co_reject_types:
+                                    co_reject_types[co] = []
+                                for t in typ.split('/'):
+                                    t = t.strip().split('(')[0].strip()
+                                    if t: co_reject_types[co].append(t)
+
+                        # keywords.json에 제외 패턴 저장
+                        kw_data = load_json(drive, KEYWORDS_FILE) or {}
+                        feedback = kw_data.get('feedback', {})
+                        for co, types in co_reject_types.items():
+                            if co not in feedback:
+                                feedback[co] = {}
+                            for t in types:
+                                feedback[co][t] = feedback[co].get(t, 0) + 1
+                        kw_data['feedback'] = feedback
+
+                        if save_json(drive, kw_data, KEYWORDS_FILE):
+                            summary_lines = [f"{co}: {dict(v)}" for co, v in list(co_reject_types.items())[:5]]
+                            st.success(f"피드백 반영 완료 — {len(rejected)}건 제외 패턴 저장")
+                            for line in summary_lines:
+                                st.caption(line)
+                        else:
+                            st.error("저장 실패")
 
 
 # ══════════════════════════════════════════════════════
