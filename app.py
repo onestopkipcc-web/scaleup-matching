@@ -1929,114 +1929,149 @@ elif page == "매칭 결과":
             st.divider()
 
             # ══════════════════════════════════════════════
-            # 빠른 검토 모드 — 기업별 그룹 테이블
+            # 빠른 검토 모드 — 기업 선택 + 공고 목록
             # ══════════════════════════════════════════════
             if view_mode == "📋 빠른 검토 (테이블)":
-                st.caption("기업별로 묶어서 점수 높은 공고 순으로 표시합니다.")
 
                 companies_in_result = filtered['기업명'].unique().tolist()
 
                 def co_pending_count(co):
-                    co_rows = filtered[filtered['기업명'] == co]
-                    return sum(1 for _, r in co_rows.iterrows()
+                    return sum(1 for _, r in filtered[filtered['기업명']==co].iterrows()
                                if st.session_state['review_state'].get(
                                    f"{r['기업명']}_{r.get('공고ID','')}", "") == "")
 
-                companies_sorted = sorted(companies_in_result, key=lambda c: -co_pending_count(c))
+                # 드롭다운 레이블에 미검토 수 표시
+                co_labels = [
+                    f"{'✅' if co_pending_count(co)==0 else '⏳'} {co}  ({co_pending_count(co)}건 미검토)"
+                    for co in companies_in_result
+                ]
+                co_map = dict(zip(co_labels, companies_in_result))
 
-                for co in companies_sorted:
-                    co_rows = filtered[filtered['기업명'] == co].copy()
-                    co_rows['점수_num'] = pd.to_numeric(co_rows['점수'], errors='coerce').fillna(0)
-                    co_rows = co_rows.sort_values('점수_num', ascending=False)
+                selected_label = st.selectbox(
+                    "기업 선택",
+                    co_labels,
+                    key="review_co_select"
+                )
+                selected_co = co_map[selected_label]
 
-                    co_ap  = sum(1 for _, r in co_rows.iterrows()
-                                 if st.session_state['review_state'].get(f"{r['기업명']}_{r.get('공고ID','')}", "") == "○")
-                    co_rj  = sum(1 for _, r in co_rows.iterrows()
-                                 if st.session_state['review_state'].get(f"{r['기업명']}_{r.get('공고ID','')}", "") == "✕")
-                    co_pen = len(co_rows) - co_ap - co_rj
+                # 선택 기업 공고 필터 + 점수순 정렬
+                co_rows = filtered[filtered['기업명'] == selected_co].copy()
+                co_rows['점수_num'] = pd.to_numeric(co_rows['점수'], errors='coerce').fillna(0)
+                co_rows = co_rows.sort_values('점수_num', ascending=False)
 
-                    # 기업 헤더
-                    with st.container():
-                        h1, h2 = st.columns([3, 2])
-                        with h1:
-                            st.markdown(f"### 🏢 {co}")
-                        with h2:
-                            st.markdown(f"총 **{len(co_rows)}건** &nbsp; ✅ {co_ap} &nbsp; ❌ {co_rj} &nbsp; ⏳ {co_pen}")
+                co_ap  = sum(1 for _, r in co_rows.iterrows() if st.session_state['review_state'].get(f"{r['기업명']}_{r.get('공고ID','')}", "")=="○")
+                co_rj  = sum(1 for _, r in co_rows.iterrows() if st.session_state['review_state'].get(f"{r['기업명']}_{r.get('공고ID','')}", "")=="✕")
+                co_pen = len(co_rows) - co_ap - co_rj
 
-                    # 컬럼 헤더
-                    hc1, hc2, hc3, hc4, hc5, hc6 = st.columns([1, 4, 3, 2, 2, 2])
-                    hc1.caption("별점")
-                    hc2.caption("공고명")
-                    hc3.caption("매칭근거")
-                    hc4.caption("마감일")
-                    hc5.caption("소재지")
-                    hc6.caption("처리")
-                    st.divider()
+                # 기업 현황 메트릭
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("전체", f"{len(co_rows)}건")
+                m2.metric("✅ 승인", f"{co_ap}건")
+                m3.metric("❌ 제외", f"{co_rj}건")
+                m4.metric("⏳ 미검토", f"{co_pen}건")
 
-                    for i, (idx, row) in enumerate(co_rows.iterrows()):
-                        key     = f"{row['기업명']}_{row.get('공고ID','')}"
-                        current = st.session_state['review_state'].get(key, "")
-                        ai_res  = st.session_state.get('ai_analysis', {}).get(key)
+                # 일괄 처리 버튼
+                ba1, ba2, _ = st.columns([1, 1, 4])
+                with ba1:
+                    if st.button("✅ 전체 승인", key="bulk_approve"):
+                        for _, r in co_rows.iterrows():
+                            k = f"{r['기업명']}_{r.get('공고ID','')}"
+                            st.session_state['review_state'][k] = "○"
+                        st.rerun()
+                with ba2:
+                    if st.button("❌ 전체 제외", key="bulk_reject"):
+                        for _, r in co_rows.iterrows():
+                            k = f"{r['기업명']}_{r.get('공고ID','')}"
+                            st.session_state['review_state'][k] = "✕"
+                        st.rerun()
 
-                        # 소재지
-                        try: loc_v = int(str(row.get('소재지점수','0')))
-                        except: loc_v = 0
-                        loc_txt = "🟢 일치" if loc_v > 0 else ("🔴 타지역" if loc_v < 0 else "전국")
+                st.divider()
 
-                        # 마감일
-                        dl = row.get('마감일','')
-                        dl_txt = "⚠️ 비정형" if not dl or not dl.strip() else dl
+                # 공고 목록
+                for i, (idx, row) in enumerate(co_rows.iterrows()):
+                    key     = f"{row['기업명']}_{row.get('공고ID','')}"
+                    current = st.session_state['review_state'].get(key, "")
+                    ai_res  = st.session_state.get('ai_analysis', {}).get(key)
 
-                        # 상태
-                        status_txt = "✅ 승인" if current=="○" else ("❌ 제외" if current=="✕" else "⏳ 미검토")
+                    try: loc_v = int(str(row.get('소재지점수','0')))
+                    except: loc_v = 0
+                    loc_txt = "🟢 지역일치" if loc_v > 0 else ("🔴 타지역" if loc_v < 0 else "🔵 전국")
 
-                        # AI 요약 (있을 때만)
-                        ai_txt = ""
-                        if ai_res and not ai_res.get('error'):
-                            rec = ai_res.get('추천여부','')
-                            ri  = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
-                            ai_txt = f"{ri} {ai_res.get('한줄요약','')[:30]}"
+                    dl = row.get('마감일','')
+                    dl_txt = "⚠️ 비정형" if not dl or not dl.strip() else dl
 
-                        # 공고 한 줄
-                        c1, c2, c3, c4, c5, c6 = st.columns([1, 4, 3, 2, 2, 2])
-                        c1.write(row.get('관련도',''))
-                        c2.write(row.get('공고명','')[:25] + ("..." if len(row.get('공고명',''))>25 else ""))
-                        c3.caption(row.get('매칭근거','')[:30] + (ai_txt and f"\n{ai_txt}" or ""))
-                        c4.caption(dl_txt)
-                        c5.caption(loc_txt)
+                    star = row.get('관련도','')
+                    reason = row.get('매칭근거','')
 
-                        with c6:
-                            b1, b2, b3 = st.columns(3)
-                            with b1:
-                                if st.button("✅" if current!="○" else "↩", key=f"o_{key}_{i}",
-                                             help="승인" if current!="○" else "승인취소"):
-                                    st.session_state['review_state'][key] = "" if current=="○" else "○"
-                                    st.rerun()
-                            with b2:
-                                if st.button("❌" if current!="✕" else "↩", key=f"x_{key}_{i}",
-                                             help="제외" if current!="✕" else "제외취소"):
-                                    st.session_state['review_state'][key] = "" if current=="✕" else "✕"
-                                    st.rerun()
-                            with b3:
-                                if row.get('공고링크',''):
-                                    st.link_button("🔗", row.get('공고링크',''), help="공고 원문")
+                    # 상태 배지
+                    if current == "○":
+                        status_txt = "✅ 승인됨"
+                    elif current == "✕":
+                        status_txt = "❌ 제외됨"
+                    else:
+                        status_txt = "⏳ 미검토"
 
-                        # AI 분석 버튼 (별도 행)
+                    # AI 요약
+                    ai_txt = ""
+                    if ai_res and not ai_res.get('error'):
+                        rec = ai_res.get('추천여부','')
+                        ri  = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
+                        ai_txt = f"{ri} {ai_res.get('한줄요약','')[:40]}"
+
+                    # 공고 행 — 5컬럼 고정
+                    c_star, c_name, c_reason, c_meta, c_btn = st.columns([1, 4, 4, 2, 3])
+
+                    with c_star:
+                        st.write(star)
+
+                    with c_name:
+                        st.write(f"**{row.get('공고명','')[:28]}**" +
+                                 ("..." if len(row.get('공고명',''))>28 else ""))
+                        st.caption(f"{row.get('주관기관','')[:15]}")
+
+                    with c_reason:
+                        st.caption(reason[:45] + ("..." if len(reason)>45 else ""))
+                        if ai_txt:
+                            st.caption(ai_txt)
+
+                    with c_meta:
+                        st.caption(dl_txt)
+                        st.caption(loc_txt)
+
+                    with c_btn:
+                        b1, b2, b3 = st.columns(3)
+                        with b1:
+                            label = "✅" if current != "○" else "↩️"
+                            if st.button(label, key=f"o_{key}_{i}",
+                                         help="승인" if current!="○" else "취소"):
+                                st.session_state['review_state'][key] = "" if current=="○" else "○"
+                                st.rerun()
+                        with b2:
+                            label = "❌" if current != "✕" else "↩️"
+                            if st.button(label, key=f"x_{key}_{i}",
+                                         help="제외" if current!="✕" else "취소"):
+                                st.session_state['review_state'][key] = "" if current=="✕" else "✕"
+                                st.rerun()
+                        with b3:
+                            if row.get('공고링크',''):
+                                st.link_button("🔗", row.get('공고링크',''), help="공고 원문")
+
+                    # 상태 + AI 버튼 한 줄
+                    s_col, ai_col, _ = st.columns([2, 2, 6])
+                    with s_col:
+                        st.caption(status_txt)
+                    with ai_col:
                         if not ai_res:
-                            _, ai_col, _ = st.columns([7, 2, 3])
-                            with ai_col:
-                                if st.button("🤖 AI분석", key=f"ai_{key}_{i}"):
-                                    with st.spinner("분석 중..."):
-                                        co_info = {}
-                                        if 'df_companies_cache' in st.session_state:
-                                            df_co2 = st.session_state['df_companies_cache']
-                                            co_rows2 = df_co2[df_co2['기업명']==row['기업명']]
-                                            if not co_rows2.empty:
-                                                co_info = co_rows2.iloc[0].to_dict()
-                                        co_info['기업명'] = row['기업명']
-                                        st.session_state['ai_analysis'][key] = claude_analyze(co_info, row.to_dict())
-                                    st.rerun()
-
+                            if st.button("🤖 AI분석", key=f"ai_{key}_{i}"):
+                                with st.spinner("분석 중..."):
+                                    co_info = {}
+                                    if 'df_companies_cache' in st.session_state:
+                                        df_co2 = st.session_state['df_companies_cache']
+                                        m = df_co2[df_co2['기업명']==row['기업명']]
+                                        if not m.empty: co_info = m.iloc[0].to_dict()
+                                    co_info['기업명'] = row['기업명']
+                                    st.session_state['ai_analysis'][key] = claude_analyze(co_info, row.to_dict())
+                                st.rerun()
                     st.divider()
 
             # ══════════════════════════════════════════════
