@@ -2073,22 +2073,57 @@ elif page == "매칭 결과":
                         m = df_co2[df_co2['기업명']==selected_co]
                         if not m.empty: co_info_panel = m.iloc[0].to_dict()
 
+                    # 상단 핵심 지표
                     pi1, pi2, pi3, pi4 = st.columns(4)
-                    pi1.metric("공고 현황", f"전체 {len(co_rows)}건", f"승인 {co_ap} / 제외 {co_rj} / 미검토 {co_pen}")
+                    pi1.metric("공고 현황", f"전체 {len(co_rows)}건",
+                               f"✅{co_ap} / ❌{co_rj} / ⏳{co_pen}")
                     pi2.metric("소재지", co_info_panel.get('소재지','—'))
-                    pi3.metric("기업유형", co_info_panel.get('기업유형','—')[:15] if co_info_panel.get('기업유형') else '—')
-                    pi4.metric("TRL", co_info_panel.get('TRL단계','—'))
+                    biz_type = co_info_panel.get('기업유형','—')
+                    pi3.metric("기업유형", biz_type[:16] + ('...' if len(str(biz_type))>16 else '') if biz_type else '—')
+                    pi4.metric("TRL / 매출", f"TRL {co_info_panel.get('TRL단계','—')} / {co_info_panel.get('매출규모','—')[:6]}" if co_info_panel.get('매출규모') else f"TRL {co_info_panel.get('TRL단계','—')}")
 
+                    st.divider()
+
+                    # 매칭 관련 정보
                     ic1, ic2 = st.columns(2)
                     with ic1:
-                        st.caption(f"**관심사업분야:** {co_info_panel.get('관심사업분야','—')}")
-                        st.caption(f"**기술키워드:** {co_info_panel.get('기술키워드','—')}")
-                        st.caption(f"**핵심수요태그:** {co_info_panel.get('핵심수요태그','—')}")
-                    with ic2:
-                        st.caption(f"**제품분야:** {co_info_panel.get('제품분야','—')}")
-                        st.caption(f"**수출실적:** {co_info_panel.get('수출실적','—')} / {co_info_panel.get('수출국가','—')}")
+                        st.caption("**관심사업분야**")
+                        st.write(co_info_panel.get('관심사업분야','—'))
+                        st.caption("**기술키워드**")
+                        st.write(co_info_panel.get('기술키워드','—'))
+                        st.caption("**핵심수요태그**")
+                        st.write(co_info_panel.get('핵심수요태그','—'))
                         if co_info_panel.get('키워드보완'):
-                            st.caption(f"**보완키워드:** {co_info_panel.get('키워드보완','')}")
+                            st.caption("**보완키워드** ✏️")
+                            st.write(co_info_panel.get('키워드보완',''))
+                    with ic2:
+                        st.caption("**제품분야**")
+                        st.write(co_info_panel.get('제품분야','—'))
+                        st.caption("**수출실적 / 수출국가**")
+                        st.write(f"{co_info_panel.get('수출실적','—')} / {co_info_panel.get('수출국가','—')}")
+                        st.caption("**이메일**")
+                        st.write(co_info_panel.get('이메일','—'))
+
+                    # 주관식 답변 (있는 경우만 표시)
+                    has_subjective = any([
+                        co_info_panel.get('희망서비스요약',''),
+                        co_info_panel.get('평가_서비스요청',''),
+                        co_info_panel.get('평가_내부논의',''),
+                    ])
+                    if has_subjective:
+                        st.divider()
+                        if co_info_panel.get('희망서비스요약',''):
+                            st.caption("**📝 희망 서비스 (신청 시 작성)**")
+                            st.info(co_info_panel.get('희망서비스요약',''))
+                        if co_info_panel.get('평가_서비스요청',''):
+                            st.caption("**📝 서비스 요청 (평가 시 작성)**")
+                            st.info(co_info_panel.get('평가_서비스요청',''))
+                        if co_info_panel.get('평가_내부논의',''):
+                            st.caption("**📋 평가 내부 의견**")
+                            st.warning(co_info_panel.get('평가_내부논의',''))
+                        if co_info_panel.get('메모',''):
+                            st.caption("**🗒 운영 메모**")
+                            st.write(co_info_panel.get('메모',''))
 
                 # ── 일괄 처리 버튼 ──────────────────────────
                 ba1, ba2, ba3, _ = st.columns([1, 1, 2, 2])
@@ -2146,32 +2181,32 @@ elif page == "매칭 결과":
                         ri     = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
                         ai_txt = f"{ri} {ai_res.get('한줄요약','')[:40]}"
 
-                    # 공고 행: 별점 / 공고명 / 매칭근거+AI요약 / 메타 / 승인버튼 / 제외버튼 / AI버튼
-                    c_star, c_name, c_reason, c_meta, c_ok, c_ng, c_ai = st.columns([1, 4, 4, 2, 1, 1, 1])
+                    # 공고 행: 별점 / 공고명+주관기관 / 매칭근거+AI요약 / 마감+소재지 / 승인 / 제외 / AI
+                    c_star, c_name, c_reason, c_meta, c_ok, c_ng, c_ai = st.columns([1, 3, 3, 2, 1.2, 1.2, 1.5])
 
                     with c_star:
                         st.write(star)
                     with c_name:
                         nm = row.get('공고명','')
-                        st.write(f"**{nm[:28]}**" + ("..." if len(nm)>28 else ""))
-                        st.caption(row.get('주관기관','')[:15])
+                        st.write(f"**{nm[:22]}**" + ("..." if len(nm)>22 else ""))
+                        st.caption(row.get('주관기관','')[:14])
                     with c_reason:
-                        st.caption(reason[:45] + ("..." if len(reason)>45 else ""))
+                        st.caption(reason[:40] + ("..." if len(reason)>40 else ""))
                         if ai_txt: st.caption(ai_txt)
                     with c_meta:
                         st.caption(dl_txt)
                         st.caption(loc_txt)
                     with c_ok:
-                        lbl = "✅" if current != "○" else "↩️"
-                        if st.button(lbl, key=f"o_{key}_{i}", help="승인" if current!="○" else "승인 취소"):
+                        lbl = "✅ 승인" if current != "○" else "↩ 취소"
+                        if st.button(lbl, key=f"o_{key}_{i}", use_container_width=True):
                             st.session_state['review_state'][key] = "" if current=="○" else "○"; st.rerun()
                     with c_ng:
-                        lbl = "❌" if current != "✕" else "↩️"
-                        if st.button(lbl, key=f"x_{key}_{i}", help="제외" if current!="✕" else "제외 취소"):
+                        lbl = "❌ 제외" if current != "✕" else "↩ 취소"
+                        if st.button(lbl, key=f"x_{key}_{i}", use_container_width=True):
                             st.session_state['review_state'][key] = "" if current=="✕" else "✕"; st.rerun()
                     with c_ai:
                         if not ai_res:
-                            if st.button("🤖", key=f"ai_{key}_{i}", help="AI 분석"):
+                            if st.button("🤖 AI", key=f"ai_{key}_{i}", use_container_width=True):
                                 with st.spinner("분석 중..."):
                                     ci = {}
                                     if 'df_companies_cache' in st.session_state:
@@ -2183,7 +2218,7 @@ elif page == "매칭 결과":
                                     st.session_state['ai_analysis'][key] = claude_analyze(ci, row.to_dict())
                                 st.rerun()
                         else:
-                            st.caption("🤖완료")
+                            st.caption("🤖 분석완료")
 
                     # AI 분석 결과 펼침
                     if ai_res and not ai_res.get('error'):
