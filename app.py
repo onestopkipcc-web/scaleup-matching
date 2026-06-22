@@ -1929,92 +1929,139 @@ elif page == "매칭 결과":
             st.divider()
 
             # ══════════════════════════════════════════════
-            # 빠른 검토 모드 — 테이블 뷰
+            # 빠른 검토 모드 — 기업별 그룹 테이블
             # ══════════════════════════════════════════════
             if view_mode == "📋 빠른 검토 (테이블)":
-                st.caption("매칭근거를 보고 ○/✕를 바로 클릭하세요. 상세 내용이 필요한 건만 '상세 검토' 모드로 전환하세요.")
+                st.caption("기업별로 묶어서 점수 높은 공고 순으로 표시합니다. ○/✕를 클릭해 빠르게 처리하세요.")
 
-                # 미검토 먼저, 그 다음 승인/제외 순 정렬
-                def review_order(row):
-                    key = f"{row['기업명']}_{row.get('공고ID','')}"
-                    s = st.session_state['review_state'].get(key, "")
-                    return 0 if s == "" else (1 if s == "○" else 2)
+                # 기업 목록 (미검토 기업 먼저, 그 다음 완료 기업)
+                companies_in_result = filtered['기업명'].unique().tolist()
 
-                filtered_sorted = filtered.copy()
-                filtered_sorted['_order'] = [review_order(r) for _, r in filtered_sorted.iterrows()]
-                filtered_sorted = filtered_sorted.sort_values(['_order','관련도'], ascending=[True, True])
+                def co_pending_count(co):
+                    co_rows = filtered[filtered['기업명'] == co]
+                    return sum(1 for _, r in co_rows.iterrows()
+                               if st.session_state['review_state'].get(
+                                   f"{r['기업명']}_{r.get('공고ID','')}", "") == "")
 
-                for i, (idx, row) in enumerate(filtered_sorted.iterrows()):
-                    key     = f"{row['기업명']}_{row.get('공고ID','')}"
-                    current = st.session_state['review_state'].get(key, "")
-                    ai_res  = st.session_state.get('ai_analysis', {}).get(key)
+                companies_sorted = sorted(companies_in_result,
+                                          key=lambda c: -co_pending_count(c))
 
-                    # 상태별 배경 스타일
-                    if current == "○":
-                        row_style = "background:rgba(99,255,168,0.08);border-left:3px solid #63FFA8;"
-                        status_icon = "✅"
-                    elif current == "✕":
-                        row_style = "background:rgba(255,99,99,0.08);border-left:3px solid #FF6363;"
-                        status_icon = "❌"
-                    else:
-                        row_style = "border-left:3px solid rgba(255,255,255,0.1);"
-                        status_icon = "⏳"
+                for co in companies_sorted:
+                    co_rows = filtered[filtered['기업명'] == co].copy()
+                    co_rows['점수_num'] = pd.to_numeric(co_rows['점수'], errors='coerce').fillna(0)
+                    co_rows = co_rows.sort_values('점수_num', ascending=False)
 
-                    # 소재지 아이콘
-                    loc_score_v = str(row.get('소재지점수','0'))
-                    loc_v = int(loc_score_v) if loc_score_v.lstrip('-').isdigit() else 0
-                    loc_icon = "🟢" if loc_v > 0 else ("🔴" if loc_v < 0 else "")
+                    co_ap  = sum(1 for _, r in co_rows.iterrows()
+                                 if st.session_state['review_state'].get(
+                                     f"{r['기업명']}_{r.get('공고ID','')}", "") == "○")
+                    co_rj  = sum(1 for _, r in co_rows.iterrows()
+                                 if st.session_state['review_state'].get(
+                                     f"{r['기업명']}_{r.get('공고ID','')}", "") == "✕")
+                    co_pen = len(co_rows) - co_ap - co_rj
 
-                    # 마감일
-                    dl = row.get('마감일','')
-                    dl_display = f"⚠️ 비정형" if not dl or dl.strip()=='' else dl
-
-                    # AI 한 줄 요약
-                    ai_summary = ""
-                    if ai_res and not ai_res.get('error'):
-                        rec = ai_res.get('추천여부','')
-                        rec_icon = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
-                        ai_summary = f"{rec_icon} {ai_res.get('한줄요약','')[:40]}"
-
-                    # 한 줄 표시
+                    # 기업 헤더
+                    co_status = "✅ 완료" if co_pen == 0 else f"⏳ {co_pen}건 미검토"
                     st.markdown(f"""
-<div style="{row_style}padding:10px 14px;margin-bottom:4px;border-radius:6px;">
-  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-    <span style="font-size:13px;min-width:16px;">{status_icon}</span>
-    <span style="font-size:12px;font-weight:700;color:#FFFFFF;min-width:120px;">{row['기업명'][:10]}</span>
-    <span style="font-size:11px;background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:10px;color:#E8EDF2;">{row.get('관련도','')}</span>
-    <span style="font-size:12px;color:#E8EDF2;flex:1;min-width:180px;">{row.get('공고명','')[:30]}{loc_icon}</span>
-    <span style="font-size:11px;color:rgba(255,255,255,0.5);min-width:80px;">{dl_display}</span>
-    <span style="font-size:11px;color:#A0ADB8;flex:1;">{row.get('매칭근거','')[:45]}</span>
-    {f'<span style="font-size:11px;color:#A0ADB8;">{ai_summary}</span>' if ai_summary else ''}
-  </div>
-</div>
-""", unsafe_allow_html=True)
+<div style="background:rgba(31,78,121,0.4);border-left:4px solid #4A9EFF;
+            padding:10px 16px;margin:16px 0 4px;border-radius:6px;
+            display:flex;align-items:center;justify-content:space-between;">
+  <span style="font-size:14px;font-weight:700;color:#FFFFFF;">{co}</span>
+  <span style="font-size:12px;color:rgba(255,255,255,0.5);">
+    총 {len(co_rows)}건 &nbsp;|&nbsp; ✅ {co_ap} &nbsp;❌ {co_rj} &nbsp;⏳ {co_pen}
+    &nbsp;&nbsp; {co_status}
+  </span>
+</div>""", unsafe_allow_html=True)
 
-                    # 버튼 행
-                    bc1, bc2, bc3, bc4, bc5 = st.columns([1, 1, 1, 1, 4])
-                    with bc1:
-                        if st.button("○ 승인", key=f"qt_o_{key}_{i}", type="primary"):
-                            st.session_state['review_state'][key] = "○"; st.rerun()
-                    with bc2:
-                        if st.button("✕ 제외", key=f"qt_x_{key}_{i}"):
-                            st.session_state['review_state'][key] = "✕"; st.rerun()
-                    with bc3:
-                        if st.button("🔗 공고", key=f"qt_link_{key}_{i}"):
-                            st.markdown(f"[공고 원문]({row.get('공고링크','')})")
-                    with bc4:
-                        _usd, _krw = estimate_cost(1)
-                        if not ai_res:
-                            if st.button(f"🤖 AI", key=f"qt_ai_{key}_{i}"):
-                                with st.spinner("분석 중..."):
-                                    co_info = {}
-                                    if 'df_companies_cache' in st.session_state:
-                                        df_co = st.session_state['df_companies_cache']
-                                        co_rows = df_co[df_co['기업명']==row['기업명']]
-                                        if not co_rows.empty: co_info = co_rows.iloc[0].to_dict()
-                                    co_info['기업명'] = row['기업명']
-                                    st.session_state['ai_analysis'][key] = claude_analyze(co_info, row.to_dict())
-                                st.rerun()
+                    # 공고 행들
+                    for i, (idx, row) in enumerate(co_rows.iterrows()):
+                        key     = f"{row['기업명']}_{row.get('공고ID','')}"
+                        current = st.session_state['review_state'].get(key, "")
+                        ai_res  = st.session_state.get('ai_analysis', {}).get(key)
+
+                        # 소재지
+                        loc_v = int(str(row.get('소재지점수','0')).lstrip('-').isdigit() and str(row.get('소재지점수','0')) or 0)
+                        try: loc_v = int(str(row.get('소재지점수','0')))
+                        except: loc_v = 0
+                        loc_badge = (
+                            '<span style="color:#63FFA8;font-size:11px;">●지역일치</span>' if loc_v > 0
+                            else '<span style="color:#FF6363;font-size:11px;">●타지역</span>' if loc_v < 0
+                            else ''
+                        )
+
+                        # 별점 색상
+                        star = row.get('관련도','')
+                        star_color = "#FFD700" if star == "★★★" else "#90EE90"
+
+                        # 상태
+                        if current == "○":
+                            bg = "rgba(99,255,168,0.07)"
+                            border = "#63FFA8"
+                            status_badge = '<span style="color:#63FFA8;font-weight:700;font-size:12px;">✅ 승인</span>'
+                        elif current == "✕":
+                            bg = "rgba(255,99,99,0.07)"
+                            border = "#FF6363"
+                            status_badge = '<span style="color:#FF6363;font-weight:700;font-size:12px;">❌ 제외</span>'
+                        else:
+                            bg = "rgba(255,255,255,0.03)"
+                            border = "rgba(255,255,255,0.08)"
+                            status_badge = '<span style="color:rgba(255,255,255,0.3);font-size:12px;">⏳ 미검토</span>'
+
+                        # AI 요약
+                        ai_badge = ""
+                        if ai_res and not ai_res.get('error'):
+                            rec = ai_res.get('추천여부','')
+                            ri  = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
+                            ai_badge = f'<span style="font-size:11px;color:rgba(255,255,255,0.6);">{ri} {ai_res.get("한줄요약","")[:35]}</span>'
+
+                        # 마감일
+                        dl = row.get('마감일','')
+                        dl_txt = "⚠️비정형" if not dl or not dl.strip() else dl
+
+                        # 매칭근거 (앞 50자)
+                        reason_short = row.get('매칭근거','')[:50]
+
+                        st.markdown(f"""
+<div style="background:{bg};border:1px solid {border};border-radius:6px;
+            padding:8px 14px;margin-bottom:3px;">
+  <div style="display:grid;grid-template-columns:28px 90px 1fr 90px 140px;
+              align-items:center;gap:10px;">
+    <span style="font-size:12px;font-weight:700;color:{star_color};">{star}</span>
+    <span style="font-size:12px;color:#E8EDF2;white-space:nowrap;overflow:hidden;
+                 text-overflow:ellipsis;">{row.get('공고명','')[:14]}</span>
+    <div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.8);">{row.get('공고명','')[:35]}{' ...' if len(row.get('공고명',''))>35 else ''}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px;">{reason_short} &nbsp; {loc_badge}</div>
+      {f'<div style="margin-top:3px;">{ai_badge}</div>' if ai_badge else ''}
+    </div>
+    <span style="font-size:11px;color:rgba(255,255,255,0.45);text-align:center;">{dl_txt}</span>
+    <div style="text-align:right;">{status_badge}</div>
+  </div>
+</div>""", unsafe_allow_html=True)
+
+                        # 버튼 행 — 컴팩트하게
+                        b1, b2, b3, b4, b5 = st.columns([1, 1, 1, 1, 6])
+                        with b1:
+                            if st.button("✅", key=f"qt_o_{key}_{i}", help="승인"):
+                                st.session_state['review_state'][key] = "○"; st.rerun()
+                        with b2:
+                            if st.button("❌", key=f"qt_x_{key}_{i}", help="제외"):
+                                st.session_state['review_state'][key] = "✕"; st.rerun()
+                        with b3:
+                            if row.get('공고링크',''):
+                                st.link_button("🔗", row.get('공고링크',''), help="공고 원문")
+                        with b4:
+                            if not ai_res:
+                                if st.button("🤖", key=f"qt_ai_{key}_{i}", help="AI 분석"):
+                                    with st.spinner("분석 중..."):
+                                        co_info = {}
+                                        if 'df_companies_cache' in st.session_state:
+                                            df_co = st.session_state['df_companies_cache']
+                                            co_rows2 = df_co[df_co['기업명']==row['기업명']]
+                                            if not co_rows2.empty:
+                                                co_info = co_rows2.iloc[0].to_dict()
+                                        co_info['기업명'] = row['기업명']
+                                        st.session_state['ai_analysis'][key] = claude_analyze(co_info, row.to_dict())
+                                    st.rerun()
 
             # ══════════════════════════════════════════════
             # 상세 검토 모드 — 기존 카드 뷰
