@@ -67,6 +67,7 @@ NOTICES_FILE     = "notices_db.xlsx"
 HISTORY_FILE     = "send_history.xlsx"
 KEYWORDS_FILE    = "keywords.json"
 DETAIL_FILE      = "notices_detail.xlsx"  # 크롤링 전문 DB
+AI_ANALYSIS_FILE = "ai_analysis.json"     # AI 분석 결과 영구 저장
 CALID_FILE       = "calendar_id.txt"
 CATCAL_FILE      = "category_calendars.json"
 INDCAL_FILE      = "individual_calendars.json"
@@ -360,6 +361,28 @@ REALM_CODE   = {
 }
 # 테스트 수신자 — 설정 탭에서 변경 가능 (session_state 우선)
 _DEFAULT_TEST_RECIPIENTS = ["fbwlgns819@naver.com","fbwlgns819@kip.re.kr"]
+
+
+def save_ai_analysis(drive):
+    """ai_analysis session_state를 드라이브에 영구 저장"""
+    data = st.session_state.get('ai_analysis', {})
+    if not data:
+        return True
+    import json
+    content = json.dumps(data, ensure_ascii=False, indent=None).encode('utf-8')
+    return drive_upload(drive, AI_ANALYSIS_FILE, content, "application/json")
+
+def load_ai_analysis(drive):
+    """드라이브에서 ai_analysis를 복원 → session_state에 저장"""
+    if 'ai_analysis' not in st.session_state:
+        st.session_state['ai_analysis'] = {}
+    saved = load_json(drive, AI_ANALYSIS_FILE)
+    if saved and isinstance(saved, dict):
+        # 기존 session_state와 병합 (새 분석이 우선)
+        merged = {**saved, **st.session_state['ai_analysis']}
+        st.session_state['ai_analysis'] = merged
+        return len(saved)
+    return 0
 
 
 def reason_to_sentence(reason_str):
@@ -1174,6 +1197,17 @@ def info_box(title, desc, how_to=None):
             st.divider()
             st.markdown("**✏️ 수정 방법**")
             st.markdown(how_to)
+
+# ── 앱 초기화 — AI 분석 결과 드라이브에서 복원 ──────
+if 'ai_analysis_loaded' not in st.session_state:
+    try:
+        _drive_init = _get_drive()
+        _loaded = load_ai_analysis(_drive_init)
+        st.session_state['ai_analysis_loaded'] = True
+        if _loaded > 0:
+            pass  # 조용히 복원 (배너 표시 안 함)
+    except Exception:
+        st.session_state['ai_analysis_loaded'] = True  # 실패해도 반복 시도 안 함
 
 # ── CSS ──────────────────────────────────────────────
 st.markdown("""
@@ -2547,7 +2581,8 @@ elif page == "매칭 결과":
                                 if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = {}
                                 st.session_state['ai_analysis'][ai_key] = claude_analyze(ci, ai_row.to_dict())
                             prog_co_ai.progress((ai_i+1)/co_ai_total, text=f"AI 분석 중... {ai_i+1}/{co_ai_total}")
-                        st.success(f"✅ {selected_co} AI 분석 완료"); st.rerun()
+                        save_ai_analysis(_get_drive())
+                        st.success(f"✅ {selected_co} AI 분석 완료 — 드라이브 저장됨"); st.rerun()
 
                 st.divider()
 
@@ -2702,7 +2737,8 @@ elif page == "매칭 결과":
                                     co_info['기업명'] = ai_row['기업명']
                                     st.session_state['ai_analysis'][ai_key] = claude_analyze(co_info, ai_row.to_dict())
                                 prog_ai.progress((ai_i+1)/len(filtered), text=f"AI 분석 중... {ai_i+1}/{len(filtered)}")
-                            st.success(f"완료 — {len(filtered)}건")
+                            save_ai_analysis(_get_drive())
+                            st.success(f"완료 — {len(filtered)}건 (드라이브 저장됨)")
                             st.rerun()
                         else:
                             st.error("확인코드가 틀렸습니다 ('분석실행' 입력)")
