@@ -2199,8 +2199,11 @@ elif page == "매칭 결과":
                 return n_dict
 
             already_sent = set(zip(df_h['기업명'], df_h['pblancId'])) if not df_h.empty else set()
-            all_results  = []; prog = st.progress(0)
+            all_results  = []
+            prog         = st.progress(0, text="매칭 준비 중...")
+            status_area  = st.empty()
             notice_recommend_count = {}
+            match_errors = []
 
             # 피드백 + 가중치 + 제외키워드 통합 로드
             kw_config = load_kw_config(drive)
@@ -2210,30 +2213,53 @@ elif page == "매칭 결과":
             if kw_config.get('exclude_keywords'):
                 st.caption(f"🚫 제외 키워드 {len(kw_config['exclude_keywords'])}개 적용")
 
+            total_cos = len(df_c)
             for idx, (_, row) in enumerate(df_c.iterrows()):
-                scored = [r for _, n in df_n.iterrows()
-                          if (r := score_notice(enrich(n.to_dict()), row, already_sent,
-                                                HIGH, MID, feedback_map, kw_config))]
+                co_name = row.get('기업명', f'기업{idx+1}')
+                prog.progress((idx+1)/total_cos,
+                              text=f"매칭 중... {idx+1}/{total_cos} ({co_name[:10]})")
 
-                for r in scored:
-                    pid = r.get('공고ID','')
-                    cnt = notice_recommend_count.get(pid, 0)
-                    if cnt >= 15:   r['점수'] -= 20  # 15개사 이상: 사실상 차단
-                    elif cnt >= 10: r['점수'] -= 15  # 10개사 이상: 강한 페널티
-                    elif cnt >= 7:  r['점수'] -= 10  # 7개사 이상: 중강 페널티
-                    elif cnt >= 4:  r['점수'] -= 6   # 4개사 이상: 중간 페널티
-                    elif cnt >= 2:  r['점수'] -= 3   # 2개사 이상: 약한 페널티
+                try:
+                    scored = []
+                    for _, n in df_n.iterrows():
+                        try:
+                            r = score_notice(enrich(n.to_dict()), row, already_sent,
+                                             HIGH, MID, feedback_map, kw_config)
+                            if r:
+                                scored.append(r)
+                        except Exception as e_inner:
+                            # 개별 공고 오류는 skip
+                            pass
 
-                scored.sort(key=lambda x: -x['점수'])
-                top = scored[:max_per]
+                    for r in scored:
+                        pid = r.get('공고ID','')
+                        cnt = notice_recommend_count.get(pid, 0)
+                        if cnt >= 15:   r['점수'] -= 20
+                        elif cnt >= 10: r['점수'] -= 15
+                        elif cnt >= 7:  r['점수'] -= 10
+                        elif cnt >= 4:  r['점수'] -= 6
+                        elif cnt >= 2:  r['점수'] -= 3
 
-                for r in top:
-                    pid = r.get('공고ID','')
-                    notice_recommend_count[pid] = notice_recommend_count.get(pid, 0) + 1
-                    r['_recommend_count'] = notice_recommend_count[pid]
+                    scored.sort(key=lambda x: -x['점수'])
+                    top = scored[:max_per]
 
-                all_results.extend(top)
-                prog.progress((idx+1)/len(df_c))
+                    for r in top:
+                        pid = r.get('공고ID','')
+                        notice_recommend_count[pid] = notice_recommend_count.get(pid, 0) + 1
+                        r['_recommend_count'] = notice_recommend_count[pid]
+
+                    all_results.extend(top)
+
+                except Exception as e_outer:
+                    match_errors.append(f"{co_name}: {str(e_outer)[:60]}")
+                    continue
+
+            prog.progress(1.0, text="매칭 완료!")
+
+            if match_errors:
+                with st.expander(f"⚠️ 처리 중 오류 {len(match_errors)}건"):
+                    for err in match_errors:
+                        st.caption(err)
 
             for r in all_results:
                 r['공고유형'] = '공통' if notice_recommend_count.get(r.get('공고ID',''), 1) >= 4 else '맞춤'
