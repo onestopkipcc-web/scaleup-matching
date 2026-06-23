@@ -3403,614 +3403,682 @@ elif page == "안내 메일":
 
     with mail_tab2:
         st.subheader("회신 메일 확인 — 키워드 자동 추출")
-        st.caption("기업이 안내 메일에 답장한 내용을 읽어 키워드를 자동 추출합니다.")
+        st.caption("기업 담당자가 안내 메일에 답장한 내용을 읽어 키워드를 자동 추출합니다.")
 
         df_c_reply = load_excel(drive, SELECTED_FILE)
 
         c1, c2 = st.columns(2)
         with c1:
             reply_label = st.text_input("회신 검색 키워드", value="원스톱 스케일업",
-                placeholder="메일 제목에 포함된 키워드로 회신 검색")
+                placeholder="발송 메일 제목에 포함된 키워드")
         with c2:
             reply_days = st.number_input("최근 N일 회신 검색", value=30, min_value=1, max_value=90)
+
+        st.caption("💡 기업 담당자가 안내 메일에 **답장(Reply)** 하면 자동으로 여기서 확인됩니다.")
 
         if st.button("📬 Gmail 회신 검색", type="primary", key="fetch_replies"):
             with st.spinner("Gmail 회신 검색 중..."):
                 try:
-                    # Gmail API로 회신 검색
                     after_date = (datetime.today() - timedelta(days=int(reply_days))).strftime('%Y/%m/%d')
-                    query = f'subject:{reply_label} after:{after_date}'
+                    # Re: 포함 + 받은 편지함 + 기간 필터
+                    query = f'subject:Re in:inbox after:{after_date}'
                     resp = gapi('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/messages',
-                                params={'q': query, 'maxResults': 50})
-                    msgs = resp.json().get('messages', []) if resp.ok else []
+                                params={'q': query, 'maxResults': 100})
+                    all_msgs = resp.json().get('messages', []) if resp.ok else []
 
-                    if not msgs:
-                        st.info(f"최근 {reply_days}일 내 '{reply_label}' 관련 회신이 없습니다.")
+                    # reply_label 키워드로 추가 필터 (스레드 제목 확인)
+                    st.session_state['reply_msgs'] = all_msgs
+                    st.session_state['reply_label_filter'] = reply_label
+
+                    if not all_msgs:
+                        st.info(f"최근 {reply_days}일 내 받은 회신이 없습니다.")
                     else:
-                        st.success(f"회신 {len(msgs)}건 발견")
-                        st.session_state['reply_msgs'] = msgs
+                        st.success(f"회신 후보 {len(all_msgs)}건 로드 — 아래에서 확인하세요.")
                 except Exception as e:
                     st.error(f"Gmail 검색 실패: {e}")
+
+        def extract_body(payload):
+            """멀티파트 메일에서 본문 텍스트 재귀 추출"""
+            import base64
+            mime = payload.get('mimeType', '')
+            if mime == 'text/plain':
+                data = payload.get('body', {}).get('data', '')
+                if data:
+                    return base64.urlsafe_b64decode(data + '==').decode('utf-8', errors='ignore')
+            elif mime == 'text/html':
+                data = payload.get('body', {}).get('data', '')
+                if data:
+                    html = base64.urlsafe_b64decode(data + '==').decode('utf-8', errors='ignore')
+                    # 태그 제거 후 텍스트만
+                    import re as _re
+                    return _re.sub(r'<[^>]+>', ' ', html)
+            # 멀티파트 재귀
+            for part in payload.get('parts', []):
+                result = extract_body(part)
+                if result and len(result) > 50:
+                    return result
+            return ''
 
         # 회신 목록 표시
         if 'reply_msgs' in st.session_state and st.session_state['reply_msgs']:
             st.divider()
-            st.subheader(f"회신 목록 ({len(st.session_state['reply_msgs'])}건)")
+            label_filter = st.session_state.get('reply_label_filter', '')
+            st.subheader(f"회신 목록")
+            st.caption(f"'{label_filter}' 관련 회신만 표시됩니다.")
 
-            for i, msg_ref in enumerate(st.session_state['reply_msgs'][:20]):
+            shown = 0
+            for i, msg_ref in enumerate(st.session_state['reply_msgs'][:50]):
                 try:
-                    # 메일 상세 읽기
                     resp = gapi('GET',
                         f'https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_ref["id"]}',
                         params={'format': 'full'})
                     if not resp.ok: continue
                     msg = resp.json()
 
-                    headers = {h['name']: h['value'] for h in msg.get('payload', {}).get('headers', [])}
-                    subject  = headers.get('Subject', '(제목 없음)')
-                    sender   = headers.get('From', '(발신자 없음)')
-                    date_str = headers.get('Date', '')[:16]
+                    hdrs    = {h['name']: h['value'] for h in msg.get('payload', {}).get('headers', [])}
+                    subject = hdrs.get('Subject', '')
+                    sender  = hdrs.get('From', '')
+                    date_str= hdrs.get('Date', '')[:16]
 
-                    # 본문 추출
-                    body_text = ''
-                    payload = msg.get('payload', {})
-                    parts = payload.get('parts', [payload])
-                    for part in parts:
-                        if part.get('mimeType') == 'text/plain':
-                            import base64
-                            data = part.get('body', {}).get('data', '')
-                            if data:
-                                body_text = base64.urlsafe_b64decode(data + '==').decode('utf-8', errors='ignore')
-                                break
+                    # label_filter로 필터링 (제목 또는 스레드에 포함 여부)
+                    if label_filter and label_filter not in subject and label_filter not in sender:
+                        # 스레드 확인 없이 제목으로만 필터 — 포함 안 되면 스킵
+                        # (Re: [원스톱 스케일업] 제목이면 포함됨)
+                        if not any(w in subject for w in ['원스톱', 'scaleup', '스케일업', '지원사업']):
+                            continue
 
-                    with st.expander(f"**{sender[:30]}** — {subject[:40]} ({date_str})"):
-                        st.caption(f"발신: {sender}")
-                        st.text_area("회신 내용", value=body_text[:800], height=150,
-                                     key=f"reply_body_{i}", disabled=True)
+                    body_text = extract_body(msg.get('payload', {}))
+                    # 이메일 인용 구분선 이전 내용만 (답장 본문)
+                    import re as _re
+                    for sep in ['On ', '---- ', '-----', '____', '보낸 사람', 'From:']:
+                        idx = body_text.find(sep)
+                        if idx > 100:
+                            body_text = body_text[:idx]
+                            break
+                    body_text = body_text.strip()
 
-                        # 기업명 매칭
+                    shown += 1
+                    with st.expander(f"**{sender[:35]}** — {subject[:40]} ({date_str})"):
+
+                        # 기업명 자동 매칭 (이메일 주소 기준)
                         matched_co = ''
+                        sender_email = _re.search(r'<(.+?)>', sender)
+                        sender_email = sender_email.group(1) if sender_email else sender
                         if not df_c_reply.empty:
                             for _, row in df_c_reply.iterrows():
-                                co = row.get('기업명', '')
-                                email = str(row.get('이메일', ''))
-                                if email and email.lower() in sender.lower():
-                                    matched_co = co
+                                co_email = str(row.get('이메일', '')).strip().lower()
+                                if co_email and co_email == sender_email.lower():
+                                    matched_co = row.get('기업명', '')
                                     break
 
                         if matched_co:
-                            st.success(f"✅ 매칭된 기업: **{matched_co}**")
+                            st.success(f"✅ 매칭 기업: **{matched_co}**")
                         else:
+                            st.caption(f"발신: {sender_email}")
                             matched_co = st.selectbox("기업 선택 (수동 매칭)",
                                 [''] + (df_c_reply['기업명'].tolist() if not df_c_reply.empty else []),
                                 key=f"reply_co_{i}")
 
+                        # 회신 본문 표시
+                        if body_text:
+                            st.text_area("회신 내용 (답장 본문)", value=body_text[:800],
+                                         height=130, key=f"reply_body_{i}", disabled=True)
+                        else:
+                            st.warning("본문을 읽을 수 없습니다.")
+
+                        # 키워드 추출
                         if body_text and st.button("🤖 키워드 자동 추출", key=f"extract_{i}"):
                             with st.spinner("Claude 분석 중..."):
-                                prompt = f"""아래는 지원사업 안내 메일에 대한 기업 담당자의 회신입니다.
-이 내용에서 매칭에 활용할 수 있는 기업의 기술/제품 키워드와 필요 지원 유형을 추출해주세요.
+                                prompt = f"""아래는 정부 지원사업 안내 메일에 대한 기업 담당자의 회신입니다.
+이 회신에서 매칭에 활용할 수 있는 정보를 추출해주세요.
 
 회신 내용:
-{body_text[:1000]}
+{body_text[:1500]}
 
-다음 JSON 형식으로만 응답하세요:
+JSON 형식으로만 응답 (다른 텍스트 없이):
 {{
-  "기술키워드": ["키워드1", "키워드2", ...],
-  "필요지원": ["지원유형1", "지원유형2", ...],
+  "기술키워드": ["귀사 기술/제품 관련 구체적 키워드"],
+  "필요지원": ["필요한 지원 유형"],
+  "수출관심국": ["관심 수출 국가 (있다면)"],
   "요약": "한 줄 요약"
 }}"""
                                 try:
                                     import json as _json
                                     res = claude_call_raw(prompt)
-                                    extracted = _json.loads(res)
-                                    st.session_state[f'extracted_{i}'] = extracted
+                                    # JSON 블록만 추출
+                                    import re as _re2
+                                    json_match = _re2.search(r'\{.*\}', res, _re2.DOTALL)
+                                    if json_match:
+                                        extracted = _json.loads(json_match.group())
+                                        st.session_state[f'extracted_{i}'] = extracted
+                                    else:
+                                        st.error("JSON 파싱 실패")
                                 except Exception as e:
                                     st.error(f"추출 실패: {e}")
 
-                        # 추출 결과 표시
+                        # 추출 결과
                         if f'extracted_{i}' in st.session_state:
                             ext = st.session_state[f'extracted_{i}']
-                            st.markdown("**추출된 키워드:**")
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                st.caption("기술 키워드")
-                                kws = ext.get('기술키워드', [])
-                                st.write(', '.join(kws))
-                            with c2:
-                                st.caption("필요 지원")
-                                sup = ext.get('필요지원', [])
-                                st.write(', '.join(sup))
+                            kws = ext.get('기술키워드', [])
+                            sup = ext.get('필요지원', [])
+                            exp = ext.get('수출관심국', [])
+
+                            col_a, col_b, col_c = st.columns(3)
+                            with col_a:
+                                st.caption("**기술 키워드**")
+                                st.write(', '.join(kws) if kws else '—')
+                            with col_b:
+                                st.caption("**필요 지원**")
+                                st.write(', '.join(sup) if sup else '—')
+                            with col_c:
+                                st.caption("**수출 관심국**")
+                                st.write(', '.join(exp) if exp else '—')
                             st.caption(f"요약: {ext.get('요약','')}")
 
-                            if matched_co and st.button(f"💾 {matched_co} 키워드 저장",
-                                                         key=f"save_reply_{i}", type="primary"):
-                                df_c_reply2 = load_excel(drive, SELECTED_FILE)
-                                mask = df_c_reply2['기업명'] == matched_co
-                                if mask.any():
-                                    existing = str(df_c_reply2.loc[mask, '키워드보완'].values[0] or '')
-                                    new_kws   = ', '.join(kws + sup)
-                                    merged    = ', '.join(filter(None, [existing, new_kws]))
-                                    df_c_reply2.loc[mask, '키워드보완'] = merged
-                                    if save_excel(drive, df_c_reply2, SELECTED_FILE,
-                                                  "선정기업명단", "1F4E79"):
-                                        st.success(f"✅ {matched_co} 키워드 저장 완료")
-                                    else:
-                                        st.error("저장 실패")
+                            if matched_co and (kws or sup):
+                                if st.button(f"💾 {matched_co} 키워드 저장",
+                                             key=f"save_reply_{i}", type="primary"):
+                                    df_c2 = load_excel(drive, SELECTED_FILE)
+                                    mask  = df_c2['기업명'] == matched_co
+                                    if mask.any():
+                                        existing = str(df_c2.loc[mask, '키워드보완'].values[0] or '')
+                                        new_kws  = ', '.join(kws + sup)
+                                        merged   = ', '.join(filter(None, [existing, new_kws]))
+                                        df_c2.loc[mask, '키워드보완'] = merged
+                                        if exp:
+                                            # 수출국가 컬럼도 업데이트
+                                            existing_exp = str(df_c2.loc[mask, '수출국가'].values[0] or '')
+                                            df_c2.loc[mask, '수출국가'] = ', '.join(
+                                                filter(None, [existing_exp, ', '.join(exp)]))
+                                        if save_excel(drive, df_c2, SELECTED_FILE, "선정기업명단", "1F4E79"):
+                                            st.success(f"✅ {matched_co} 키워드 저장 완료 → 다음 매칭에 반영됩니다")
+                                        else:
+                                            st.error("저장 실패")
+                            elif not matched_co:
+                                st.warning("저장하려면 위에서 기업을 선택하세요.")
 
                 except Exception as e:
-                    st.caption(f"메일 읽기 오류: {e}")
                     continue
+
+            if shown == 0:
+                st.info(f"'{label_filter}' 관련 회신이 없습니다. 검색 키워드를 변경해보세요.")
 
     with mail_tab1:
         info_box("안내 메일",
             """
 공고 매칭과 무관한 일반 안내 메일을 선정/예비 기업에게 발송합니다.
+
+**활용 예시**
+- 첫 안내 메일 (선정 축하 + 회신 요청)
+- 교육 프로그램 수요조사
+- 성과집계 조사 요청
+- 서류 제출 안내
             """,
             "발송 대상 선택 → 제목/내용 작성 → 미리보기 확인 → 발송")
 
-    with st.spinner("기업 명단 로딩 중..."):
-        df_c = load_excel(drive, SELECTED_FILE)
+        with st.spinner("기업 명단 로딩 중..."):
+            df_c = load_excel(drive, SELECTED_FILE)
 
-    if df_c.empty:
-        st.warning("선정기업 명단이 없습니다. 기업 관리 탭에서 먼저 업로드하세요.")
-        st.stop()
+        if df_c.empty:
+            st.warning("선정기업 명단이 없습니다. 기업 관리 탭에서 먼저 업로드하세요.")
+            st.stop()
 
-    for col in ['수신거부','선정구분']:
-        if col not in df_c.columns: df_c[col] = ''
+        for col in ['수신거부','선정구분']:
+            if col not in df_c.columns: df_c[col] = ''
 
-    st.subheader("① 발송 대상 선택")
-    has_status = '선정구분' in df_c.columns and df_c['선정구분'].str.strip().ne('').any()
+        st.subheader("① 발송 대상 선택")
+        has_status = '선정구분' in df_c.columns and df_c['선정구분'].str.strip().ne('').any()
 
-    col1, col2 = st.columns(2)
-    with col1:
+        col1, col2 = st.columns(2)
+        with col1:
+            if has_status:
+                target_group = st.radio(
+                    "발송 그룹",
+                    ["선정 50개사", "예비 20개사", "전체 70개사", "직접 선택"],
+                    horizontal=False, key="notice_mail_group"
+                )
+            else:
+                target_group = "전체"
+
+        # 대상 기업 필터링
+        df_active = df_c[df_c['수신거부'] != 'Y'].copy()
         if has_status:
-            target_group = st.radio(
-                "발송 그룹",
-                ["선정 50개사", "예비 20개사", "전체 70개사", "직접 선택"],
-                horizontal=False, key="notice_mail_group"
-            )
-        else:
-            target_group = "전체"
-
-    # 대상 기업 필터링
-    df_active = df_c[df_c['수신거부'] != 'Y'].copy()
-    if has_status:
-        if target_group == "선정 50개사":
-            df_target = df_active[df_active['선정구분'] == '선정']
-        elif target_group == "예비 20개사":
-            df_target = df_active[df_active['선정구분'] == '예비']
-        elif target_group == "직접 선택":
-            selected_names = st.multiselect(
-                "기업 직접 선택", df_active['기업명'].tolist(), key="notice_mail_select"
-            )
-            df_target = df_active[df_active['기업명'].isin(selected_names)]
+            if target_group == "선정 50개사":
+                df_target = df_active[df_active['선정구분'] == '선정']
+            elif target_group == "예비 20개사":
+                df_target = df_active[df_active['선정구분'] == '예비']
+            elif target_group == "직접 선택":
+                selected_names = st.multiselect(
+                    "기업 직접 선택", df_active['기업명'].tolist(), key="notice_mail_select"
+                )
+                df_target = df_active[df_active['기업명'].isin(selected_names)]
+            else:
+                df_target = df_active
         else:
             df_target = df_active
-    else:
-        df_target = df_active
 
-    with col2:
-        st.metric("발송 대상", f"{len(df_target)}개사")
-        if not df_target.empty:
-            email_count = df_target['이메일'].str.strip().ne('').sum()
-            st.metric("이메일 보유", f"{email_count}개사")
+        with col2:
+            st.metric("발송 대상", f"{len(df_target)}개사")
+            if not df_target.empty:
+                email_count = df_target['이메일'].str.strip().ne('').sum()
+                st.metric("이메일 보유", f"{email_count}개사")
 
-    st.divider()
-    st.subheader("② 메일 내용 작성")
+        st.divider()
+        st.subheader("② 메일 내용 작성")
 
-    # 템플릿 선택
-    template_choice = st.selectbox("템플릿 선택 (직접 수정 가능)", [
-        "직접 작성",
-        "첫 안내 메일 (맞춤 매칭 신청 포함)",
-        "선정 기업 축하 및 프로그램 안내",
-        "교육 프로그램 수요조사",
-        "성과집계 조사 요청",
-        "서류 제출 안내",
-    ], key="notice_mail_template")
+        # 템플릿 선택
+        template_choice = st.selectbox("템플릿 선택 (직접 수정 가능)", [
+            "직접 작성",
+            "첫 안내 메일 (맞춤 매칭 신청 포함)",
+            "선정 기업 축하 및 프로그램 안내",
+            "교육 프로그램 수요조사",
+            "성과집계 조사 요청",
+            "서류 제출 안내",
+        ], key="notice_mail_template")
 
-    TEMPLATES = {
-        "첫 안내 메일 (맞춤 매칭 신청 포함)": {
-            "subject": "[원스톱 스케일업] 2026년 선정을 축하드립니다 — 맞춤 지원사업 안내 시작",
-            "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
+        TEMPLATES = {
+            "첫 안내 메일 (맞춤 매칭 신청 포함)": {
+                "subject": "[원스톱 스케일업] 2026년 선정을 축하드립니다 — 맞춤 지원사업 안내 시작",
+                "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
 
-귀사가 2026년 원스톱 스케일업 프로그램 선정 기업으로 확정되셨음을 진심으로 축하드립니다.
+    귀사가 2026년 원스톱 스케일업 프로그램 선정 기업으로 확정되셨음을 진심으로 축하드립니다.
 
-본 프로그램은 혁신제품 지정기업, G-PASS 기업, 우수조달기업 등 우수한 조달·수출 역량을 갖춘 기업에 맞춤형 지원사업 정보를 제공하고, 해외 판로 개척 및 공공조달 시장 진출을 집중 지원하는 사업입니다.
+    본 프로그램은 혁신제품 지정기업, G-PASS 기업, 우수조달기업 등 우수한 조달·수출 역량을 갖춘 기업에 맞춤형 지원사업 정보를 제공하고, 해외 판로 개척 및 공공조달 시장 진출을 집중 지원하는 사업입니다.
 
-▣ 운영 방식
-저희 팀은 매월 bizinfo, 조달청, KOTRA 등에서 수집한 지원사업 공고 중 귀사에 적합한 공고를 선별하여 정기적으로 안내해드립니다.
+    ▣ 운영 방식
+    저희 팀은 매월 bizinfo, 조달청, KOTRA 등에서 수집한 지원사업 공고 중 귀사에 적합한 공고를 선별하여 정기적으로 안내해드립니다.
 
-▣ 맞춤 매칭을 위한 정보 요청
-더 정확한 공고 매칭을 위해 아래 링크를 통해 귀사의 관심 분야와 필요 지원 유형을 알려주시면 감사하겠습니다. (3분 소요)
+    ▣ 맞춤 매칭을 위한 정보 요청
+    더 정확한 공고 매칭을 위해 아래 링크를 통해 귀사의 관심 분야와 필요 지원 유형을 알려주시면 감사하겠습니다. (3분 소요)
 
-📋 맞춤 지원사업 신청 설문: [링크]
-응답 기한: [응답 기한]
+    📋 맞춤 지원사업 신청 설문: [링크]
+    응답 기한: [응답 기한]
 
-▣ 주요 지원 내용
-- 맞춤형 지원사업 공고 발굴 및 정기 안내 (월 1~2회)
-- 해외조달시장(G-PASS, KONEPS, UN조달 등) 진출 컨설팅
-- 조달·수출 역량강화 교육 프로그램
-- 성과 분석 및 피드백 제공
+    ▣ 주요 지원 내용
+    - 맞춤형 지원사업 공고 발굴 및 정기 안내 (월 1~2회)
+    - 해외조달시장(G-PASS, KONEPS, UN조달 등) 진출 컨설팅
+    - 조달·수출 역량강화 교육 프로그램
+    - 성과 분석 및 피드백 제공
 
-앞으로 함께하는 프로그램 기간 동안 귀사의 성장에 도움이 될 수 있도록 최선을 다하겠습니다.
+    앞으로 함께하는 프로그램 기간 동안 귀사의 성장에 도움이 될 수 있도록 최선을 다하겠습니다.
 
-문의사항은 아래 연락처로 편하게 연락 주시기 바랍니다.
-감사합니다.""",
-        },
-        "선정 기업 축하 및 프로그램 안내": {
-            "subject": "[원스톱 스케일업] 2026년 선정 기업 안내 드립니다",
-            "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
+    문의사항은 아래 연락처로 편하게 연락 주시기 바랍니다.
+    감사합니다.""",
+            },
+            "선정 기업 축하 및 프로그램 안내": {
+                "subject": "[원스톱 스케일업] 2026년 선정 기업 안내 드립니다",
+                "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
 
-귀사가 2026년 원스톱 스케일업 프로그램 참여 기업으로 선정되셨음을 진심으로 축하드립니다.
+    귀사가 2026년 원스톱 스케일업 프로그램 참여 기업으로 선정되셨음을 진심으로 축하드립니다.
 
-본 프로그램은 혁신제품 지정기업, G-PASS 기업, 우수조달기업 등 조달·수출 역량을 갖춘 기업의 해외 판로 개척 및 공공조달 시장 진출을 집중 지원하기 위해 기획되었습니다.
+    본 프로그램은 혁신제품 지정기업, G-PASS 기업, 우수조달기업 등 조달·수출 역량을 갖춘 기업의 해외 판로 개척 및 공공조달 시장 진출을 집중 지원하기 위해 기획되었습니다.
 
-▣ 주요 지원 내용
-- 맞춤형 지원사업 공고 발굴 및 정기 안내
-- 해외조달시장(G-PASS, KONEPS 연계 등) 진출 컨설팅
-- 조달·수출 분야 역량강화 교육 프로그램
-- 성과 분석 및 지속적 피드백 제공
+    ▣ 주요 지원 내용
+    - 맞춤형 지원사업 공고 발굴 및 정기 안내
+    - 해외조달시장(G-PASS, KONEPS 연계 등) 진출 컨설팅
+    - 조달·수출 분야 역량강화 교육 프로그램
+    - 성과 분석 및 지속적 피드백 제공
 
-향후 운영 일정과 세부 안내는 순차적으로 말씀드릴 예정입니다. 프로그램 운영 기간 동안 적극적인 참여와 관심 부탁드립니다.
+    향후 운영 일정과 세부 안내는 순차적으로 말씀드릴 예정입니다. 프로그램 운영 기간 동안 적극적인 참여와 관심 부탁드립니다.
 
-문의사항이 있으시면 아래 연락처로 편하게 연락 주시기 바랍니다.
-감사합니다.""",
-        },
-        "교육 프로그램 수요조사": {
-            "subject": "[원스톱 스케일업] 역량강화 교육 프로그램 수요조사 안내",
-            "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
+    문의사항이 있으시면 아래 연락처로 편하게 연락 주시기 바랍니다.
+    감사합니다.""",
+            },
+            "교육 프로그램 수요조사": {
+                "subject": "[원스톱 스케일업] 역량강화 교육 프로그램 수요조사 안내",
+                "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
 
-2026년 하반기 역량강화 교육 프로그램 편성을 위해 수요조사를 진행합니다.
-귀사에 실질적으로 도움이 되는 교육을 기획하고자 하오니, 3분 내외의 짧은 응답 부탁드립니다.
+    2026년 하반기 역량강화 교육 프로그램 편성을 위해 수요조사를 진행합니다.
+    귀사에 실질적으로 도움이 되는 교육을 기획하고자 하오니, 3분 내외의 짧은 응답 부탁드립니다.
 
-📋 수요조사 참여하기: [링크]
-응답 기한: [응답 기한]
+    📋 수요조사 참여하기: [링크]
+    응답 기한: [응답 기한]
 
-▣ 주요 조사 항목
-- 희망 교육 분야 (해외조달, 수출바우처 활용, 혁신제품 지정, IP·인증 등)
-- 선호 교육 방식 (온라인/오프라인, 집합교육/1:1 컨설팅)
-- 희망 교육 시간 및 일정
+    ▣ 주요 조사 항목
+    - 희망 교육 분야 (해외조달, 수출바우처 활용, 혁신제품 지정, IP·인증 등)
+    - 선호 교육 방식 (온라인/오프라인, 집합교육/1:1 컨설팅)
+    - 희망 교육 시간 및 일정
 
-수요조사 결과는 교육 프로그램 편성에 직접 반영될 예정입니다.
-바쁘신 와중에도 귀한 시간 내어 주셔서 감사합니다.""",
-        },
-        "성과집계 조사 요청": {
-            "subject": "[원스톱 스케일업] 프로그램 참여 성과 자료 제출 요청",
-            "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
+    수요조사 결과는 교육 프로그램 편성에 직접 반영될 예정입니다.
+    바쁘신 와중에도 귀한 시간 내어 주셔서 감사합니다.""",
+            },
+            "성과집계 조사 요청": {
+                "subject": "[원스톱 스케일업] 프로그램 참여 성과 자료 제출 요청",
+                "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
 
-2026년 원스톱 스케일업 프로그램 운영 성과 집계를 위해 참여 기업의 성과 현황 파악이 필요합니다.
-아래 안내에 따라 기한 내 자료 제출을 부탁드립니다.
+    2026년 원스톱 스케일업 프로그램 운영 성과 집계를 위해 참여 기업의 성과 현황 파악이 필요합니다.
+    아래 안내에 따라 기한 내 자료 제출을 부탁드립니다.
 
-▣ 제출 항목
-- 프로그램 참여 후 지원사업 신청·선정 현황
-- 해외 수출 계약 또는 해외조달시장 진입 실적
-- 혁신제품 지정, G-PASS 등 인증 취득 현황
-- 기타 프로그램 활용 성과
+    ▣ 제출 항목
+    - 프로그램 참여 후 지원사업 신청·선정 현황
+    - 해외 수출 계약 또는 해외조달시장 진입 실적
+    - 혁신제품 지정, G-PASS 등 인증 취득 현황
+    - 기타 프로그램 활용 성과
 
-📋 성과 입력 링크: [링크]
-제출 기한: [제출 기한]
+    📋 성과 입력 링크: [링크]
+    제출 기한: [제출 기한]
 
-제출해 주신 자료는 프로그램 개선 및 정책 보고 목적으로만 활용되며, 개별 정보는 외부에 공개되지 않습니다.
-협조해 주셔서 감사합니다.""",
-        },
-        "서류 제출 안내": {
-            "subject": "[원스톱 스케일업] 참여 확약서 및 필수 서류 제출 안내",
-            "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
+    제출해 주신 자료는 프로그램 개선 및 정책 보고 목적으로만 활용되며, 개별 정보는 외부에 공개되지 않습니다.
+    협조해 주셔서 감사합니다.""",
+            },
+            "서류 제출 안내": {
+                "subject": "[원스톱 스케일업] 참여 확약서 및 필수 서류 제출 안내",
+                "body": """안녕하세요, 혁신제품지원센터 원스톱 스케일업 운영팀입니다.
 
-2026년 원스톱 스케일업 프로그램 참여를 위한 필수 서류 제출을 안내드립니다.
-아래 항목을 확인하시고 기한 내에 제출하여 주시기 바랍니다.
+    2026년 원스톱 스케일업 프로그램 참여를 위한 필수 서류 제출을 안내드립니다.
+    아래 항목을 확인하시고 기한 내에 제출하여 주시기 바랍니다.
 
-▣ 제출 서류
-1. 프로그램 참여 확약서 (서명 후 스캔 또는 사진 첨부)
-2. 사업자등록증 사본
-3. 기업 소개자료 (제품 및 기술 개요 포함, A4 2페이지 이내)
+    ▣ 제출 서류
+    1. 프로그램 참여 확약서 (서명 후 스캔 또는 사진 첨부)
+    2. 사업자등록증 사본
+    3. 기업 소개자료 (제품 및 기술 개요 포함, A4 2페이지 이내)
 
-📋 서류 제출 방법: [제출 링크 또는 이메일 안내]
-제출 기한: [제출 기한]
-제출처: onestop.kipcc@gmail.com
+    📋 서류 제출 방법: [제출 링크 또는 이메일 안내]
+    제출 기한: [제출 기한]
+    제출처: onestop.kipcc@gmail.com
 
-기한 내 미제출 시 프로그램 참여가 제한될 수 있으니 반드시 기한을 준수해 주시기 바랍니다.
-서류 관련 문의사항은 아래 운영팀으로 연락 주시기 바랍니다.
-감사합니다.""",
-        },
-    }
+    기한 내 미제출 시 프로그램 참여가 제한될 수 있으니 반드시 기한을 준수해 주시기 바랍니다.
+    서류 관련 문의사항은 아래 운영팀으로 연락 주시기 바랍니다.
+    감사합니다.""",
+            },
+        }
 
-    # 템플릿 선택 시 session_state를 직접 갱신 → text_input/text_area에 즉시 반영
-    # (Streamlit에서 value= 파라미터는 최초 렌더링에만 적용되므로 session_state 방식 필요)
-    prev_template = st.session_state.get('_prev_notice_template', '')
-    if template_choice != prev_template:
-        st.session_state['_prev_notice_template'] = template_choice
-        if template_choice != "직접 작성" and template_choice in TEMPLATES:
-            st.session_state['notice_mail_subject'] = TEMPLATES[template_choice]["subject"]
-            st.session_state['notice_mail_body']    = TEMPLATES[template_choice]["body"]
+        # 템플릿 선택 시 session_state를 직접 갱신 → text_input/text_area에 즉시 반영
+        # (Streamlit에서 value= 파라미터는 최초 렌더링에만 적용되므로 session_state 방식 필요)
+        prev_template = st.session_state.get('_prev_notice_template', '')
+        if template_choice != prev_template:
+            st.session_state['_prev_notice_template'] = template_choice
+            if template_choice != "직접 작성" and template_choice in TEMPLATES:
+                st.session_state['notice_mail_subject'] = TEMPLATES[template_choice]["subject"]
+                st.session_state['notice_mail_body']    = TEMPLATES[template_choice]["body"]
+            else:
+                st.session_state['notice_mail_subject'] = ""
+                st.session_state['notice_mail_body']    = ""
+            st.rerun()
+
+        mail_subject = st.text_input("제목", key="notice_mail_subject")
+        mail_body    = st.text_area("본문", height=300, key="notice_mail_body",
+                                    help="수신자 이름은 자동으로 '[기업명] 담당자님'으로 삽입됩니다.")
+        form_link    = st.text_input("📋 구글 폼 링크 (선택사항)", placeholder="https://forms.gle/...",
+                                     key="notice_mail_form")
+
+        st.divider()
+        st.subheader("③ 발송 미리보기")
+
+        if df_target.empty:
+            st.warning("발송 대상 기업이 없습니다.")
+        elif not mail_subject or not mail_body:
+            st.info("제목과 본문을 작성하면 미리보기가 표시됩니다.")
         else:
-            st.session_state['notice_mail_subject'] = ""
-            st.session_state['notice_mail_body']    = ""
-        st.rerun()
+            sample_company = df_target.iloc[0]['기업명'] if not df_target.empty else "샘플기업"
+            today_str = datetime.today().strftime('%Y.%m.%d')
 
-    mail_subject = st.text_input("제목", key="notice_mail_subject")
-    mail_body    = st.text_area("본문", height=300, key="notice_mail_body",
-                                help="수신자 이름은 자동으로 '[기업명] 담당자님'으로 삽입됩니다.")
-    form_link    = st.text_input("📋 구글 폼 링크 (선택사항)", placeholder="https://forms.gle/...",
-                                 key="notice_mail_form")
+            form_section = ""
+            if form_link:
+                form_section = f"""
+                <div style="background:rgba(74,158,255,0.1);border:1px solid rgba(74,158,255,0.3);
+                            border-radius:8px;padding:16px 18px;margin:16px 0;">
+                  <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#10B981;letter-spacing:1.5px;">
+                    📋 설문/폼 링크
+                  </p>
+                  <a href="{form_link}" style="font-size:13px;color:#10B981;">{form_link}</a>
+                </div>"""
 
-    st.divider()
-    st.subheader("③ 발송 미리보기")
+            body_html = mail_body.replace('\n', '<br>')
 
-    if df_target.empty:
-        st.warning("발송 대상 기업이 없습니다.")
-    elif not mail_subject or not mail_body:
-        st.info("제목과 본문을 작성하면 미리보기가 표시됩니다.")
-    else:
-        sample_company = df_target.iloc[0]['기업명'] if not df_target.empty else "샘플기업"
-        today_str = datetime.today().strftime('%Y.%m.%d')
+            sample_html = f"""<!DOCTYPE html>
+    <html lang="ko">
+    <head><meta charset="UTF-8"></head>
+    <body style="margin:0;padding:0;background:#F2F4F7;
+                 font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#F2F4F7;padding:36px 0 52px;">
+    <tr><td align="center">
+    <table width="560" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="background:#ffffff;border-radius:14px 14px 0 0;
+                   padding:20px 28px;border-bottom:1px solid #E8ECF0;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td valign="middle">
+                <span style="font-size:15px;font-weight:700;color:#1F4E79;">혁신제품지원센터</span>
+              </td>
+              <td align="right" valign="middle">
+                <p style="margin:0;font-size:11px;color:#A0ADB8;">{today_str}</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#0F1D2E;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="padding:28px 28px 20px;
+                         background:linear-gradient(150deg,#0D1B2A 0%,#132B47 100%);
+                         border-bottom:1px solid rgba(255,255,255,0.06);">
+                <p style="margin:0 0 2px;font-size:10px;font-weight:700;letter-spacing:2.5px;
+                           color:rgba(255,255,255,0.3);text-transform:uppercase;">
+                  원스톱 스케일업 안내
+                </p>
+                <h1 style="margin:6px 0 0;font-size:22px;font-weight:800;color:#FFFFFF;line-height:1.3;">
+                  {mail_subject}
+                </h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 28px;background:#0F1D2E;">
+                <div style="padding:14px 18px;background:rgba(255,255,255,0.05);
+                            border-radius:8px;border-left:3px solid #10B981;margin-bottom:20px;">
+                  <p style="margin:0;font-size:14px;font-weight:600;color:#FFFFFF;">
+                    {sample_company}
+                    <span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);margin-left:4px;">담당자님</span>
+                  </p>
+                </div>
+                <div style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.9;">
+                  {body_html}
+                </div>
+                {form_section}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#ffffff;border-radius:0 0 14px 14px;
+                   padding:18px 28px;border-top:1px solid #E8ECF0;">
+          <p style="margin:0;font-size:12px;color:#8A96A3;line-height:1.9;">
+            혁신제품지원센터 원스톱 스케일업 운영팀<br>
+            <a href="mailto:onestop.kipcc@gmail.com"
+               style="color:#1F4E79;text-decoration:none;font-weight:600;">
+              onestop.kipcc@gmail.com
+            </a>
+          </p>
+        </td>
+      </tr>
+    </table>
+    </td></tr></table>
+    </body></html>"""
 
-        form_section = ""
-        if form_link:
-            form_section = f"""
-            <div style="background:rgba(74,158,255,0.1);border:1px solid rgba(74,158,255,0.3);
-                        border-radius:8px;padding:16px 18px;margin:16px 0;">
-              <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#10B981;letter-spacing:1.5px;">
-                📋 설문/폼 링크
-              </p>
-              <a href="{form_link}" style="font-size:13px;color:#10B981;">{form_link}</a>
-            </div>"""
+            with st.expander(f"📧 미리보기 — {sample_company}", expanded=True):
+                st.components.v1.html(sample_html, height=500, scrolling=True)
 
-        body_html = mail_body.replace('\n', '<br>')
+            st.divider()
+            st.subheader("④ 발송 실행")
 
-        sample_html = f"""<!DOCTYPE html>
-<html lang="ko">
-<head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#F2F4F7;
-             font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#F2F4F7;padding:36px 0 52px;">
-<tr><td align="center">
-<table width="560" cellpadding="0" cellspacing="0">
-  <tr>
-    <td style="background:#ffffff;border-radius:14px 14px 0 0;
-               padding:20px 28px;border-bottom:1px solid #E8ECF0;">
-      <table width="100%" cellpadding="0" cellspacing="0">
-        <tr>
-          <td valign="middle">
-            <span style="font-size:15px;font-weight:700;color:#1F4E79;">혁신제품지원센터</span>
-          </td>
-          <td align="right" valign="middle">
-            <p style="margin:0;font-size:11px;color:#A0ADB8;">{today_str}</p>
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-  <tr>
-    <td style="background:#0F1D2E;">
-      <table width="100%" cellpadding="0" cellspacing="0">
-        <tr>
-          <td style="padding:28px 28px 20px;
-                     background:linear-gradient(150deg,#0D1B2A 0%,#132B47 100%);
-                     border-bottom:1px solid rgba(255,255,255,0.06);">
-            <p style="margin:0 0 2px;font-size:10px;font-weight:700;letter-spacing:2.5px;
-                       color:rgba(255,255,255,0.3);text-transform:uppercase;">
-              원스톱 스케일업 안내
-            </p>
-            <h1 style="margin:6px 0 0;font-size:22px;font-weight:800;color:#FFFFFF;line-height:1.3;">
-              {mail_subject}
-            </h1>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:24px 28px;background:#0F1D2E;">
-            <div style="padding:14px 18px;background:rgba(255,255,255,0.05);
-                        border-radius:8px;border-left:3px solid #10B981;margin-bottom:20px;">
-              <p style="margin:0;font-size:14px;font-weight:600;color:#FFFFFF;">
-                {sample_company}
-                <span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);margin-left:4px;">담당자님</span>
-              </p>
-            </div>
-            <div style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.9;">
-              {body_html}
-            </div>
-            {form_section}
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-  <tr>
-    <td style="background:#ffffff;border-radius:0 0 14px 14px;
-               padding:18px 28px;border-top:1px solid #E8ECF0;">
-      <p style="margin:0;font-size:12px;color:#8A96A3;line-height:1.9;">
-        혁신제품지원센터 원스톱 스케일업 운영팀<br>
-        <a href="mailto:onestop.kipcc@gmail.com"
-           style="color:#1F4E79;text-decoration:none;font-weight:600;">
-          onestop.kipcc@gmail.com
-        </a>
-      </p>
-    </td>
-  </tr>
-</table>
-</td></tr></table>
-</body></html>"""
+            c1, c2 = st.columns(2)
+            with c1:
+                st.info(f"**발송 대상:** {target_group if has_status else '전체'} ({len(df_target)}개사)")
+            with c2:
+                no_email = df_target[df_target['이메일'].str.strip() == '']
+                if not no_email.empty:
+                    st.warning(f"이메일 없는 기업 {len(no_email)}개사는 발송 제외됩니다.")
 
-        with st.expander(f"📧 미리보기 — {sample_company}", expanded=True):
-            st.components.v1.html(sample_html, height=500, scrolling=True)
+            if test_mode:
+                st.warning("⚠️ 테스트 모드 — 본인 메일로만 발송됩니다.")
 
-        st.divider()
-        st.subheader("④ 발송 실행")
+            if st.button("📤 안내 메일 발송", type="primary", key="notice_mail_send"):
+                from email.mime.multipart import MIMEMultipart
+                from email.mime.text import MIMEText
+                import base64
 
-        c1, c2 = st.columns(2)
-        with c1:
-            st.info(f"**발송 대상:** {target_group if has_status else '전체'} ({len(df_target)}개사)")
-        with c2:
-            no_email = df_target[df_target['이메일'].str.strip() == '']
-            if not no_email.empty:
-                st.warning(f"이메일 없는 기업 {len(no_email)}개사는 발송 제외됩니다.")
+                df_send = df_target[df_target['이메일'].str.strip() != '']
+                prog = st.progress(0); log_area = st.empty(); logs = []
+                ok_count = fail_count = 0
 
-        if test_mode:
-            st.warning("⚠️ 테스트 모드 — 본인 메일로만 발송됩니다.")
+                for i, (_, row) in enumerate(df_send.iterrows()):
+                    company  = row['기업명']
+                    to_email = row['이메일'].strip() if not test_mode else get_test_recipients()[0]
+                    today_str = datetime.today().strftime('%Y.%m.%d')
+                    body_html_co = mail_body.replace('\n', '<br>')
 
-        if st.button("📤 안내 메일 발송", type="primary", key="notice_mail_send"):
-            from email.mime.multipart import MIMEMultipart
-            from email.mime.text import MIMEText
-            import base64
+                    form_sec_co = ""
+                    if form_link:
+                        form_sec_co = f"""
+                        <div style="background:rgba(74,158,255,0.1);border:1px solid rgba(74,158,255,0.3);
+                                    border-radius:8px;padding:16px 18px;margin:16px 0;">
+                          <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#10B981;letter-spacing:1.5px;">
+                            📋 설문/폼 링크
+                          </p>
+                          <a href="{form_link}" style="font-size:13px;color:#10B981;">{form_link}</a>
+                        </div>"""
 
-            df_send = df_target[df_target['이메일'].str.strip() != '']
-            prog = st.progress(0); log_area = st.empty(); logs = []
-            ok_count = fail_count = 0
+                    html_body = f"""<!DOCTYPE html>
+    <html lang="ko"><head><meta charset="UTF-8"></head>
+    <body style="margin:0;padding:0;background:#F2F4F7;
+                 font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#F2F4F7;padding:36px 0 52px;">
+    <tr><td align="center">
+    <table width="560" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="background:#ffffff;border-radius:14px 14px 0 0;
+                   padding:20px 28px;border-bottom:1px solid #E8ECF0;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td valign="middle">
+                <span style="font-size:15px;font-weight:700;color:#1F4E79;">혁신제품지원센터</span>
+              </td>
+              <td align="right">
+                <p style="margin:0;font-size:11px;color:#A0ADB8;">{today_str}</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#0F1D2E;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="padding:28px 28px 20px;
+                         background:linear-gradient(150deg,#0D1B2A 0%,#132B47 100%);
+                         border-bottom:1px solid rgba(255,255,255,0.06);">
+                <p style="margin:0 0 2px;font-size:10px;font-weight:700;letter-spacing:2.5px;
+                           color:rgba(255,255,255,0.3);text-transform:uppercase;">
+                  원스톱 스케일업 안내
+                </p>
+                <h1 style="margin:6px 0 0;font-size:22px;font-weight:800;color:#FFFFFF;line-height:1.3;">
+                  {mail_subject}
+                </h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 28px;background:#0F1D2E;">
+                <div style="padding:14px 18px;background:rgba(255,255,255,0.05);
+                            border-radius:8px;border-left:3px solid #10B981;margin-bottom:20px;">
+                  <p style="margin:0;font-size:14px;font-weight:600;color:#FFFFFF;">
+                    {company}
+                    <span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);margin-left:4px;">담당자님</span>
+                  </p>
+                </div>
+                <div style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.9;">
+                  {body_html_co}
+                </div>
+                {form_sec_co}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#ffffff;border-radius:0 0 14px 14px;
+                   padding:18px 28px;border-top:1px solid #E8ECF0;">
+          <p style="margin:0;font-size:12px;color:#8A96A3;line-height:1.9;">
+            혁신제품지원센터 원스톱 스케일업 운영팀<br>
+            <a href="mailto:onestop.kipcc@gmail.com"
+               style="color:#1F4E79;text-decoration:none;font-weight:600;">
+              onestop.kipcc@gmail.com
+            </a>
+          </p>
+        </td>
+      </tr>
+    </table>
+    </td></tr></table>
+    </body></html>"""
 
-            for i, (_, row) in enumerate(df_send.iterrows()):
-                company  = row['기업명']
-                to_email = row['이메일'].strip() if not test_mode else get_test_recipients()[0]
-                today_str = datetime.today().strftime('%Y.%m.%d')
-                body_html_co = mail_body.replace('\n', '<br>')
+                    try:
+                        msg = MIMEMultipart('alternative')
+                        msg['Subject'] = mail_subject if not test_mode else f"[TEST] {mail_subject}"
+                        msg['From']    = "onestop.kipcc@gmail.com"
+                        msg['To']      = to_email
+                        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+                        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+                        gmail_send(raw)
+                        ok_count += 1
+                        logs.append(f"✅ {company} → {to_email}")
+                    except Exception as e:
+                        fail_count += 1
+                        logs.append(f"❌ {company} — {str(e)[:40]}")
 
-                form_sec_co = ""
-                if form_link:
-                    form_sec_co = f"""
-                    <div style="background:rgba(74,158,255,0.1);border:1px solid rgba(74,158,255,0.3);
-                                border-radius:8px;padding:16px 18px;margin:16px 0;">
-                      <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#10B981;letter-spacing:1.5px;">
-                        📋 설문/폼 링크
-                      </p>
-                      <a href="{form_link}" style="font-size:13px;color:#10B981;">{form_link}</a>
-                    </div>"""
+                    prog.progress((i+1)/len(df_send))
+                    log_area.code("\n".join(logs[-10:]))
 
-                html_body = f"""<!DOCTYPE html>
-<html lang="ko"><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#F2F4F7;
-             font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#F2F4F7;padding:36px 0 52px;">
-<tr><td align="center">
-<table width="560" cellpadding="0" cellspacing="0">
-  <tr>
-    <td style="background:#ffffff;border-radius:14px 14px 0 0;
-               padding:20px 28px;border-bottom:1px solid #E8ECF0;">
-      <table width="100%" cellpadding="0" cellspacing="0">
-        <tr>
-          <td valign="middle">
-            <span style="font-size:15px;font-weight:700;color:#1F4E79;">혁신제품지원센터</span>
-          </td>
-          <td align="right">
-            <p style="margin:0;font-size:11px;color:#A0ADB8;">{today_str}</p>
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-  <tr>
-    <td style="background:#0F1D2E;">
-      <table width="100%" cellpadding="0" cellspacing="0">
-        <tr>
-          <td style="padding:28px 28px 20px;
-                     background:linear-gradient(150deg,#0D1B2A 0%,#132B47 100%);
-                     border-bottom:1px solid rgba(255,255,255,0.06);">
-            <p style="margin:0 0 2px;font-size:10px;font-weight:700;letter-spacing:2.5px;
-                       color:rgba(255,255,255,0.3);text-transform:uppercase;">
-              원스톱 스케일업 안내
-            </p>
-            <h1 style="margin:6px 0 0;font-size:22px;font-weight:800;color:#FFFFFF;line-height:1.3;">
-              {mail_subject}
-            </h1>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:24px 28px;background:#0F1D2E;">
-            <div style="padding:14px 18px;background:rgba(255,255,255,0.05);
-                        border-radius:8px;border-left:3px solid #10B981;margin-bottom:20px;">
-              <p style="margin:0;font-size:14px;font-weight:600;color:#FFFFFF;">
-                {company}
-                <span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);margin-left:4px;">담당자님</span>
-              </p>
-            </div>
-            <div style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.9;">
-              {body_html_co}
-            </div>
-            {form_sec_co}
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-  <tr>
-    <td style="background:#ffffff;border-radius:0 0 14px 14px;
-               padding:18px 28px;border-top:1px solid #E8ECF0;">
-      <p style="margin:0;font-size:12px;color:#8A96A3;line-height:1.9;">
-        혁신제품지원센터 원스톱 스케일업 운영팀<br>
-        <a href="mailto:onestop.kipcc@gmail.com"
-           style="color:#1F4E79;text-decoration:none;font-weight:600;">
-          onestop.kipcc@gmail.com
-        </a>
-      </p>
-    </td>
-  </tr>
-</table>
-</td></tr></table>
-</body></html>"""
-
-                try:
-                    msg = MIMEMultipart('alternative')
-                    msg['Subject'] = mail_subject if not test_mode else f"[TEST] {mail_subject}"
-                    msg['From']    = "onestop.kipcc@gmail.com"
-                    msg['To']      = to_email
-                    msg.attach(MIMEText(html_body, 'html', 'utf-8'))
-                    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
-                    gmail_send(raw)
-                    ok_count += 1
-                    logs.append(f"✅ {company} → {to_email}")
-                except Exception as e:
-                    fail_count += 1
-                    logs.append(f"❌ {company} — {str(e)[:40]}")
-
-                prog.progress((i+1)/len(df_send))
-                log_area.code("\n".join(logs[-10:]))
-
-            if ok_count > 0:
-                st.success(f"✅ 발송 완료 — 성공 {ok_count}건 / 실패 {fail_count}건")
-            if fail_count > 0:
-                st.error(f"실패 {fail_count}건 — 로그를 확인하세요.")
+                if ok_count > 0:
+                    st.success(f"✅ 발송 완료 — 성공 {ok_count}건 / 실패 {fail_count}건")
+                if fail_count > 0:
+                    st.error(f"실패 {fail_count}건 — 로그를 확인하세요.")
 
 
 
-    drive = _get_drive()
-    st.title("발송 이력")
-    info_box("발송 이력",
-        """
-발송 완료 건 기록 + 성과 추적
+        drive = _get_drive()
+        st.title("발송 이력")
+        info_box("발송 이력",
+            """
+    발송 완료 건 기록 + 성과 추적
 
-**자동 기록** — 기업명·공고명·발송일·매칭점수
-**담당자 직접 입력** — 신청여부(Y/N)·선정결과(선정/미선정/대기)
+    **자동 기록** — 기업명·공고명·발송일·매칭점수
+    **담당자 직접 입력** — 신청여부(Y/N)·선정결과(선정/미선정/대기)
 
-**중복 발송 방지** — 이 이력 기반으로 이미 발송한 공고는 다음 매칭에서 자동 제외
-재발송 필요 시 해당 행 삭제 후 저장
-        """,
-        "특정 행 삭제 → 표에서 행 선택 후 Delete → '드라이브 저장' 클릭")
+    **중복 발송 방지** — 이 이력 기반으로 이미 발송한 공고는 다음 매칭에서 자동 제외
+    재발송 필요 시 해당 행 삭제 후 저장
+            """,
+            "특정 행 삭제 → 표에서 행 선택 후 Delete → '드라이브 저장' 클릭")
 
-    with st.spinner("드라이브 이력 로딩 중..."):
-        df_h = load_excel(drive, HISTORY_FILE)
+        with st.spinner("드라이브 이력 로딩 중..."):
+            df_h = load_excel(drive, HISTORY_FILE)
 
-    if df_h.empty:
-        st.info("발송 이력 없음")
-    else:
-        c1,c2,c3 = st.columns(3)
-        c1.metric("총 발송", len(df_h))
-        c2.metric("신청 건", (df_h['신청여부']=='Y').sum() if '신청여부' in df_h.columns else 0)
-        c3.metric("선정 건", (df_h['선정결과']=='선정').sum() if '선정결과' in df_h.columns else 0)
-        st.divider()
+        if df_h.empty:
+            st.info("발송 이력 없음")
+        else:
+            c1,c2,c3 = st.columns(3)
+            c1.metric("총 발송", len(df_h))
+            c2.metric("신청 건", (df_h['신청여부']=='Y').sum() if '신청여부' in df_h.columns else 0)
+            c3.metric("선정 건", (df_h['선정결과']=='선정').sum() if '선정결과' in df_h.columns else 0)
+            st.divider()
 
-        edited = st.data_editor(df_h, use_container_width=True, hide_index=True,
-            column_config={
-                "신청여부":st.column_config.SelectboxColumn("신청여부",options=["","Y","N"]),
-                "선정결과":st.column_config.SelectboxColumn("선정결과",options=["","선정","미선정","대기"]),
-            })
-        if st.button("💾 드라이브 저장"):
-            with st.spinner("저장 중..."):
-                save_excel(drive, edited, HISTORY_FILE, "발송이력", "375623")
-            st.success("저장 완료")
+            edited = st.data_editor(df_h, use_container_width=True, hide_index=True,
+                column_config={
+                    "신청여부":st.column_config.SelectboxColumn("신청여부",options=["","Y","N"]),
+                    "선정결과":st.column_config.SelectboxColumn("선정결과",options=["","선정","미선정","대기"]),
+                })
+            if st.button("💾 드라이브 저장"):
+                with st.spinner("저장 중..."):
+                    save_excel(drive, edited, HISTORY_FILE, "발송이력", "375623")
+                st.success("저장 완료")
 
-        st.divider()
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine='openpyxl') as w: df_h.to_excel(w, index=False)
-        st.download_button("📥 엑셀 다운로드", buf.getvalue(), HISTORY_FILE,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.divider()
+            buf = io.BytesIO()
+            with pd.ExcelWriter(buf, engine='openpyxl') as w: df_h.to_excel(w, index=False)
+            st.download_button("📥 엑셀 다운로드", buf.getvalue(), HISTORY_FILE,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 # ══════════════════════════════════════════════════════
@@ -4589,6 +4657,7 @@ elif page == "캘린더 관리":
 
 
 
+elif page == "설정":
     drive = _get_drive()
     st.title("설정")
     info_box("설정",
