@@ -35,13 +35,16 @@ def check_password():
                   border:1px solid #A7F3D0;border-radius:14px;
                   display:flex;align-items:center;justify-content:center;
                   margin:0 auto 20px;font-size:24px;box-shadow:0 2px 8px rgba(16,185,129,0.15);">📢</div>
-      <h2 style="color:#0F172A;font-size:22px;font-weight:700;margin:0 0 6px;">원스톱 스케일업</h2>
-      <p style="color:#64748B;font-size:13px;margin:0 0 32px;">혁신제품지원센터 공고 매칭 시스템</p>
+      <h2 style="color:#0F172A;font-size:22px;font-weight:700;margin:0 0 6px;
+                 font-family:'Inter','Apple SD Gothic Neo',sans-serif;">원스톱 스케일업</h2>
+      <p style="color:#64748B;font-size:13px;margin:0 0 32px;
+                font-family:'Inter','Apple SD Gothic Neo',sans-serif;">혁신제품지원센터 공고 매칭 시스템</p>
     </div>
     """, unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        pw = st.text_input("비밀번호", type="password", placeholder="비밀번호 입력", label_visibility="collapsed")
+        pw = st.text_input("비밀번호", type="password",
+                           placeholder="비밀번호 입력", label_visibility="collapsed")
         if st.button("로그인", use_container_width=True, type="primary"):
             correct = st.secrets.get("password", "scaleup2026")
             if pw == correct:
@@ -1140,59 +1143,35 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-/* ══ Streamlit 다크 테마 전면 오버라이드 ══
-   Streamlit이 기본으로 주입하는 모든 어두운 색상을 라이트로 덮습니다 */
-*, *::before, *::after { box-sizing: border-box; }
-
-/* 전체 배경 */
-html, body, #root, #root > div, .stApp, .main,
-.block-container, section.main, [data-testid="stAppViewContainer"],
-[data-testid="stMain"], [data-testid="stHeader"] {
-  background: #F8FAFC !important;
-  color: #0F172A !important;
-}
-
-/* Streamlit이 렌더링하는 모든 div 기본 배경 초기화 */
-.stApp > div, .stApp section, .stApp article {
-  background: transparent !important;
-}
-
-/* ── 전역 변수 ── */
 :root {
-  --bg:         #F8FAFC;
-  --surface:    #FFFFFF;
-  --surface-2:  #F1F5F9;
-  --border:     #E2E8F0;
-  --border-2:   #CBD5E1;
-  --text-1:     #0F172A;
-  --text-2:     #475569;
-  --text-3:     #94A3B8;
-  --accent:     #10B981;
-  --accent-light: #D1FAE5;
+  --accent:       #10B981;
+  --accent-light: #ECFDF5;
   --accent-dark:  #059669;
-  --blue:       #3B82F6;
-  --blue-light: #DBEAFE;
-  --yellow:     #F59E0B;
-  --yellow-light:#FEF3C7;
-  --red:        #EF4444;
-  --red-light:  #FEE2E2;
-  --radius:     8px;
-  --shadow:     0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:  0 4px 6px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
+  --border:       #E2E8F0;
+  --border-2:     #CBD5E1;
+  --surface:      #FFFFFF;
+  --bg:           #F8FAFC;
+  --text-1:       #0F172A;
+  --text-2:       #475569;
+  --text-3:       #94A3B8;
+  --blue:         #3B82F6;
+  --yellow:       #F59E0B;
+  --red:          #EF4444;
+  --radius:       8px;
+  --shadow:       0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md:    0 4px 12px rgba(0,0,0,0.08);
 }
 
-/* ── 전체 ── */
+/* ── 전체 폰트 ── */
 .stApp {
-  background: var(--bg) !important;
   font-family: 'Inter','Apple SD Gothic Neo','Malgun Gothic',sans-serif !important;
+  background: var(--bg) !important;
 }
-.stApp, .stApp * { color: var(--text-1) !important; }
 
 /* ── 타이포 ── */
 h1 { font-size:22px !important; font-weight:700 !important; color:var(--text-1) !important; letter-spacing:-0.3px !important; }
 h2 { font-size:17px !important; font-weight:600 !important; color:var(--text-1) !important; }
 h3 { font-size:15px !important; font-weight:600 !important; color:var(--text-1) !important; }
-p, li, div, label, span { color:var(--text-1) !important; font-size:14px !important; line-height:1.6 !important; }
 strong { color:var(--accent-dark) !important; font-weight:600 !important; }
 code {
   color:var(--accent-dark) !important;
@@ -1200,27 +1179,7 @@ code {
   border-radius:4px !important; padding:1px 6px !important; font-size:12px !important;
 }
 
-/* ── 사이드바 ── */
-[data-testid="stSidebar"] {
-  background: var(--surface) !important;
-  border-right: 1px solid var(--border) !important;
-  box-shadow: var(--shadow) !important;
-}
-[data-testid="stSidebar"] * { color: var(--text-1) !important; }
-[data-testid="stSidebarNav"] { display:none; }
-[data-testid="stSidebar"] .stRadio label {
-  border-radius: var(--radius) !important;
-  padding: 6px 10px !important;
-  color: var(--text-2) !important;
-}
-[data-testid="stSidebar"] .stRadio [aria-checked="true"] + label,
-[data-testid="stSidebar"] .stRadio label:has(input:checked) {
-  background: var(--accent-light) !important;
-  color: var(--accent-dark) !important;
-  font-weight: 600 !important;
-}
-
-/* ── 메트릭 ── */
+/* ── 메트릭 카드 ── */
 [data-testid="metric-container"] {
   background: var(--surface) !important;
   border: 1px solid var(--border) !important;
@@ -1229,242 +1188,61 @@ code {
   box-shadow: var(--shadow) !important;
 }
 [data-testid="stMetricLabel"] {
+  font-size: 11px !important; font-weight:500 !important;
+  text-transform: uppercase !important; letter-spacing:0.5px !important;
   color: var(--text-2) !important;
-  font-size: 11px !important;
-  font-weight: 500 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.5px !important;
 }
-[data-testid="stMetricValue"] {
-  color: var(--text-1) !important;
-  font-size: 24px !important;
-  font-weight: 700 !important;
-}
-[data-testid="stMetricDelta"] { font-size: 12px !important; }
+[data-testid="stMetricValue"] { font-size:24px !important; font-weight:700 !important; }
 
-/* ── 버튼 ── */
-.stButton button {
-  background: var(--surface) !important;
-  color: var(--text-1) !important;
-  border: 1px solid var(--border-2) !important;
-  border-radius: var(--radius) !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  padding: 6px 14px !important;
-  box-shadow: var(--shadow) !important;
-  transition: all 0.15s !important;
-}
-.stButton button:hover {
-  border-color: var(--accent) !important;
-  color: var(--accent-dark) !important;
-  box-shadow: var(--shadow-md) !important;
-}
+/* ── primary 버튼 ── */
 button[kind="primary"] {
   background: var(--accent) !important;
-  color: #fff !important;
-  border: none !important;
-  font-weight: 600 !important;
+  color: #fff !important; border:none !important; font-weight:600 !important;
   box-shadow: 0 1px 3px rgba(16,185,129,0.3) !important;
 }
-button[kind="primary"]:hover {
-  background: var(--accent-dark) !important;
-  box-shadow: 0 4px 8px rgba(16,185,129,0.3) !important;
-}
+button[kind="primary"]:hover { background: var(--accent-dark) !important; }
 
-/* ── 입력창 ── */
-.stTextInput input, .stTextArea textarea,
-.stTextInput > div, .stTextArea > div,
-.stTextInput > div > div, .stTextArea > div > div {
-  background: var(--surface) !important;
-  color: var(--text-1) !important;
-  border: 1px solid var(--border-2) !important;
+/* ── 일반 버튼 ── */
+.stButton button {
   border-radius: var(--radius) !important;
-  font-size: 14px !important;
-  box-shadow: var(--shadow) !important;
+  font-size:13px !important; font-weight:500 !important;
+  border: 1px solid var(--border-2) !important;
+  transition: all 0.15s !important;
 }
-/* Streamlit이 주입하는 textarea 래퍼 어두운 배경 제거 */
-[data-baseweb="textarea"] { background: var(--surface) !important; }
-[data-baseweb="textarea"] textarea { background: var(--surface) !important; color: var(--text-1) !important; }
-[data-baseweb="base-input"] { background: var(--surface) !important; }
+.stButton button:hover { border-color: var(--accent) !important; color: var(--accent-dark) !important; }
+
+/* ── 입력창 포커스 ── */
 .stTextInput input:focus, .stTextArea textarea:focus {
   border-color: var(--accent) !important;
   box-shadow: 0 0 0 3px rgba(16,185,129,0.15) !important;
-  outline: none !important;
-}
-/* 모든 input/textarea 부모 컨테이너 배경 강제 */
-.stTextArea > label + div,
-.stTextInput > label + div { background: var(--surface) !important; }
-.stSelectbox div[data-baseweb="select"] {
-  background: var(--surface) !important;
-  border: 1px solid var(--border-2) !important;
-  border-radius: var(--radius) !important;
-  box-shadow: var(--shadow) !important;
-}
-.stSelectbox div[data-baseweb="select"] * { color: var(--text-1) !important; }
-/* selectbox 내부 컨트롤 배경 강제 */
-[data-baseweb="select"] > div { background: var(--surface) !important; }
-[data-baseweb="select"] > div > div { background: var(--surface) !important; color: var(--text-1) !important; }
-/* multiselect */
-.stMultiSelect [data-baseweb="select"] { background: var(--surface) !important; }
-.stMultiSelect [data-baseweb="select"] > div { background: var(--surface) !important; }
-[data-baseweb="tag"] { background: var(--accent-light) !important; color: var(--accent-dark) !important; }
-/* 드롭다운 팝오버 — body 포탈로 렌더링되므로 최상위에서 덮어쓰기 */
-[data-baseweb="popover"],
-[data-baseweb="popover"] *,
-body > div[data-baseweb="popover"],
-body > div[role="listbox"],
-body > div[data-baseweb="tooltip"] {
-  background: #FFFFFF !important;
-  color: #0F172A !important;
-  border: 1px solid #E2E8F0 !important;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important;
-}
-[data-baseweb="menu"],
-[data-baseweb="menu"] *,
-body > div [data-baseweb="menu"],
-body > div [data-baseweb="menu"] * {
-  background: #FFFFFF !important;
-  color: #0F172A !important;
-}
-[data-baseweb="menu"] li,
-[data-baseweb="menu"] [role="option"] {
-  background: #FFFFFF !important;
-  color: #0F172A !important;
-  font-size: 13px !important;
-}
-[data-baseweb="menu"] li:hover,
-[data-baseweb="menu"] [role="option"]:hover,
-[data-baseweb="menu"] li[aria-selected="true"],
-[data-baseweb="menu"] [role="option"][aria-selected="true"] {
-  background: #ECFDF5 !important;
-  color: #059669 !important;
-}
-/* 팝오버 내 모든 div 배경 강제 */
-[data-baseweb="popover"] div,
-[data-baseweb="popover"] ul,
-[data-baseweb="popover"] li {
-  background: #FFFFFF !important;
-  color: #0F172A !important;
-}
-/* Streamlit 어두운 인라인 스타일 덮어쓰기 — RGB 값으로 매칭 */
-div[style*="background: rgb(38, 39, 48)"],
-div[style*="background-color: rgb(38, 39, 48)"],
-div[style*="background: rgb(14, 17, 23)"],
-div[style*="background-color: rgb(14, 17, 23)"],
-div[style*="background: rgb(26, 28, 36)"],
-div[style*="background-color: rgb(26, 28, 36)"],
-div[style*="background: rgb(17, 23, 29)"],
-div[style*="background-color: rgb(17, 23, 29)"] {
-  background: #FFFFFF !important;
-  color: #0F172A !important;
-}
-div[style*="background: rgb(38, 39, 48)"] *,
-div[style*="background: rgb(14, 17, 23)"] *,
-div[style*="background: rgb(26, 28, 36)"] *,
-div[style*="background: rgb(17, 23, 29)"] * {
-  color: #0F172A !important;
 }
 
 /* ── 탭 ── */
 .stTabs [data-baseweb="tab-list"] {
-  background: transparent !important;
   border-bottom: 2px solid var(--border) !important;
-  gap: 2px !important;
-}
-.stTabs [data-baseweb="tab"] {
-  color: var(--text-2) !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  padding: 8px 16px !important;
-  background: transparent !important;
-  border-radius: 6px 6px 0 0 !important;
 }
 .stTabs [aria-selected="true"] {
   color: var(--accent-dark) !important;
-  font-weight: 600 !important;
+  font-weight:600 !important;
   border-bottom: 2px solid var(--accent) !important;
   background: var(--accent-light) !important;
 }
 
-/* ── Expander ── */
-.streamlit-expanderHeader {
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--radius) !important;
-  color: var(--text-1) !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  box-shadow: var(--shadow) !important;
-}
-.streamlit-expanderContent {
-  background: var(--surface-2) !important;
-  border: 1px solid var(--border) !important;
-  border-top: none !important;
-  border-radius: 0 0 var(--radius) var(--radius) !important;
-}
-
 /* ── 알림 박스 ── */
-.stSuccess {
-  background: #ECFDF5 !important;
-  border: 1px solid #A7F3D0 !important;
-  border-left: 3px solid var(--accent) !important;
-  border-radius: var(--radius) !important;
-}
 .stSuccess, .stSuccess * { color: #065F46 !important; }
-.stWarning {
-  background: #FFFBEB !important;
-  border: 1px solid #FDE68A !important;
-  border-left: 3px solid var(--yellow) !important;
-  border-radius: var(--radius) !important;
-}
+.stSuccess { background: #ECFDF5 !important; border-left: 3px solid var(--accent) !important; border-radius:var(--radius) !important; }
 .stWarning, .stWarning * { color: #78350F !important; }
-.stError {
-  background: #FEF2F2 !important;
-  border: 1px solid #FECACA !important;
-  border-left: 3px solid var(--red) !important;
-  border-radius: var(--radius) !important;
-}
+.stWarning { background: #FFFBEB !important; border-left: 3px solid var(--yellow) !important; border-radius:var(--radius) !important; }
 .stError, .stError * { color: #7F1D1D !important; }
-.stInfo {
-  background: #EFF6FF !important;
-  border: 1px solid #BFDBFE !important;
-  border-left: 3px solid var(--blue) !important;
-  border-radius: var(--radius) !important;
-}
+.stError { background: #FEF2F2 !important; border-left: 3px solid var(--red) !important; border-radius:var(--radius) !important; }
 .stInfo, .stInfo * { color: #1E3A8A !important; }
+.stInfo { background: #EFF6FF !important; border-left: 3px solid var(--blue) !important; border-radius:var(--radius) !important; }
 
 /* ── 구분선 ── */
 hr { border: none !important; border-top: 1px solid var(--border) !important; }
 
 /* ── 캡션 ── */
-.stCaption, [data-testid="stCaptionContainer"] {
-  color: var(--text-3) !important; font-size: 12px !important;
-}
-
-/* ── 데이터프레임 ── */
-.stDataFrame {
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--radius) !important;
-  box-shadow: var(--shadow) !important;
-}
-.stDataFrame * { color: var(--text-1) !important; font-size: 13px !important; }
-.stDataFrame th { background: var(--surface-2) !important; font-weight:600 !important; }
-
-/* ── 슬라이더 — 트랙 연회색, 핸들+진행바만 에메랄드 ── */
-.stSlider * { color: var(--text-1) !important; }
-[data-testid="stSlider"] > div > div { background: var(--border) !important; }
-[data-testid="stSlider"] [role="progressbar"] { background: var(--accent) !important; }
-[data-testid="stSlider"] [role="slider"] {
-  background: var(--accent) !important;
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px rgba(16,185,129,0.2) !important;
-}
-
-/* ── 체크박스 / 토글 / 라디오 ── */
-.stCheckbox label, .stCheckbox span { color: var(--text-1) !important; }
-.stToggle label { color: var(--text-1) !important; }
-.stRadio label  { color: var(--text-1) !important; font-size:14px !important; }
+.stCaption, [data-testid="stCaptionContainer"] { color: var(--text-3) !important; font-size:12px !important; }
 
 /* ── progress ── */
 .stProgress > div > div { background: var(--accent) !important; }
@@ -1472,19 +1250,12 @@ hr { border: none !important; border-top: 1px solid var(--border) !important; }
 
 /* ── link button ── */
 .stLinkButton a {
-  background: var(--surface) !important;
-  color: var(--text-1) !important;
   border: 1px solid var(--border-2) !important;
   border-radius: var(--radius) !important;
-  font-size: 13px !important;
-  text-decoration: none !important;
-  padding: 5px 12px !important;
-  box-shadow: var(--shadow) !important;
+  font-size:13px !important; text-decoration:none !important;
+  transition: all 0.15s !important;
 }
-.stLinkButton a:hover {
-  border-color: var(--accent) !important;
-  color: var(--accent-dark) !important;
-}
+.stLinkButton a:hover { border-color: var(--accent) !important; color: var(--accent-dark) !important; }
 
 /* ── 사이드바 항상 표시 ── */
 [data-testid="stSidebarCollapseButton"] { display:none !important; }
@@ -1503,8 +1274,15 @@ div[data-testid="stStatusWidget"] { display:none !important; }
 #MainMenu { visibility:hidden; }
 footer    { visibility:hidden; }
 header    { visibility:hidden; }
+
+/* ── 슬라이더 진행바만 에메랄드 ── */
+[data-testid="stSlider"] [role="progressbar"] { background: var(--accent) !important; }
+[data-testid="stSlider"] [role="slider"] {
+  background: var(--accent) !important; border-color: var(--accent) !important;
+}
 </style>
 """, unsafe_allow_html=True)
+
 
 # ── 사이드바 ──────────────────────────────────────────
 with st.sidebar:
@@ -2317,6 +2095,13 @@ elif page == "매칭 결과":
 
         # ── 스마트 매칭 권고 알림 ────────────────────────
         df_n_check = load_excel(drive, NOTICES_FILE)
+
+        # 드라이브에서 마지막 매칭 정보 복원 (앱 재시작 후에도 유지)
+        if 'last_match_info' not in st.session_state:
+            kw_saved = load_json(drive, KEYWORDS_FILE) or {}
+            if 'last_match' in kw_saved:
+                st.session_state['last_match_info'] = kw_saved['last_match']
+
         last_match_info = st.session_state.get('last_match_info', {})
         need_rematch    = False
         rematch_reason  = ""
@@ -2456,12 +2241,19 @@ elif page == "매칭 결과":
             enriched_count = len(detail_map)
             st.session_state['match_results'] = all_results
             st.session_state['df_companies_cache'] = df_c
-            # 매칭 실행 정보 저장 - 재실행 권고 판단에 활용
-            st.session_state['last_match_info'] = {
+            # 매칭 실행 정보 저장 — session_state + 드라이브 JSON (앱 재시작 후에도 유지)
+            match_info = {
                 'date':         datetime.today().strftime('%Y-%m-%d'),
+                'time':         datetime.today().strftime('%H:%M'),
                 'notice_count': len(df_n),
                 'result_count': len(all_results),
+                'target_group': target_group,
             }
+            st.session_state['last_match_info'] = match_info
+            # 드라이브에도 저장
+            kw_data_save = load_json(drive, KEYWORDS_FILE) or {}
+            kw_data_save['last_match'] = match_info
+            save_json(drive, kw_data_save, KEYWORDS_FILE)
             st.success(
                 f"✅ 매칭 완료 — 총 {len(all_results)}건 "
                 f"(전문 DB {enriched_count}건 반영 / 공고 총 {df_n.shape[0]}건 중 매칭) "
