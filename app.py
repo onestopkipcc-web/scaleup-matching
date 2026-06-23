@@ -1140,6 +1140,23 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+/* ══ Streamlit 다크 테마 전면 오버라이드 ══
+   Streamlit이 기본으로 주입하는 모든 어두운 색상을 라이트로 덮습니다 */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* 전체 배경 */
+html, body, #root, #root > div, .stApp, .main,
+.block-container, section.main, [data-testid="stAppViewContainer"],
+[data-testid="stMain"], [data-testid="stHeader"] {
+  background: #F8FAFC !important;
+  color: #0F172A !important;
+}
+
+/* Streamlit이 렌더링하는 모든 div 기본 배경 초기화 */
+.stApp > div, .stApp section, .stApp article {
+  background: transparent !important;
+}
+
 /* ── 전역 변수 ── */
 :root {
   --bg:         #F8FAFC;
@@ -1291,26 +1308,61 @@ button[kind="primary"]:hover {
 .stMultiSelect [data-baseweb="select"] { background: var(--surface) !important; }
 .stMultiSelect [data-baseweb="select"] > div { background: var(--surface) !important; }
 [data-baseweb="tag"] { background: var(--accent-light) !important; color: var(--accent-dark) !important; }
-/* 드롭다운 팝오버 */
-[data-baseweb="popover"] { background: var(--surface) !important; border: 1px solid var(--border) !important; box-shadow: var(--shadow-md) !important; }
-[data-baseweb="menu"]    { background: var(--surface) !important; }
-[data-baseweb="menu"] li { color: var(--text-1) !important; background: var(--surface) !important; }
-[data-baseweb="menu"] li:hover { background: var(--accent-light) !important; color: var(--accent-dark) !important; }
-[data-baseweb="menu"] [aria-selected="true"] { background: var(--accent-light) !important; color: var(--accent-dark) !important; }
-
-/* ── 모든 어두운 배경 강제 제거 (Streamlit 내부 잔재) ── */
-div[class*="block-container"] { background: transparent !important; }
-[data-testid="stVerticalBlock"] { background: transparent !important; }
-/* 어두운 배경 컨테이너 덮어쓰기 */
-div[style*="background-color: rgb(14, 17, 23)"],
-div[style*="background-color: rgb(26, 28, 36)"],
-div[style*="background: rgb(14, 17, 23)"],
-div[style*="background: rgb(26, 28, 36)"] {
-  background: var(--surface) !important;
+/* 드롭다운 팝오버 — body 포탈로 렌더링되므로 최상위에서 덮어쓰기 */
+[data-baseweb="popover"],
+[data-baseweb="popover"] *,
+body > div[data-baseweb="popover"],
+body > div[role="listbox"],
+body > div[data-baseweb="tooltip"] {
+  background: #FFFFFF !important;
+  color: #0F172A !important;
+  border: 1px solid #E2E8F0 !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important;
 }
-div[style*="background-color: rgba(14, 17, 23"],
-div[style*="background-color: rgba(26, 28, 36"] {
-  background: var(--surface) !important;
+[data-baseweb="menu"],
+[data-baseweb="menu"] *,
+body > div [data-baseweb="menu"],
+body > div [data-baseweb="menu"] * {
+  background: #FFFFFF !important;
+  color: #0F172A !important;
+}
+[data-baseweb="menu"] li,
+[data-baseweb="menu"] [role="option"] {
+  background: #FFFFFF !important;
+  color: #0F172A !important;
+  font-size: 13px !important;
+}
+[data-baseweb="menu"] li:hover,
+[data-baseweb="menu"] [role="option"]:hover,
+[data-baseweb="menu"] li[aria-selected="true"],
+[data-baseweb="menu"] [role="option"][aria-selected="true"] {
+  background: #ECFDF5 !important;
+  color: #059669 !important;
+}
+/* 팝오버 내 모든 div 배경 강제 */
+[data-baseweb="popover"] div,
+[data-baseweb="popover"] ul,
+[data-baseweb="popover"] li {
+  background: #FFFFFF !important;
+  color: #0F172A !important;
+}
+/* Streamlit 어두운 인라인 스타일 덮어쓰기 — RGB 값으로 매칭 */
+div[style*="background: rgb(38, 39, 48)"],
+div[style*="background-color: rgb(38, 39, 48)"],
+div[style*="background: rgb(14, 17, 23)"],
+div[style*="background-color: rgb(14, 17, 23)"],
+div[style*="background: rgb(26, 28, 36)"],
+div[style*="background-color: rgb(26, 28, 36)"],
+div[style*="background: rgb(17, 23, 29)"],
+div[style*="background-color: rgb(17, 23, 29)"] {
+  background: #FFFFFF !important;
+  color: #0F172A !important;
+}
+div[style*="background: rgb(38, 39, 48)"] *,
+div[style*="background: rgb(14, 17, 23)"] *,
+div[style*="background: rgb(26, 28, 36)"] *,
+div[style*="background: rgb(17, 23, 29)"] * {
+  color: #0F172A !important;
 }
 
 /* ── 탭 ── */
