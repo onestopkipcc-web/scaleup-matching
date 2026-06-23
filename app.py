@@ -1270,34 +1270,33 @@ button[kind="primary"]:hover {
 
 /* ── 알림 박스 ── */
 .stSuccess {
-  background: var(--accent-light) !important;
-  border: 1px solid rgba(16,185,129,0.3) !important;
+  background: #ECFDF5 !important;
+  border: 1px solid #A7F3D0 !important;
   border-left: 3px solid var(--accent) !important;
   border-radius: var(--radius) !important;
-  color: var(--text-1) !important;
 }
-.stSuccess * { color: var(--accent-dark) !important; }
+.stSuccess, .stSuccess * { color: #065F46 !important; }
 .stWarning {
-  background: var(--yellow-light) !important;
-  border: 1px solid rgba(245,158,11,0.3) !important;
+  background: #FFFBEB !important;
+  border: 1px solid #FDE68A !important;
   border-left: 3px solid var(--yellow) !important;
   border-radius: var(--radius) !important;
 }
-.stWarning * { color: #92400E !important; }
+.stWarning, .stWarning * { color: #78350F !important; }
 .stError {
-  background: var(--red-light) !important;
-  border: 1px solid rgba(239,68,68,0.3) !important;
+  background: #FEF2F2 !important;
+  border: 1px solid #FECACA !important;
   border-left: 3px solid var(--red) !important;
   border-radius: var(--radius) !important;
 }
-.stError * { color: #991B1B !important; }
+.stError, .stError * { color: #7F1D1D !important; }
 .stInfo {
-  background: var(--blue-light) !important;
-  border: 1px solid rgba(59,130,246,0.3) !important;
+  background: #EFF6FF !important;
+  border: 1px solid #BFDBFE !important;
   border-left: 3px solid var(--blue) !important;
   border-radius: var(--radius) !important;
 }
-.stInfo * { color: #1E40AF !important; }
+.stInfo, .stInfo * { color: #1E3A8A !important; }
 
 /* ── 구분선 ── */
 hr { border: none !important; border-top: 1px solid var(--border) !important; }
@@ -1317,9 +1316,15 @@ hr { border: none !important; border-top: 1px solid var(--border) !important; }
 .stDataFrame * { color: var(--text-1) !important; font-size: 13px !important; }
 .stDataFrame th { background: var(--surface-2) !important; font-weight:600 !important; }
 
-/* ── 슬라이더 ── */
+/* ── 슬라이더 — 트랙 연회색, 핸들+진행바만 에메랄드 ── */
 .stSlider * { color: var(--text-1) !important; }
-[data-testid="stSlider"] > div > div { background: var(--accent) !important; }
+[data-testid="stSlider"] > div > div { background: var(--border) !important; }
+[data-testid="stSlider"] [role="progressbar"] { background: var(--accent) !important; }
+[data-testid="stSlider"] [role="slider"] {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.2) !important;
+}
 
 /* ── 체크박스 / 토글 / 라디오 ── */
 .stCheckbox label, .stCheckbox span { color: var(--text-1) !important; }
