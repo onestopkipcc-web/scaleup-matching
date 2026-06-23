@@ -31,12 +31,12 @@ def check_password():
         return True
     st.markdown("""
     <div style="max-width:380px;margin:100px auto;text-align:center;">
-      <div style="width:48px;height:48px;background:rgba(16,185,129,0.15);
-                  border:1px solid rgba(16,185,129,0.3);border-radius:12px;
+      <div style="width:52px;height:52px;background:#ECFDF5;
+                  border:1px solid #A7F3D0;border-radius:14px;
                   display:flex;align-items:center;justify-content:center;
-                  margin:0 auto 20px;font-size:22px;">📢</div>
-      <h2 style="color:#F0F2F5;font-size:20px;font-weight:700;margin:0 0 6px;">원스톱 스케일업</h2>
-      <p style="color:#8B95A8;font-size:13px;margin:0 0 32px;">혁신제품지원센터 공고 매칭 시스템</p>
+                  margin:0 auto 20px;font-size:24px;box-shadow:0 2px 8px rgba(16,185,129,0.15);">📢</div>
+      <h2 style="color:#0F172A;font-size:22px;font-weight:700;margin:0 0 6px;">원스톱 스케일업</h2>
+      <p style="color:#64748B;font-size:13px;margin:0 0 32px;">혁신제품지원센터 공고 매칭 시스템</p>
     </div>
     """, unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -1602,10 +1602,17 @@ if page == "대시보드":
         if df_n.empty:
             st.info("공고 수집 후 확인 가능")
         elif '분야' in df_n.columns:
+            import plotly.express as px
             realm_count = df_n['분야'].value_counts().reset_index()
             realm_count.columns = ['분야', '공고 수']
             realm_count = realm_count[realm_count['분야'] != ''].head(10)
-            st.bar_chart(realm_count.set_index('분야'), height=300)
+            fig = px.bar(realm_count, x='분야', y='공고 수',
+                         color_discrete_sequence=['#10B981'],
+                         template='simple_white', height=300)
+            fig.update_layout(margin=dict(l=0,r=0,t=10,b=0),
+                              font_family="'Apple SD Gothic Neo','Malgun Gothic',sans-serif",
+                              plot_bgcolor='white', paper_bgcolor='white')
+            st.plotly_chart(fig, use_container_width=True)
             st.caption(f"총 {len(df_n):,}건 / {len(realm_count)}개 분야")
         else:
             st.info("분야 컬럼 없음")
@@ -1614,6 +1621,7 @@ if page == "대시보드":
         if df_c.empty:
             st.info("선정기업 명단 업로드 후 확인 가능")
         else:
+            import plotly.express as px
             col_a, col_b = st.columns(2)
             with col_a:
                 if '관심사업분야' in df_c.columns:
@@ -1626,18 +1634,27 @@ if page == "대시보드":
                     interest_count = pd.Series(all_interests).value_counts().reset_index()
                     interest_count.columns = ['관심분야', '기업 수']
                     st.caption("관심사업분야 분포")
-                    st.bar_chart(interest_count.set_index('관심분야'), height=250)
+                    fig = px.bar(interest_count, x='관심분야', y='기업 수',
+                                 color_discrete_sequence=['#10B981'],
+                                 template='simple_white', height=250)
+                    fig.update_layout(margin=dict(l=0,r=0,t=10,b=0), plot_bgcolor='white', paper_bgcolor='white')
+                    st.plotly_chart(fig, use_container_width=True)
             with col_b:
                 if '소재지' in df_c.columns:
                     region_count = df_c['소재지'].value_counts().reset_index()
                     region_count.columns = ['소재지', '기업 수']
                     st.caption("소재지 분포")
-                    st.bar_chart(region_count.set_index('소재지'), height=250)
+                    fig = px.bar(region_count, x='소재지', y='기업 수',
+                                 color_discrete_sequence=['#3B82F6'],
+                                 template='simple_white', height=250)
+                    fig.update_layout(margin=dict(l=0,r=0,t=10,b=0), plot_bgcolor='white', paper_bgcolor='white')
+                    st.plotly_chart(fig, use_container_width=True)
 
     with tab_c3:
         if not results:
             st.info("매칭 실행 후 확인 가능")
         else:
+            import plotly.express as px
             df_r = pd.DataFrame(results)
             col_a, col_b = st.columns(2)
             with col_a:
@@ -1645,14 +1662,24 @@ if page == "대시보드":
                     star_count = df_r['관련도'].value_counts().reset_index()
                     star_count.columns = ['관련도', '건수']
                     st.caption("별점 분포")
-                    st.bar_chart(star_count.set_index('관련도'), height=200)
+                    fig = px.bar(star_count, x='관련도', y='건수',
+                                 color_discrete_sequence=['#F59E0B'],
+                                 template='simple_white', height=200)
+                    fig.update_layout(margin=dict(l=0,r=0,t=10,b=0), plot_bgcolor='white', paper_bgcolor='white')
+                    st.plotly_chart(fig, use_container_width=True)
             with col_b:
                 if '공고명' in df_r.columns:
                     top_notices = df_r.groupby('공고명').size().sort_values(ascending=False).head(10).reset_index()
                     top_notices.columns = ['공고명', '추천 기업 수']
-                    top_notices['공고명'] = top_notices['공고명'].str[:20] + '...'
+                    top_notices['공고명'] = top_notices['공고명'].str[:18] + '...'
                     st.caption("공고별 추천 기업 수 (상위 10)")
-                    st.bar_chart(top_notices.set_index('공고명'), height=200)
+                    fig = px.bar(top_notices, x='추천 기업 수', y='공고명',
+                                 orientation='h',
+                                 color_discrete_sequence=['#EF4444'],
+                                 template='simple_white', height=260)
+                    fig.update_layout(margin=dict(l=0,r=0,t=10,b=0), yaxis={'categoryorder':'total ascending'},
+                                      plot_bgcolor='white', paper_bgcolor='white')
+                    st.plotly_chart(fig, use_container_width=True)
             if '공고유형' in df_r.columns:
                 st.divider()
                 type_count = df_r['공고유형'].value_counts()
@@ -1666,11 +1693,16 @@ if page == "대시보드":
             st.info("발송 이력이 쌓이면 확인 가능")
         else:
             if '발송일' in df_h.columns:
+                import plotly.express as px
                 df_h2 = df_h.copy()
                 df_h2['발송일'] = pd.to_datetime(df_h2['발송일'], errors='coerce')
                 df_h2['월'] = df_h2['발송일'].dt.to_period('M').astype(str)
                 monthly = df_h2.groupby('월').size().reset_index(name='발송 건수')
-                st.line_chart(monthly.set_index('월'), height=220)
+                fig = px.line(monthly, x='월', y='발송 건수', markers=True,
+                              color_discrete_sequence=['#10B981'],
+                              template='simple_white', height=220)
+                fig.update_layout(margin=dict(l=0,r=0,t=10,b=0), plot_bgcolor='white', paper_bgcolor='white')
+                st.plotly_chart(fig, use_container_width=True)
             col_a, col_b, col_c = st.columns(3)
             col_a.metric("총 발송", f"{len(df_h)}건")
             if '신청여부' in df_h.columns:
@@ -3912,14 +3944,15 @@ elif page == "성과 집계":
 # ══════════════════════════════════════════════════════
 elif page == "키워드 관리":
     drive = _get_drive()
-    st.title("키워드 관리")
-    info_box("키워드 관리",
+    st.title("키워드·매칭 설정")
+    info_box("키워드·매칭 설정",
         """
-매칭에 사용되는 키워드를 관리합니다.
+매칭에 사용되는 모든 키워드와 가중치를 관리합니다.
 
-- **전체 키워드** — 모든 기업에 공통 적용. HIGH(★★★ 필수조건) / MID(★★ 조건)
-- **기업별 키워드** — 기업 관리 탭의 '키워드 보완' 필드 일괄 편집
-- **매칭 가중치** — 각 매칭 축의 점수 비중 조정
+- **축1 지원대상** — 공고가 누구를 위한 것인지 판단하는 키워드 (별점 결정의 핵심)
+- **축2 사업성격** — 공고가 어떤 종류의 지원인지 판단하는 키워드
+- **기업별 키워드** — 기업별 추가 키워드 (입력할수록 매칭 정확도 향상)
+- **매칭 가중치** — 각 축의 점수 비중 조정
         """,
         "변경 후 반드시 '저장' → 매칭 재실행")
 
@@ -3927,66 +3960,84 @@ elif page == "키워드 관리":
     HIGH_kw, MID_kw = load_keywords(drive)
     df_c = load_excel(drive, SELECTED_FILE)
 
-    tab_kw1, tab_kw2, tab_kw3 = st.tabs(["🎯 전체 키워드", "🏢 기업별 키워드", "⚖️ 매칭 가중치"])
+    tab_kw1, tab_kw2, tab_kw3, tab_kw4 = st.tabs([
+        "🎯 축1 — 지원대상", "📋 축2 — 사업성격",
+        "🏢 기업별 키워드", "⚖️ 매칭 가중치"
+    ])
 
-    # ── 탭1: 전체 키워드 ──────────────────────────────
+    # ── 탭1: 축1 지원대상 ──────────────────────────────
     with tab_kw1:
-        st.subheader("HIGH 키워드 (★★★ 필수조건)")
-        st.caption("이 키워드가 공고에 있으면 ★★★ 후보. 지원대상·공공조달 관련 핵심 단어.")
-        high_str = st.text_area(
-            "HIGH 키워드 (쉼표 구분)",
-            value=", ".join(HIGH_kw),
-            height=120, key="kw_high_edit"
-        )
+        st.subheader("축1 — 지원대상 키워드")
+        st.caption("공고가 어떤 기업을 대상으로 하는지 판단합니다. 이 키워드가 공고에 있을 때 해당 카테고리로 분류됩니다.")
 
-        st.divider()
-        st.subheader("MID 키워드 (★★ 조건)")
-        st.caption("이 키워드가 공고에 있으면 ★★ 후보. 해외진출·마케팅 관련 단어.")
-        mid_str = st.text_area(
-            "MID 키워드 (쉼표 구분)",
-            value=", ".join(MID_kw),
-            height=120, key="kw_mid_edit"
-        )
+        current_target = kw_data.get("TARGET_KW", TARGET_KW)
+        t_inputs = {}
+        label_map1 = {
+            "조달기업특화": "🏆 조달기업특화 (G-PASS·조달청·혁신제품 대상 공고) → ★★★",
+            "수출기업특화": "🌏 수출기업특화 (수출·글로벌 대상 공고) → ★★★",
+            "중소벤처일반": "🏢 중소벤처일반 (일반 중소·벤처 대상 공고) → ★★",
+        }
+        for cat, kws in current_target.items():
+            st.markdown(f"**{label_map1.get(cat, cat)}**")
+            st.caption(f"현재 {len(kws)}개 키워드")
+            t_inputs[cat] = st.text_area(
+                f"{cat}", value=", ".join(kws), height=80,
+                key=f"tkw_{cat}", label_visibility="collapsed",
+                placeholder="쉼표로 구분하여 입력"
+            )
+            st.divider()
 
-        st.divider()
-
-        # 제외 키워드 (특정 단어가 있으면 매칭에서 감점)
-        st.subheader("제외 키워드 (매칭 감점)")
-        st.caption("공고에 이 단어가 있으면 점수를 낮춤. 예: 예비창업자, 소셜벤처 등 해당 없는 대상.")
-        exclude_kws = kw_data.get("exclude_keywords", [])
-        excl_str = st.text_area(
-            "제외 키워드 (쉼표 구분)",
-            value=", ".join(exclude_kws),
-            height=80, key="kw_excl_edit",
-            placeholder="예: 예비창업자, 창업팀, 소셜벤처, 사회적기업"
-        )
-
-        if st.button("💾 전체 키워드 저장", type="primary", key="save_global_kw"):
-            new_high  = [k.strip() for k in high_str.split(',') if k.strip()]
-            new_mid   = [k.strip() for k in mid_str.split(',')  if k.strip()]
-            new_excl  = [k.strip() for k in excl_str.split(',') if k.strip()]
-            kw_data["HIGH"] = new_high
-            kw_data["MID"]  = new_mid
-            kw_data["exclude_keywords"] = new_excl
+        if st.button("💾 축1 키워드 저장", type="primary", key="save_target_kw"):
+            new_target = {}
+            for cat in current_target:
+                new_target[cat] = [k.strip() for k in t_inputs[cat].split(',') if k.strip()]
+            kw_data["TARGET_KW"] = new_target
             if save_json(drive, kw_data, KEYWORDS_FILE):
-                st.success(f"저장 완료 — HIGH {len(new_high)}개 / MID {len(new_mid)}개 / 제외 {len(new_excl)}개")
+                total = sum(len(v) for v in new_target.values())
+                st.success(f"축1 저장 완료 — 총 {total}개 키워드")
             else:
                 st.error("저장 실패")
 
-        # 현재 키워드 통계
-        with st.expander("📊 현재 키워드 현황"):
-            c1, c2, c3 = st.columns(3)
-            c1.metric("HIGH", f"{len(HIGH_kw)}개")
-            c2.metric("MID",  f"{len(MID_kw)}개")
-            c3.metric("제외", f"{len(exclude_kws)}개")
-
-            st.caption("**HIGH 키워드 목록**")
-            st.write(", ".join(HIGH_kw))
-            st.caption("**MID 키워드 목록**")
-            st.write(", ".join(MID_kw))
-
-    # ── 탭2: 기업별 키워드 ────────────────────────────
+    # ── 탭2: 축2 사업성격 ──────────────────────────────
     with tab_kw2:
+        st.subheader("축2 — 사업성격 키워드")
+        st.caption("공고가 어떤 종류의 지원인지 판단합니다. 축1과 교차하여 별점이 결정됩니다.")
+
+        current_type = kw_data.get("TYPE_KW", TYPE_KW)
+        ty_inputs = {}
+        label_map2 = {
+            "공공조달":   "🏛 공공조달 (조달청·시범구매·MAS) → ★★★",
+            "해외진출":   "🌏 해외진출 (수출바우처·해외판로) → ★★★",
+            "마케팅홍보": "📢 마케팅·홍보 (전시회·박람회·홍보) → ★★",
+            "인증특허":   "📋 인증·특허 (해외인증·IP) → ★★",
+            "기술개발":   "🔬 기술개발 (R&D·기술사업화) → ★★",
+            "금융융자":   "💰 금융·융자 (정책자금·보증) → ★★",
+            "내수판로":   "🛒 내수판로 (온라인몰·유통) → ★★",
+            "인력채용":   "👥 인력·채용 (청년채용·인재양성) → ★★",
+        }
+        for cat, kws in current_type.items():
+            st.markdown(f"**{label_map2.get(cat, cat)}**")
+            st.caption(f"현재 {len(kws)}개 키워드")
+            ty_inputs[cat] = st.text_area(
+                f"{cat}", value=", ".join(kws), height=80,
+                key=f"tykw_{cat}", label_visibility="collapsed",
+                placeholder="쉼표로 구분하여 입력"
+            )
+            st.divider()
+
+        if st.button("💾 축2 키워드 저장", type="primary", key="save_type_kw"):
+            new_type = {}
+            for cat in current_type:
+                new_type[cat] = [k.strip() for k in ty_inputs[cat].split(',') if k.strip()]
+            kw_data["TYPE_KW"] = new_type
+            if save_json(drive, kw_data, KEYWORDS_FILE):
+                total = sum(len(v) for v in new_type.values())
+                st.success(f"축2 저장 완료 — 총 {total}개 키워드")
+            else:
+                st.error("저장 실패")
+
+    # ── 탭3: 기업별 키워드 ────────────────────────────
+    with tab_kw3:
         st.subheader("기업별 키워드 보완")
         st.caption("각 기업에 추가 키워드를 설정합니다. 기업 관리 탭과 동일한 필드이며 여기서 일괄 편집 가능합니다.")
 
@@ -4114,8 +4165,8 @@ elif page == "키워드 관리":
             for co, patterns in list(feedback.items())[:10]:
                 st.write(f"**{co}**: " + ", ".join([f"{k}({v}회)" for k,v in sorted(patterns.items(), key=lambda x:-x[1])]))
 
-    # ── 탭3: 매칭 가중치 ──────────────────────────────
-    with tab_kw3:
+    # ── 탭4: 매칭 가중치 ──────────────────────────────
+    with tab_kw4:
         st.subheader("매칭 축별 가중치 조정")
         st.caption("각 축의 점수 비중을 조정합니다. 합산 점수가 별점(★) 판정에 영향을 줍니다.")
 
@@ -4231,78 +4282,7 @@ elif page == "설정":
         st.write(f"{'✅' if fid else '❌'} {label} ({fname})")
 
     st.divider()
-    st.subheader("🔑 키워드 설정")
-    st.caption("수정 후 저장 → keywords.json 드라이브 업데이트 → 다음 매칭부터 반영")
-
-    with st.spinner("키워드 로딩 중..."):
-        HIGH, MID = load_keywords(drive)
-
-    st.caption("💡 두 축(지원대상 × 사업성격) 교차로 별점 판정 — 아래에서 각 축 키워드 수정")
-
-    kw_data = load_json(drive, KEYWORDS_FILE)
-    tab_k1, tab_k2 = st.tabs(["축1 — 지원대상", "축2 — 사업성격"])
-
-    with tab_k1:
-        st.caption("공고가 어떤 기업을 대상으로 하는지 판단 — 대상과 사업성격이 교차될 때 별점 결정")
-        current_target = kw_data.get("TARGET_KW", TARGET_KW)
-        t_inputs = {}
-        label_map1 = {
-            "조달기업특화": "조달기업특화 ★★★ (G-PASS·조달청·해외조달 대상 공고)",
-            "수출기업특화": "수출기업특화 ★★★ (수출·글로벌 대상 공고)",
-            "중소벤처일반": "중소벤처일반 ★★ (일반 중소·벤처 대상 공고)",
-        }
-        for cat, kws in current_target.items():
-            st.markdown(f"**{label_map1.get(cat, cat)}**")
-            t_inputs[cat] = st.text_area(
-                f"{cat} 키워드", value=", ".join(kws), height=70,
-                key=f"tkw_{cat}", label_visibility="collapsed"
-            )
-
-    with tab_k2:
-        st.caption("공고가 어떤 종류의 지원인지 판단 — 지원대상과 교차하여 별점 결정")
-        current_type = kw_data.get("TYPE_KW", TYPE_KW)
-        ty_inputs = {}
-        label_map2 = {
-            "공공조달":   "공공조달 ★★★ (조달청·시범구매·MAS)",
-            "해외진출":   "해외진출 ★★★ (수출바우처·해외판로)",
-            "마케팅홍보": "마케팅·홍보 ★★ (전시회·박람회·홍보)",
-            "인증특허":   "인증·특허 ★★ (해외인증·IP)",
-            "기술개발":   "기술개발 ★★ (R&D·기술사업화)",
-            "금융융자":   "금융·융자 ★★ (정책자금·보증)",
-            "내수판로":   "내수판로 ★★ (온라인몰·유통)",
-        }
-        col1, col2 = st.columns(2)
-        cats = list(current_type.items())
-        for i, (cat, kws) in enumerate(cats):
-            with (col1 if i % 2 == 0 else col2):
-                st.markdown(f"**{label_map2.get(cat, cat)}**")
-                ty_inputs[cat] = st.text_area(
-                    f"{cat} 키워드", value=", ".join(kws), height=70,
-                    key=f"tykw_{cat}", label_visibility="collapsed"
-                )
-
-    st.divider()
-    st.caption("""
-    **별점 판정 기준**
-    ★★★: 핵심수요태그 직접 매칭 / 조달기업+공공조달 / 조달기업+해외진출 / 수출기업+해외진출 / 기업키워드+공공조달
-    ★★:  기업키워드+사업성격 / 조달·수출기업+마케팅·인증 / 중소벤처+조달·해외진출
-    """)
-    if st.button("💾 키워드 저장 → 드라이브", type="primary"):
-        new_target = {cat: [k.strip() for k in v.replace("\n",",").split(",") if k.strip()]
-                      for cat, v in t_inputs.items()}
-        new_type   = {cat: [k.strip() for k in v.replace("\n",",").split(",") if k.strip()]
-                      for cat, v in ty_inputs.items()}
-        save_data  = {
-            "TARGET_KW": new_target,
-            "TYPE_KW":   new_type,
-            "HIGH": sum(new_target.values(), [])[:15],
-            "MID":  sum(new_type.values(), [])[:15],
-        }
-        with st.spinner("드라이브 저장 중..."):
-            if save_json(drive, save_data, KEYWORDS_FILE):
-                st.success("저장 완료 — 다음 매칭부터 반영")
-            else:
-                st.error("저장 실패")
+    st.info("🔑 키워드 설정은 사이드바의 **키워드 관리** 탭에서 관리합니다. (축1 지원대상 / 축2 사업성격 / 기업별 키워드 / 매칭 가중치)")
 
 
 # ══════════════════════════════════════════════════════
