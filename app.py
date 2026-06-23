@@ -1072,6 +1072,22 @@ def estimate_cost(n_notices):
     total_krw  = total_usd * USD_TO_KRW
     return total_usd, total_krw
 
+def claude_call_raw(prompt, max_tokens=1000):
+    """단순 텍스트 프롬프트 → Claude 응답 문자열 반환"""
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "model": "claude-sonnet-4-6",
+        "max_tokens": max_tokens,
+        "messages": [{"role": "user", "content": prompt}]
+    }
+    resp = requests.post("https://api.anthropic.com/v1/messages",
+                         headers=headers, json=payload)
+    if resp.ok:
+        content = resp.json().get('content', [])
+        return content[0].get('text', '') if content else ''
+    return ''
+
+
 def claude_analyze(company_info, notice_info):
     """Claude API로 공고-기업 적합성 분석"""
     api_key = ""
@@ -3382,17 +3398,155 @@ elif page == "발송 관리":
 elif page == "안내 메일":
     drive = _get_drive()
     st.title("안내 메일")
-    info_box("안내 메일",
-        """
-공고 매칭과 무관한 일반 안내 메일을 선정/예비 기업에게 발송합니다.
 
-**활용 예시**
-- 선정 기업 축하 및 프로그램 안내
-- 교육 프로그램 수요조사 안내 (구글 폼 링크 포함)
-- 성과집계 조사 요청
-- 서류 제출 안내 및 일정 공지
-        """,
-        "발송 대상 선택 → 제목/내용 작성 → 미리보기 확인 → 발송")
+    mail_tab1, mail_tab2 = st.tabs(["📨 메일 발송", "📬 회신 확인 (키워드 수집)"])
+
+    with mail_tab2:
+        st.subheader("회신 메일 확인 — 키워드 자동 추출")
+        st.caption("기업이 안내 메일에 답장한 내용을 읽어 키워드를 자동 추출합니다.")
+
+        df_c_reply = load_excel(drive, SELECTED_FILE)
+
+        c1, c2 = st.columns(2)
+        with c1:
+            reply_label = st.text_input("회신 검색 키워드", value="원스톱 스케일업",
+                placeholder="메일 제목에 포함된 키워드로 회신 검색")
+        with c2:
+            reply_days = st.number_input("최근 N일 회신 검색", value=30, min_value=1, max_value=90)
+
+        if st.button("📬 Gmail 회신 검색", type="primary", key="fetch_replies"):
+            with st.spinner("Gmail 회신 검색 중..."):
+                try:
+                    # Gmail API로 회신 검색
+                    after_date = (datetime.today() - timedelta(days=int(reply_days))).strftime('%Y/%m/%d')
+                    query = f'subject:{reply_label} after:{after_date}'
+                    resp = gapi('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/messages',
+                                params={'q': query, 'maxResults': 50})
+                    msgs = resp.json().get('messages', []) if resp.ok else []
+
+                    if not msgs:
+                        st.info(f"최근 {reply_days}일 내 '{reply_label}' 관련 회신이 없습니다.")
+                    else:
+                        st.success(f"회신 {len(msgs)}건 발견")
+                        st.session_state['reply_msgs'] = msgs
+                except Exception as e:
+                    st.error(f"Gmail 검색 실패: {e}")
+
+        # 회신 목록 표시
+        if 'reply_msgs' in st.session_state and st.session_state['reply_msgs']:
+            st.divider()
+            st.subheader(f"회신 목록 ({len(st.session_state['reply_msgs'])}건)")
+
+            for i, msg_ref in enumerate(st.session_state['reply_msgs'][:20]):
+                try:
+                    # 메일 상세 읽기
+                    resp = gapi('GET',
+                        f'https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_ref["id"]}',
+                        params={'format': 'full'})
+                    if not resp.ok: continue
+                    msg = resp.json()
+
+                    headers = {h['name']: h['value'] for h in msg.get('payload', {}).get('headers', [])}
+                    subject  = headers.get('Subject', '(제목 없음)')
+                    sender   = headers.get('From', '(발신자 없음)')
+                    date_str = headers.get('Date', '')[:16]
+
+                    # 본문 추출
+                    body_text = ''
+                    payload = msg.get('payload', {})
+                    parts = payload.get('parts', [payload])
+                    for part in parts:
+                        if part.get('mimeType') == 'text/plain':
+                            import base64
+                            data = part.get('body', {}).get('data', '')
+                            if data:
+                                body_text = base64.urlsafe_b64decode(data + '==').decode('utf-8', errors='ignore')
+                                break
+
+                    with st.expander(f"**{sender[:30]}** — {subject[:40]} ({date_str})"):
+                        st.caption(f"발신: {sender}")
+                        st.text_area("회신 내용", value=body_text[:800], height=150,
+                                     key=f"reply_body_{i}", disabled=True)
+
+                        # 기업명 매칭
+                        matched_co = ''
+                        if not df_c_reply.empty:
+                            for _, row in df_c_reply.iterrows():
+                                co = row.get('기업명', '')
+                                email = str(row.get('이메일', ''))
+                                if email and email.lower() in sender.lower():
+                                    matched_co = co
+                                    break
+
+                        if matched_co:
+                            st.success(f"✅ 매칭된 기업: **{matched_co}**")
+                        else:
+                            matched_co = st.selectbox("기업 선택 (수동 매칭)",
+                                [''] + (df_c_reply['기업명'].tolist() if not df_c_reply.empty else []),
+                                key=f"reply_co_{i}")
+
+                        if body_text and st.button("🤖 키워드 자동 추출", key=f"extract_{i}"):
+                            with st.spinner("Claude 분석 중..."):
+                                prompt = f"""아래는 지원사업 안내 메일에 대한 기업 담당자의 회신입니다.
+이 내용에서 매칭에 활용할 수 있는 기업의 기술/제품 키워드와 필요 지원 유형을 추출해주세요.
+
+회신 내용:
+{body_text[:1000]}
+
+다음 JSON 형식으로만 응답하세요:
+{{
+  "기술키워드": ["키워드1", "키워드2", ...],
+  "필요지원": ["지원유형1", "지원유형2", ...],
+  "요약": "한 줄 요약"
+}}"""
+                                try:
+                                    import json as _json
+                                    res = claude_call_raw(prompt)
+                                    extracted = _json.loads(res)
+                                    st.session_state[f'extracted_{i}'] = extracted
+                                except Exception as e:
+                                    st.error(f"추출 실패: {e}")
+
+                        # 추출 결과 표시
+                        if f'extracted_{i}' in st.session_state:
+                            ext = st.session_state[f'extracted_{i}']
+                            st.markdown("**추출된 키워드:**")
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                st.caption("기술 키워드")
+                                kws = ext.get('기술키워드', [])
+                                st.write(', '.join(kws))
+                            with c2:
+                                st.caption("필요 지원")
+                                sup = ext.get('필요지원', [])
+                                st.write(', '.join(sup))
+                            st.caption(f"요약: {ext.get('요약','')}")
+
+                            if matched_co and st.button(f"💾 {matched_co} 키워드 저장",
+                                                         key=f"save_reply_{i}", type="primary"):
+                                df_c_reply2 = load_excel(drive, SELECTED_FILE)
+                                mask = df_c_reply2['기업명'] == matched_co
+                                if mask.any():
+                                    existing = str(df_c_reply2.loc[mask, '키워드보완'].values[0] or '')
+                                    new_kws   = ', '.join(kws + sup)
+                                    merged    = ', '.join(filter(None, [existing, new_kws]))
+                                    df_c_reply2.loc[mask, '키워드보완'] = merged
+                                    if save_excel(drive, df_c_reply2, SELECTED_FILE,
+                                                  "선정기업명단", "1F4E79"):
+                                        st.success(f"✅ {matched_co} 키워드 저장 완료")
+                                    else:
+                                        st.error("저장 실패")
+
+                except Exception as e:
+                    st.caption(f"메일 읽기 오류: {e}")
+                    continue
+
+    with mail_tab1:
+        info_box("안내 메일",
+            """
+공고 매칭과 무관한 일반 안내 메일을 선정/예비 기업에게 발송합니다.
+            """,
+            "발송 대상 선택 → 제목/내용 작성 → 미리보기 확인 → 발송")
 
     with st.spinner("기업 명단 로딩 중..."):
         df_c = load_excel(drive, SELECTED_FILE)
@@ -4503,18 +4657,149 @@ elif page == "시스템 명세":
 
     # ── 탭1: 전체 흐름 ──────────────────────────────
     with tab1:
-        st.subheader("운영 사이클")
-        st.markdown("""
-**주간 운영 흐름 (격주 발송 기준)**
+        st.subheader("원스톱 스케일업 시스템 전체 흐름")
 
-| 단계 | 시점 | 담당 | 내용 |
-|------|------|------|------|
-| ① 공고 수집 | 매주 월요일 | 자동 | bizinfo API → 8개 분야 전체 수집 → notices_db.xlsx 갱신 |
-| ② 전문 크롤링 | 매주 수요일 | 자동 | GitHub Actions → 공고 원문 크롤링 → notices_detail.xlsx 저장 |
-| ③ 매칭 실행 | 매주 수요일 | 수동 | 앱에서 매칭 실행 → 전문 내용 + 키워드 스코어링 |
-| ④ 담당자 검토 | 격주 수~목 | 수동 | ○/✕ 클릭, AI 분석 버튼 활용, 소재지·업종 확인 |
-| ⑤ 발송 | 격주 목요일 | 자동 | 맞춤공고 + 공통공고 HTML 메일 + 캘린더 D-day 등록 |
-| ⑥ 성과 입력 | 분기 1회 | 수동 | 신청여부·선정결과 발송 이력에 입력 |
+        st.markdown("""
+<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:24px;font-family:'Apple SD Gothic Neo',sans-serif;">
+
+<h4 style="color:#0F172A;margin:0 0 20px;">📌 전체 파이프라인</h4>
+
+<div style="display:flex;flex-direction:column;gap:4px;">
+
+<!-- 단계 1 -->
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span style="background:#10B981;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 1</span>
+    <span style="font-size:14px;font-weight:600;color:#0F172A;">기업 DB 구축</span>
+    <span style="font-size:11px;color:#94A3B8;margin-left:auto;">기수 시작 시 1회</span>
+  </div>
+  <div style="margin-top:10px;padding-left:4px;color:#475569;font-size:13px;line-height:1.8;">
+    WALLA 신청서 → <code>walla_to_selected.py</code> → <code>선정기업_명단.xlsx</code> → 구글 드라이브<br>
+    포함 정보: 기업명, 이메일, 소재지, 기업유형, TRL, 관심사업분야, 기술키워드, 핵심수요태그, 수출실적
+  </div>
+</div>
+
+<div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
+
+<!-- 단계 2 -->
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span style="background:#10B981;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 2</span>
+    <span style="font-size:14px;font-weight:600;color:#0F172A;">공고 수집</span>
+    <span style="font-size:11px;color:#94A3B8;margin-left:auto;">매주 월요일 (수동 실행)</span>
+  </div>
+  <div style="margin-top:10px;padding-left:4px;color:#475569;font-size:13px;line-height:1.8;">
+    bizinfo API → 8개 분야 공고 수집 → <code>notices_db.xlsx</code><br>
+    이후 Playwright 크롤링 → 공고 전문 → <code>notices_detail.xlsx</code>
+  </div>
+</div>
+
+<div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
+
+<!-- 단계 3 -->
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span style="background:#10B981;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 3</span>
+    <span style="font-size:14px;font-weight:600;color:#0F172A;">매칭 실행</span>
+    <span style="font-size:11px;color:#94A3B8;margin-left:auto;">격주 수요일 (수동 실행)</span>
+  </div>
+  <div style="margin-top:10px;padding-left:4px;color:#475569;font-size:13px;line-height:1.8;">
+    50개사 × 전체 공고 → 7개 축 점수 계산 → 별점 판정 → 상위 N건 추출<br>
+    출력: 기업별 ★★★/★★ 공고 목록 (소재지 강등 · 쏠림 페널티 · 세그먼트 부스트 적용)
+  </div>
+</div>
+
+<div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
+
+<!-- 단계 4 -->
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span style="background:#3B82F6;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 4</span>
+    <span style="font-size:14px;font-weight:600;color:#0F172A;">담당자 검토</span>
+    <span style="font-size:11px;color:#94A3B8;margin-left:auto;">격주 수~목 (수동)</span>
+  </div>
+  <div style="margin-top:10px;padding-left:4px;color:#475569;font-size:13px;line-height:1.8;">
+    기업별 검토 탭 → 공고 상세 확인 + AI 분석 → ✅ 승인 / ❌ 제외<br>
+    검토 상태 드라이브 자동 저장 → 이전/다음 버튼으로 50개사 순회
+  </div>
+</div>
+
+<div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
+
+<!-- 단계 5 -->
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span style="background:#10B981;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 5</span>
+    <span style="font-size:14px;font-weight:600;color:#0F172A;">발송</span>
+    <span style="font-size:11px;color:#94A3B8;margin-left:auto;">격주 목요일 (수동 실행)</span>
+  </div>
+  <div style="margin-top:10px;padding-left:4px;color:#475569;font-size:13px;line-height:1.8;">
+    승인된 공고 → 기업별 HTML 메일 발송 (Gmail API)<br>
+    메일 내 공고카드: 공고명 + 마감일 + <b style="color:#10B981;">매칭근거 자연어 한 줄</b><br>
+    동시에: 공고 마감 D-7·D-3 → 기업별 구글 캘린더 이벤트 등록
+  </div>
+</div>
+
+<div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
+
+<!-- 단계 6 -->
+<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span style="background:#F59E0B;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 6</span>
+    <span style="font-size:14px;font-weight:600;color:#0F172A;">피드백 수집 · 개선</span>
+    <span style="font-size:11px;color:#94A3B8;margin-left:auto;">상시</span>
+  </div>
+  <div style="margin-top:10px;padding-left:4px;color:#475569;font-size:13px;line-height:1.8;">
+    기업 회신 메일 → Gmail API 읽기 → Claude 키워드 추출 → 기업 키워드 보완 자동 저장<br>
+    검토 제외 패턴 → 피드백 루프 → 다음 매칭 자동 감점<br>
+    신청여부·선정결과 → 발송 이력 입력 → 분기 성과 집계
+  </div>
+</div>
+
+</div>
+</div>
+        """, unsafe_allow_html=True)
+
+        st.divider()
+        st.subheader("📊 점수 계산 한눈에 보기")
+        st.markdown("""
+| 매칭 축 | 계산 방식 | 기본 점수 | 최대 점수 |
+|---------|-----------|-----------|-----------|
+| **축1 지원대상** | TARGET_KW 카테고리 매칭 건수 × 가중치 | ×3점 | ~15점 |
+| **축2 사업성격** | TYPE_KW 카테고리 매칭 건수 × 가중치 | ×2점 | ~10점 |
+| **축3 기업키워드** | 기업 키워드 → 공고 전문 직접 검색 | ×2점 | ~10점 |
+| **축4 핵심수요** | 핵심수요태그 → 공고 직접 매칭 | ×3점 | ~9점 |
+| **축5 업종역방향** | 제품분야 → INDUSTRY_KW → 공고 간접매칭 | ×1점 | ~6점 |
+| **축6 소재지** | 지역 일치 +3점 / 불일치 -5점 | ±점 | +3 / -5 |
+| **축7 세그먼트** | 기업 유형별 사업성격 부스트 | +1~4점 | +4점 |
+| **★ 별점 보너스** | ★★★ 판정 시 추가 가산 | +5점 | +5점 |
+| **쏠림 페널티** | 이미 많은 기업에 추천된 공고 감산 | -3~-20점 | — |
+| **피드백 페널티** | 과거 자주 제외한 사업성격 감산 | -3~-6점 | — |
+
+**별점 판정 기준**
+- ★★★ : 핵심수요 직접매칭 / 조달+공공조달 / 조달+해외진출 / 수출+해외진출 / 기업키워드+공공조달
+- ★★  : 기업키워드+사업성격 / 조달·수출+마케팅·인증 / 중소벤처+조달·해외진출
+- 소재지 불일치 시 강제 강등: ★★★→★★, ★★→★ (★는 제외)
+        """)
+
+        st.divider()
+        st.subheader("🔄 키워드 개선 루프")
+        st.markdown("""
+```
+기업 DB 구축 (기술키워드 · 핵심수요태그)
+    ↓
+매칭 실행 → 점수 계산
+    ↓
+담당자 검토 → 제외 패턴 수집
+    ↓ (피드백 반영 버튼)
+keywords.json 업데이트 → 다음 매칭 자동 반영
+    ↓
+기업 회신 메일 → Claude 키워드 추출
+    ↓
+키워드보완 컬럼 업데이트 → 다음 매칭 정확도 향상
+    ↓ (반복)
+매칭 품질 점진적 개선
+```
         """)
 
         st.divider()
