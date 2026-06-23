@@ -361,6 +361,43 @@ REALM_CODE   = {
 # 테스트 수신자 — 설정 탭에서 변경 가능 (session_state 우선)
 _DEFAULT_TEST_RECIPIENTS = ["fbwlgns819@naver.com","fbwlgns819@kip.re.kr"]
 
+
+def reason_to_sentence(reason_str):
+    """매칭근거 문자열을 메일용 자연스러운 한 줄 문장으로 변환"""
+    if not reason_str: return ""
+    parts = [p.strip() for p in reason_str.split("+")]
+    targets, types, tags, industry, location = [], [], [], [], ""
+    for p in parts:
+        if "조달기업 대상" in p:    targets.append("조달")
+        elif "수출기업 대상" in p:  targets.append("수출")
+        elif "중소기업" in p:       targets.append("중소기업")
+        if "공공조달" in p:         types.append("공공조달 진출")
+        elif "해외진출" in p:       types.append("해외 판로 개척")
+        elif "기술개발" in p:       types.append("기술개발")
+        elif "마케팅" in p:         types.append("홍보·마케팅")
+        elif "인증특허" in p or "인증·특허" in p: types.append("인증·특허")
+        elif "금융" in p and "융자" in p:         types.append("자금 지원")
+        elif "내수" in p:           types.append("내수 판로")
+        if "수요태그(" in p:
+            tags.append(p.split("(")[1].rstrip(")"))
+        if "업종일치(" in p:
+            industry = p.split("(")[1].rstrip(")")
+        if "동일지역" in p: location = "지역 가점"
+    parts_out = []
+    if targets:
+        parts_out.append("·".join(list(dict.fromkeys(targets))) + " 기업 대상")
+    if types:
+        mt = types[0] + (" 외 " + str(len(types)-1) + "개 지원" if len(types) > 1 else "")
+        parts_out.append(mt)
+    if tags:
+        parts_out.append(", ".join(tags[:2]) + " 역량 활용 가능")
+    if industry:
+        parts_out.append(industry[:12] + " 분야 연관")
+    if location:
+        parts_out.append(location)
+    return " · ".join(parts_out) if parts_out else reason_str[:40]
+
+
 def get_test_recipients():
     saved = st.session_state.get('test_recipients_str','')
     if saved:
@@ -3004,27 +3041,36 @@ elif page == "발송 관리":
                     dl_raw = n.get('마감일','')
                     if not dl_raw and '~' in n.get('접수기간',''):
                         dl_raw = n.get('접수기간','').split('~')[-1].strip()
+                    # 매칭근거 → 자연어 한 줄 변환
+                    reason_sentence = reason_to_sentence(n.get('매칭근거',''))
+                    reason_html = f"""
+                          <p style="margin:6px 0 0;font-size:11px;color:#10B981;
+                                     font-style:normal;line-height:1.5;">
+                            ↳ {reason_sentence}
+                          </p>""" if reason_sentence else ""
                     return f"""
                     <table width="100%" cellpadding="0" cellspacing="0"
-                           style="margin-bottom:10px;background:rgba(255,255,255,0.04);
-                                  border:1px solid rgba(255,255,255,0.07);
-                                  border-radius:10px;overflow:hidden;">
+                           style="margin-bottom:10px;background:#FFFFFF;
+                                  border:1px solid #E2E8F0;
+                                  border-radius:10px;overflow:hidden;
+                                  box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                       <tr>
-                        <td style="padding:16px 18px;">
+                        <td style="padding:14px 16px;">
                           <a href="{n.get('공고링크','#')}"
-                             style="font-size:14px;font-weight:700;color:#0F172A;
+                             style="font-size:14px;font-weight:600;color:#0F172A;
                                     text-decoration:none;line-height:1.5;display:block;">
                             {n.get('공고명','')}
                           </a>
-                          <p style="margin:6px 0 0;font-size:12px;color:rgba(255,255,255,0.35);">
+                          <p style="margin:4px 0 0;font-size:12px;color:#94A3B8;">
                             {n.get('주관기관','')}
                             &nbsp;·&nbsp;
-                            마감 {dl_raw}
+                            마감 {dl_raw if dl_raw else '상시'}
                           </p>
+                          {reason_html}
                         </td>
-                        <td width="70" align="center" valign="middle"
-                            style="padding:16px 12px;
-                                   border-left:1px solid rgba(255,255,255,0.06);">
+                        <td width="60" align="center" valign="middle"
+                            style="padding:14px 12px;
+                                   border-left:1px solid #F1F5F9;">
                           <a href="{n.get('공고링크','#')}"
                              style="display:inline-block;font-size:12px;font-weight:600;
                                     color:#10B981;text-decoration:none;white-space:nowrap;">
