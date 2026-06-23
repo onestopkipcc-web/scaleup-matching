@@ -30,21 +30,25 @@ def check_password():
     if st.session_state.get("authenticated"):
         return True
     st.markdown("""
-    <div style="max-width:400px;margin:80px auto;text-align:center">
-      <h2 style="color:#1F4E79">📢 원스톱 스케일업</h2>
-      <p style="color:#666;margin-bottom:24px">혁신제품지원센터 공고 매칭 시스템</p>
+    <div style="max-width:380px;margin:100px auto;text-align:center;">
+      <div style="width:48px;height:48px;background:rgba(16,185,129,0.15);
+                  border:1px solid rgba(16,185,129,0.3);border-radius:12px;
+                  display:flex;align-items:center;justify-content:center;
+                  margin:0 auto 20px;font-size:22px;">📢</div>
+      <h2 style="color:#F0F2F5;font-size:20px;font-weight:700;margin:0 0 6px;">원스톱 스케일업</h2>
+      <p style="color:#8B95A8;font-size:13px;margin:0 0 32px;">혁신제품지원센터 공고 매칭 시스템</p>
     </div>
     """, unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1,2,1])
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        pw = st.text_input("비밀번호", type="password", placeholder="비밀번호 입력")
+        pw = st.text_input("비밀번호", type="password", placeholder="비밀번호 입력", label_visibility="collapsed")
         if st.button("로그인", use_container_width=True, type="primary"):
             correct = st.secrets.get("password", "scaleup2026")
             if pw == correct:
                 st.session_state["authenticated"] = True
                 st.rerun()
             else:
-                st.error("비밀번호 오류")
+                st.error("비밀번호가 올바르지 않습니다")
     return False
 
 if not check_password():
@@ -175,76 +179,148 @@ INDUSTRY_KW = {
         "바이오","의료","의료기기","헬스케어","제약","헬스","생명공학","의약",
         "진단","치료","의료용","임상","체외진단","의약품","바이오텍",
         "의료AI","디지털헬스","원격의료","웨어러블의료",
+        # 동의어 확장
+        "메디컬","헬스테크","의생명","생물의약","디지털치료제",
+        "의료정보","병원정보","의료데이터","EMR","PHR",
+        "재활","보조기기","의료소프트웨어","수술로봇","진단기기",
     ],
     "미래차·모빌리티": [
         "미래차","모빌리티","전기차","자율주행","수소차","친환경차","UAM",
         "퍼스널모빌리티","전동화","충전인프라","배터리","이차전지",
         "자동차부품","차량","운송","교통수단","커넥티드카",
+        # 동의어 확장
+        "EV","전동킥보드","PM","도심항공","전기버스","수소버스",
+        "차량공유","카셰어링","라이드헤일링","MaaS","통합모빌리티",
+        "ADAS","자동차SW","차량용반도체","OBC","BMS",
     ],
     "환경·에너지 기술": [
         "환경","에너지","탄소중립","친환경","온실가스","신재생","태양광",
         "수소","폐기물","재활용","탄소","녹색","저탄소","청정",
         "에너지효율","ESG","탄소저감","기후","풍력","연료전지",
         "환경오염","수처리","대기","토양정화","친환경소재",
+        # 동의어 확장
+        "탄소발자국","넷제로","RE100","그린뉴딜","순환경제",
+        "폐기물처리","하수처리","대기오염","미세먼지","소음진동",
+        "환경모니터링","환경측정","에너지저장","ESS","BESS",
+        "태양전지","풍력발전","바이오에너지","지열","조력",
     ],
     "스마트 제조·산업·기계": [
         "스마트제조","스마트공장","제조혁신","산업기계","자동화","로봇",
         "공정혁신","MES","제조","기계","장비","설비","부품","소재",
         "정밀기계","산업용","제조업","공정","생산","품질관리",
         "CNC","공작기계","산업로봇","협동로봇","용접","도금",
+        # 동의어 확장
+        "DX전환","디지털공장","산업IoT","IIoT","예지보전",
+        "품질검사","비전검사","비파괴검사","측정","계측",
+        "금형","주조","단조","압출","표면처리","열처리",
+        "PCB제조","반도체장비","디스플레이장비","이차전지장비",
     ],
     "스마트 건설": [
         "스마트건설","건설","건축","BIM","모듈러","건설기술","건설자재","플랜트",
         "건설장비","건설안전","건축자재","인프라건설","토목","시공",
         "건물","구조물","시설물","유지보수","안전진단","건설IT",
+        # 동의어 확장
+        "OSC","탈현장건설","3D프린팅건설","드론측량","건설드론",
+        "시설관리","FM","AMO","건물에너지","BEMS","FEMS",
+        "안전모니터링","작업자안전","건설현장안전","붕괴예측",
     ],
     "도시·교통 인프라": [
         "스마트시티","도시","교통","인프라","철도","도로","물류","스마트교통",
         "도시개발","대중교통","지하철","버스","항만","공항",
         "물류센터","SCM","공급망","유통인프라","스마트물류",
+        # 동의어 확장
+        "C-ITS","도로인프라","교통신호","주차관제","주차공유",
+        "라스트마일","배송","풀필먼트","크로스도킹","콜드체인",
+        "스마트항만","항만물류","선박물류","물류자동화","WMS",
     ],
     "방산·국방 기술": [
         "방산","국방","방위","군수","보안","방위산업","군","방어",
         "국방기술","방위기술","무기","군용","군사","사이버보안",
         "정보보안","보안솔루션","네트워크보안","물리보안",
+        # 동의어 확장
+        "ITAR","방산수출","국방R&D","ADD","국방조달",
+        "보안인증","CC인증","ISMS","ISMS-P","보안감사",
+        "침해대응","취약점","위협인텔리전스","SOC","SIEM",
     ],
     "정보통신 기술": [
         "ICT","정보통신","소프트웨어","앱","플랫폼","클라우드","SaaS","통신",
         "SW","IT","시스템","솔루션","네트워크","서버","데이터센터",
         "사물인터넷","IoT","5G","통신망","디지털","스마트",
         "보안","ERP","CRM","그룹웨어","SI",
+        # 동의어 확장
+        "API","마이크로서비스","컨테이너","쿠버네티스","DevOps",
+        "엣지컴퓨팅","엣지","멀티클라우드","하이브리드클라우드",
+        "RPA","업무자동화","디지털워크플레이스","협업툴",
+        "6G","위성통신","저궤도위성","O-RAN","오픈랜",
     ],
     "AI·데이터 기술": [
         "AI","인공지능","빅데이터","데이터","머신러닝","딥러닝","디지털전환","DX",
         "자연어처리","컴퓨터비전","생성형AI","ChatGPT","LLM",
         "데이터분석","데이터플랫폼","MLOps","AI솔루션","지능형",
         "예측","추천","자동화AI","AI서비스",
+        # 동의어 확장
+        "파운데이션모델","멀티모달","RAG","AI에이전트","AI플랫폼",
+        "데이터레이크","데이터웨어하우스","데이터마트","ETL",
+        "시각AI","음성AI","영상분석","이상탐지","예측유지보수",
+        "AI반도체","NPU","온디바이스AI","경량화모델",
     ],
     "농축산·수산·식품": [
         "농업","농식품","식품","수산","축산","스마트팜","농산물","푸드테크",
         "농기계","농촌","원예","작물","가공식품","식품안전",
         "수산물","수산양식","해양수산","축산물","낙농",
+        # 동의어 확장
+        "정밀농업","농업IoT","농업드론","수직농장","식물공장",
+        "대체육","배양육","세포농업","푸드업사이클","기능성식품",
+        "HACCP","식품인증","GMP식품","유기농","GAP",
+        "어업","어선","어망","수산가공","냉동수산",
     ],
     "우주·항공·해양": [
         "우주","항공","드론","해양","선박","해운","위성",
         "UAM","도심항공","항공기","항공부품","발사체",
         "해양플랜트","해양기술","조선","선박부품","해양수산",
+        # 동의어 확장
+        "소형위성","큐브샛","우주부품","발사서비스","뉴스페이스",
+        "MRO","항공정비","항공소재","항공SW","항공안전",
+        "수중드론","AUV","ROV","수중로봇","해양로봇",
+        "선박자율운항","자율선박","스마트쉽","친환경선박",
     ],
     "핀테크·금융 IT": [
         "핀테크","금융","결제","블록체인","암호화폐","보험테크",
         "디지털금융","오픈뱅킹","간편결제","송금","대출플랫폼",
         "자산관리","투자플랫폼","금융데이터","RegTech",
+        # 동의어 확장
+        "마이데이터","신용평가","대안신용","P2P금융","크라우드펀딩",
+        "CBDC","STO","NFT","디지털자산","웹3",
+        "보험금청구","자동심사","손해사정","보험데이터",
+        "PG","VAN","전자지갑","선불카드","BNPL",
     ],
     "전기·전자": [
         "전기","전자","반도체","디스플레이","배터리","전력","회로","센서",
         "전장","전기부품","전자부품","LED","OLED","PCB",
         "전력반도체","시스템반도체","전력변환","전기설비",
         "계측기","검사장비","시험장비",
+        # 동의어 확장
+        "SiC","GaN","MLCC","MEMS","RF부품","안테나",
+        "마이크로LED","MiniLED","플렉서블디스플레이","투명디스플레이",
+        "사이니지","전광판","스마트사이니지","디지털사이니지",
+        "스마트미터","AMI","전력IT","에너지관리","HEMS",
     ],
     "교육·HR테크": [
         "에듀테크","교육","HR","인재","학습","이러닝","채용플랫폼",
         "온라인교육","직무교육","기업교육","학습관리","LMS",
         "인적자원","인사관리","채용","HRD","HRM",
+        # 동의어 확장
+        "적응형학습","메타버스교육","XR교육","AI튜터","코딩교육",
+        "평생학습","직업훈련","직업교육","자격증","역량평가",
+        "피플애널리틱스","인사AI","채용AI","온보딩","퇴직관리",
+    ],
+    "콘텐츠·미디어·문화": [
+        "콘텐츠","미디어","문화","게임","엔터","영상","음악","OTT",
+        "웹툰","웹소설","애니메이션","VFX","CG","디지털콘텐츠",
+        "메타버스","XR","VR","AR","MR","실감콘텐츠",
+        "MCN","유튜브","SNS","인플루언서","소셜미디어",
+        "광고","마케팅","브랜드","PR","디지털광고",
+        "관광","여행","스마트관광","여가","레저","스포츠테크",
     ],
 }
 
@@ -500,6 +576,32 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None):
     if str(row.get('수출실적',''))=='아니오' and '수출' in str(notice.get('분야','')): return None
 
     text = " ".join([str(notice.get(k,'')) for k in ['공고명','사업개요','전문내용','해시태그','주관기관','지원대상']])
+
+    # ── 강화된 부정 필터 — 자격 미달이 명확한 공고 사전 제거 ──
+    # 업력 제한: 창업 초기 공고에 오래된 기업 매칭 방지
+    biz_start = str(row.get('설립연도', row.get('창업연도', '')))
+    if biz_start and biz_start.isdigit():
+        biz_age = datetime.today().year - int(biz_start)
+        # 공고에 "창업 7년 이내" 등 업력 제한이 명시된 경우
+        age_patterns = re.findall(r'창업\s*(\d+)년\s*이내', text)
+        for ap in age_patterns:
+            if biz_age > int(ap):
+                return None  # 업력 초과 → 제외
+        startup_only = any(p in text for p in ['예비창업자', '창업팀', '예비 창업'])
+        if startup_only:
+            return None  # 예비창업자 전용 공고
+
+    # 매출 규모 제한 (공고에 "매출 N억 이하" 명시 시 대형 기업 제외)
+    revenue_str = str(row.get('매출규모', row.get('매출액', '')))
+    if revenue_str and '억' in revenue_str:
+        try:
+            rev_amt = float(re.search(r'([\d.]+)', revenue_str).group(1))
+            revenue_limits = re.findall(r'매출액?\s*(\d+)억\s*원?\s*이하', text)
+            for rl in revenue_limits:
+                if rev_amt > float(rl) * 1.5:  # 1.5배 여유 허용
+                    return None
+        except Exception:
+            pass
 
     # ── 기업 세그먼트 자동 분류 ───────────────────────────
     # 기업 프로파일에 따라 3개 세그먼트로 분류 → 세그먼트별 점수 보정
@@ -984,129 +1086,284 @@ def info_box(title, desc, how_to=None):
             st.markdown("**✏️ 수정 방법**")
             st.markdown(how_to)
 
-# ── CSS (툴팁 제거 포함) ──────────────────────────────
+# ── CSS ──────────────────────────────────────────────
 st.markdown("""
 <style>
-/* ── 전체 배경·텍스트 ── */
-.stApp {background:#0F1923;}
-.stApp, .stApp * {color:#E8EDF2;}
-p, li, span, div, label {color:#E8EDF2 !important; font-size:14px;}
-h1 {color:#FFFFFF !important; font-size:28px !important; font-weight:700 !important;}
-h2 {color:#FFFFFF !important; font-size:18px !important; font-weight:700 !important;}
-h3 {color:#FFFFFF !important; font-size:16px !important; font-weight:600 !important;}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ── 전역 변수 ── */
+:root {
+  --bg-base:    #0F1117;
+  --bg-surface: #161B27;
+  --bg-elevated:#1C2333;
+  --bg-border:  #2A3347;
+  --text-primary:   #F0F2F5;
+  --text-secondary: #8B95A8;
+  --text-muted:     #5A6477;
+  --accent:     #10B981;
+  --accent-dim: rgba(16,185,129,0.12);
+  --accent-hover:#0EA472;
+  --blue:       #3B82F6;
+  --yellow:     #F59E0B;
+  --red:        #EF4444;
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+}
+
+/* ── 전체 배경·폰트 ── */
+.stApp {
+  background: var(--bg-base) !important;
+  font-family: 'Inter', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif !important;
+}
+.stApp, .stApp * { color: var(--text-primary); }
+
+/* ── 타이포그래피 ── */
+h1 {
+  color: var(--text-primary) !important;
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.3px !important;
+}
+h2 {
+  color: var(--text-primary) !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+}
+h3 {
+  color: var(--text-primary) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+}
+p, li, div, label, span {
+  color: var(--text-primary) !important;
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+}
+strong { color: var(--accent) !important; font-weight: 600 !important; }
+code {
+  color: var(--accent) !important;
+  background: var(--accent-dim) !important;
+  border-radius: 4px !important;
+  padding: 1px 6px !important;
+  font-size: 12px !important;
+}
 
 /* ── 사이드바 ── */
-[data-testid="stSidebar"] {background:#0A1628 !important;}
-[data-testid="stSidebar"] * {color:#E8EDF2 !important;}
-[data-testid="stSidebarNav"] {display:none;}
+[data-testid="stSidebar"] {
+  background: var(--bg-surface) !important;
+  border-right: 1px solid var(--bg-border) !important;
+}
+[data-testid="stSidebar"] * { color: var(--text-primary) !important; }
+[data-testid="stSidebarNav"] { display: none; }
+[data-testid="stSidebar"] .stRadio label {
+  padding: 6px 10px !important;
+  border-radius: var(--radius-sm) !important;
+  transition: background 0.15s !important;
+}
+[data-testid="stSidebar"] .stRadio label:hover {
+  background: var(--bg-elevated) !important;
+}
 
 /* ── 메트릭 ── */
-[data-testid="stMetricLabel"] {color:#A0AEC0 !important; font-size:12px !important;}
-[data-testid="stMetricValue"] {color:#FFFFFF !important; font-weight:700; font-size:24px !important;}
-[data-testid="stMetricDelta"] {font-size:12px !important;}
+[data-testid="stMetricLabel"] {
+  color: var(--text-secondary) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+[data-testid="stMetricValue"] {
+  color: var(--text-primary) !important;
+  font-size: 22px !important;
+  font-weight: 700 !important;
+}
+[data-testid="stMetricDelta"] { font-size: 12px !important; }
+[data-testid="metric-container"] {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--bg-border) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 14px 18px !important;
+}
 
 /* ── 버튼 ── */
 .stButton button {
-    border-radius:6px;
-    background:#1F4E79;
-    color:#FFFFFF !important;
-    border:none;
-    font-size:14px !important;
-    font-weight:600 !important;
-    padding:6px 16px !important;
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--bg-border) !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  padding: 6px 14px !important;
+  transition: all 0.15s !important;
 }
-.stButton button:hover {background:#2E75B6;}
-button[kind="primary"] {background:#4A9EFF !important; color:#0F1923 !important; font-weight:700;}
-button[kind="primary"]:hover {background:#63B3FF !important;}
+.stButton button:hover {
+  background: var(--bg-border) !important;
+  border-color: var(--text-muted) !important;
+}
+button[kind="primary"] {
+  background: var(--accent) !important;
+  color: #000 !important;
+  border: none !important;
+  font-weight: 600 !important;
+}
+button[kind="primary"]:hover {
+  background: var(--accent-hover) !important;
+}
 
 /* ── 입력창 ── */
 .stTextInput input, .stTextArea textarea {
-    background:#1A2940 !important;
-    color:#E8EDF2 !important;
-    border:1px solid #2D4A6E !important;
-    border-radius:6px;
+  background: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--bg-border) !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: 14px !important;
+}
+.stTextInput input:focus, .stTextArea textarea:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px var(--accent-dim) !important;
 }
 .stSelectbox div[data-baseweb="select"] {
-    background:#1A2940 !important;
-    border:1px solid #2D4A6E !important;
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--bg-border) !important;
+  border-radius: var(--radius-sm) !important;
 }
-.stSelectbox div[data-baseweb="select"] * {color:#E8EDF2 !important;}
-
-/* ── 슬라이더 ── */
-.stSlider * {color:#E8EDF2 !important;}
-
-/* ── 체크박스 ── */
-.stCheckbox label, .stCheckbox span, .stCheckbox p {color:#E8EDF2 !important;}
-[data-testid="stCheckbox"] label {color:#E8EDF2 !important;}
-
-/* ── 토글 ── */
-.stToggle label {color:#E8EDF2 !important;}
+.stSelectbox div[data-baseweb="select"] * { color: var(--text-primary) !important; }
+.stMultiSelect div[data-baseweb="select"] {
+  background: var(--bg-surface) !important;
+  border-color: var(--bg-border) !important;
+}
 
 /* ── 탭 ── */
-.stTabs [data-baseweb="tab"] {color:#A0AEC0 !important;}
-.stTabs [aria-selected="true"] {color:#4A9EFF !important; border-bottom:2px solid #4A9EFF;}
+.stTabs [data-baseweb="tab-list"] {
+  background: transparent !important;
+  border-bottom: 1px solid var(--bg-border) !important;
+  gap: 4px !important;
+}
+.stTabs [data-baseweb="tab"] {
+  color: var(--text-secondary) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  padding: 8px 16px !important;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0 !important;
+  background: transparent !important;
+}
+.stTabs [aria-selected="true"] {
+  color: var(--accent) !important;
+  border-bottom: 2px solid var(--accent) !important;
+  background: var(--accent-dim) !important;
+}
 
-/* ── expander ── */
-.streamlit-expanderHeader {color:#E8EDF2 !important; background:#1A2940 !important;}
-.streamlit-expanderContent {background:#131F2E !important;}
-
-/* ── 데이터프레임 ── */
-.stDataFrame {background:#1A2940 !important;}
-.stDataFrame * {color:#E8EDF2 !important;}
-
-/* ── 구분선 ── */
-hr {border-color:#2D4A6E !important;}
-
-/* ── 강조 ── */
-strong {color:#4A9EFF !important;}
-code {color:#63FFA8 !important; background:#1A2940 !important; font-size:13px !important;}
-.stCaption, [data-testid="stCaptionContainer"] {color:#A0AEC0 !important; font-size:12px !important;}
-
-/* ── 폰트 크기 통일 ── */
-.stTextInput input    {font-size:14px !important;}
-.stTextArea textarea  {font-size:14px !important;}
-.stSelectbox *        {font-size:14px !important;}
-.stMultiSelect *      {font-size:14px !important;}
-.stSlider *           {font-size:13px !important;}
-.stRadio label        {font-size:14px !important;}
-.stCheckbox label     {font-size:14px !important;}
-.stExpander summary   {font-size:14px !important;}
-.stTabs [data-baseweb="tab"] {font-size:14px !important;}
-.stDataFrame          {font-size:13px !important;}
-[data-testid="stSidebar"] .stRadio label {font-size:14px !important;}
-
-/* ── info_box 안내 텍스트 ── */
-.streamlit-expanderContent p  {font-size:13px !important; line-height:1.7;}
-.streamlit-expanderContent li {font-size:13px !important; line-height:1.7;}
-.streamlit-expanderHeader p   {font-size:13px !important;}
+/* ── Expander ── */
+.streamlit-expanderHeader {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--bg-border) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--text-primary) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+.streamlit-expanderContent {
+  background: var(--bg-elevated) !important;
+  border: 1px solid var(--bg-border) !important;
+  border-top: none !important;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm) !important;
+}
 
 /* ── 알림 박스 ── */
-.stSuccess {background:#0D2B1A !important; border-left:4px solid #63FFA8 !important;}
-.stWarning {background:#2B1D0A !important; border-left:4px solid #FFC863 !important;}
-.stError   {background:#2B0A0A !important; border-left:4px solid #FF6363 !important;}
-.stInfo    {background:#0A1A2B !important; border-left:4px solid #4A9EFF !important;}
+.stSuccess {
+  background: rgba(16,185,129,0.08) !important;
+  border: 1px solid rgba(16,185,129,0.25) !important;
+  border-left: 3px solid var(--accent) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--text-primary) !important;
+}
+.stWarning {
+  background: rgba(245,158,11,0.08) !important;
+  border: 1px solid rgba(245,158,11,0.25) !important;
+  border-left: 3px solid var(--yellow) !important;
+  border-radius: var(--radius-sm) !important;
+}
+.stError {
+  background: rgba(239,68,68,0.08) !important;
+  border: 1px solid rgba(239,68,68,0.25) !important;
+  border-left: 3px solid var(--red) !important;
+  border-radius: var(--radius-sm) !important;
+}
+.stInfo {
+  background: rgba(59,130,246,0.08) !important;
+  border: 1px solid rgba(59,130,246,0.25) !important;
+  border-left: 3px solid var(--blue) !important;
+  border-radius: var(--radius-sm) !important;
+}
 
-/* ── 사이드바 강제 항상 노출 ── */
-[data-testid="stSidebarCollapseButton"] {display:none !important;}
-[data-testid="collapsedControl"]        {display:none !important;}
+/* ── 구분선 ── */
+hr { border: none !important; border-top: 1px solid var(--bg-border) !important; }
+
+/* ── 캡션 ── */
+.stCaption, [data-testid="stCaptionContainer"] {
+  color: var(--text-secondary) !important;
+  font-size: 12px !important;
+}
+
+/* ── 데이터프레임 ── */
+.stDataFrame { background: var(--bg-surface) !important; border-radius: var(--radius-md) !important; }
+.stDataFrame * { color: var(--text-primary) !important; font-size: 13px !important; }
+
+/* ── 슬라이더 ── */
+.stSlider * { color: var(--text-primary) !important; }
+[data-testid="stSlider"] > div > div > div { background: var(--accent) !important; }
+
+/* ── 체크박스 / 토글 / 라디오 ── */
+.stCheckbox label, .stCheckbox span, .stCheckbox p { color: var(--text-primary) !important; }
+.stToggle label { color: var(--text-primary) !important; }
+.stRadio label  { color: var(--text-primary) !important; font-size: 14px !important; }
+
+/* ── 사이드바 항상 표시 ── */
+[data-testid="stSidebarCollapseButton"] { display: none !important; }
+[data-testid="collapsedControl"]        { display: none !important; }
 section[data-testid="stSidebar"] {
-    display: block !important;
-    transform: translateX(0) !important;
-    min-width: 244px !important;
-    visibility: visible !important;
+  display: block !important;
+  transform: translateX(0) !important;
+  min-width: 244px !important;
+  visibility: visible !important;
 }
 section[data-testid="stSidebar"][aria-expanded="false"] {
-    display: block !important;
-    transform: translateX(0) !important;
-    margin-left: 0 !important;
+  display: block !important;
+  transform: translateX(0) !important;
+  margin-left: 0 !important;
 }
 
-/* ── 툴팁·도움말 완전 제거 ── */
-.stTooltipIcon {display:none !important;}
-div[data-testid="stStatusWidget"] {display:none !important;}
-#MainMenu {visibility:hidden;}
-footer    {visibility:hidden;}
-header    {visibility:hidden;}
+/* ── 시스템 UI 숨김 ── */
+.stTooltipIcon                       { display: none !important; }
+div[data-testid="stStatusWidget"]    { display: none !important; }
+#MainMenu { visibility: hidden; }
+footer    { visibility: hidden; }
+header    { visibility: hidden; }
+
+/* ── link button ── */
+.stLinkButton a {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--bg-border) !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: 13px !important;
+  text-decoration: none !important;
+  padding: 6px 12px !important;
+}
+.stLinkButton a:hover {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+/* ── 로그인 화면 ── */
+.stApp [data-testid="stVerticalBlock"] input[type="password"] {
+  border-color: var(--bg-border) !important;
+}
+
+/* ── progress bar ── */
+.stProgress > div > div { background: var(--accent) !important; }
+[data-testid="stProgressBar"] > div { background: var(--accent) !important; }
 </style>
 """, unsafe_allow_html=True)
 
