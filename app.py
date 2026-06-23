@@ -558,6 +558,21 @@ def load_keywords(drive):
     if "TYPE_KW"   in kw: TYPE_KW   = kw["TYPE_KW"]
     return kw.get("HIGH", DEFAULT_HIGH), kw.get("MID", DEFAULT_MID)
 
+def load_kw_config(drive):
+    """가중치, 제외키워드, 피드백 등 전체 키워드 설정 로드"""
+    kw = load_json(drive, KEYWORDS_FILE) or {}
+    weights = kw.get("weights", {
+        "지원대상": 3, "사업성격": 2, "기업키워드": 2,
+        "핵심수요": 3, "업종역방향": 1, "소재지가산": 3, "세그먼트": 2
+    })
+    return {
+        "weights":          weights,
+        "exclude_keywords": kw.get("exclude_keywords", []),
+        "feedback":         kw.get("feedback", {}),
+        "star3_threshold":  kw.get("star3_threshold", 20),
+        "star2_threshold":  kw.get("star2_threshold", 10),
+    }
+
 # ── 유틸 ─────────────────────────────────────────────
 def strip_html(html):
     return re.sub(r'<[^>]+>', ' ', html or '').strip()
@@ -568,7 +583,7 @@ def parse_deadline(s):
         return datetime.strptime(re.sub(r'\.', '-', end), "%Y-%m-%d")
     except: return None
 
-def score_notice(notice, row, already_sent, HIGH, MID, feedback=None):
+def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=None):
     pid = notice.get('pblancId', '')
     if (row['기업명'], pid) in already_sent: return None
     dl = notice.get('마감일', '')
@@ -576,6 +591,22 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None):
     if str(row.get('수출실적',''))=='아니오' and '수출' in str(notice.get('분야','')): return None
 
     text = " ".join([str(notice.get(k,'')) for k in ['공고명','사업개요','전문내용','해시태그','주관기관','지원대상']])
+
+    # ── 제외 키워드 필터 ──────────────────────────────
+    if kw_config:
+        for excl_kw in kw_config.get("exclude_keywords", []):
+            if excl_kw and excl_kw in text:
+                return None  # 제외 키워드 포함 공고 즉시 제거
+
+    # 가중치 설정 (없으면 기본값)
+    W = kw_config.get("weights", {}) if kw_config else {}
+    W_TARGET = W.get("지원대상", 3)
+    W_TYPE   = W.get("사업성격", 2)
+    W_KW     = W.get("기업키워드", 2)
+    W_DEMAND = W.get("핵심수요", 3)
+    W_IND    = W.get("업종역방향", 1)
+    W_LOC    = W.get("소재지가산", 3)
+    W_SEG    = W.get("세그먼트", 4)
 
     # ── 강화된 부정 필터 — 자격 미달이 명확한 공고 사전 제거 ──
     # 업력 제한: 창업 초기 공고에 오래된 기업 매칭 방지
@@ -880,24 +911,25 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None):
 
     # ── 점수 계산 (정렬용) ────────────────────────────
     # 세그먼트 부스트: 해당 기업 세그먼트와 맞는 사업성격 카테고리에 가산
-    seg_score = sum(seg_boost.get(cat, 0) for cat in matched_type.keys())
+    seg_score = sum(min(seg_boost.get(cat, 0), W_SEG) for cat in matched_type.keys())
 
     # ── 피드백 페널티: 이전 검토에서 자주 제외된 사업성격 감산 ──
     feedback_penalty = 0
-    if feedback:
-        co_feedback = feedback.get(row.get('기업명',''), {})
+    fb = feedback or (kw_config.get("feedback", {}) if kw_config else {})
+    if fb:
+        co_feedback = fb.get(row.get('기업명',''), {})
         for cat in matched_type.keys():
             reject_count = co_feedback.get(cat, 0)
-            if reject_count >= 3:   feedback_penalty -= 6   # 3회 이상 제외 → 강한 감산
-            elif reject_count >= 2: feedback_penalty -= 3   # 2회 이상 제외 → 중간 감산
+            if reject_count >= 3:   feedback_penalty -= 6
+            elif reject_count >= 2: feedback_penalty -= 3
 
     score = (
-        len(sum(matched_target.values(), [])) * 3 +
-        len(sum(matched_type.values(),   [])) * 2 +
-        len(matched_co) * 2 +
-        len(matched_demand) * 3 +
-        ind_score +
-        xs + location_score + seg_score + feedback_penalty
+        len(sum(matched_target.values(), [])) * W_TARGET +
+        len(sum(matched_type.values(),   [])) * W_TYPE   +
+        len(matched_co)     * W_KW    +
+        len(matched_demand) * W_DEMAND +
+        ind_score * W_IND   +
+        xs + (location_score * W_LOC // 3) + seg_score + feedback_penalty
     )
     if stars == "★★★": score += 5
     if score <= 0: return None
@@ -1225,10 +1257,34 @@ button[kind="primary"]:hover {
   box-shadow: var(--shadow) !important;
 }
 .stSelectbox div[data-baseweb="select"] * { color: var(--text-1) !important; }
-[data-baseweb="popover"] { background: var(--surface) !important; border: 1px solid var(--border) !important; }
+/* selectbox 내부 컨트롤 배경 강제 */
+[data-baseweb="select"] > div { background: var(--surface) !important; }
+[data-baseweb="select"] > div > div { background: var(--surface) !important; color: var(--text-1) !important; }
+/* multiselect */
+.stMultiSelect [data-baseweb="select"] { background: var(--surface) !important; }
+.stMultiSelect [data-baseweb="select"] > div { background: var(--surface) !important; }
+[data-baseweb="tag"] { background: var(--accent-light) !important; color: var(--accent-dark) !important; }
+/* 드롭다운 팝오버 */
+[data-baseweb="popover"] { background: var(--surface) !important; border: 1px solid var(--border) !important; box-shadow: var(--shadow-md) !important; }
 [data-baseweb="menu"]    { background: var(--surface) !important; }
-[data-baseweb="menu"] li { color: var(--text-1) !important; }
-[data-baseweb="menu"] li:hover { background: var(--accent-light) !important; }
+[data-baseweb="menu"] li { color: var(--text-1) !important; background: var(--surface) !important; }
+[data-baseweb="menu"] li:hover { background: var(--accent-light) !important; color: var(--accent-dark) !important; }
+[data-baseweb="menu"] [aria-selected="true"] { background: var(--accent-light) !important; color: var(--accent-dark) !important; }
+
+/* ── 모든 어두운 배경 강제 제거 (Streamlit 내부 잔재) ── */
+div[class*="block-container"] { background: transparent !important; }
+[data-testid="stVerticalBlock"] { background: transparent !important; }
+/* 어두운 배경 컨테이너 덮어쓰기 */
+div[style*="background-color: rgb(14, 17, 23)"],
+div[style*="background-color: rgb(26, 28, 36)"],
+div[style*="background: rgb(14, 17, 23)"],
+div[style*="background: rgb(26, 28, 36)"] {
+  background: var(--surface) !important;
+}
+div[style*="background-color: rgba(14, 17, 23"],
+div[style*="background-color: rgba(26, 28, 36"] {
+  background: var(--surface) !important;
+}
 
 /* ── 탭 ── */
 .stTabs [data-baseweb="tab-list"] {
@@ -1379,7 +1435,7 @@ with st.sidebar:
     page = st.radio("메뉴", [
         "대시보드", "기업 관리", "공고 수집",
         "매칭 결과", "발송 관리", "안내 메일",
-        "발송 이력", "성과 집계", "설정", "시스템 명세"
+        "발송 이력", "성과 집계", "키워드 관리", "설정", "시스템 명세"
     ], label_visibility="collapsed")
     st.divider()
     test_mode = st.toggle("테스트 모드", value=True)
@@ -2250,15 +2306,18 @@ elif page == "매칭 결과":
             all_results  = []; prog = st.progress(0)
             notice_recommend_count = {}
 
-            # 피드백 로드 (이전 검토에서 제외한 패턴)
-            kw_data_fb = load_json(drive, KEYWORDS_FILE) or {}
-            feedback_map = kw_data_fb.get('feedback', {})
+            # 피드백 + 가중치 + 제외키워드 통합 로드
+            kw_config = load_kw_config(drive)
+            feedback_map = kw_config.get('feedback', {})
             if feedback_map:
                 st.caption(f"🔄 피드백 반영 중 — {len(feedback_map)}개사 패턴 로드")
+            if kw_config.get('exclude_keywords'):
+                st.caption(f"🚫 제외 키워드 {len(kw_config['exclude_keywords'])}개 적용")
 
             for idx, (_, row) in enumerate(df_c.iterrows()):
                 scored = [r for _, n in df_n.iterrows()
-                          if (r := score_notice(enrich(n.to_dict()), row, already_sent, HIGH, MID, feedback_map))]
+                          if (r := score_notice(enrich(n.to_dict()), row, already_sent,
+                                                HIGH, MID, feedback_map, kw_config))]
 
                 for r in scored:
                     pid = r.get('공고ID','')
@@ -3791,7 +3850,204 @@ elif page == "성과 집계":
 # ══════════════════════════════════════════════════════
 # 설정
 # ══════════════════════════════════════════════════════
-elif page == "설정":
+
+# ══════════════════════════════════════════════════════
+# 키워드 관리
+# ══════════════════════════════════════════════════════
+elif page == "키워드 관리":
+    drive = _get_drive()
+    st.title("키워드 관리")
+    info_box("키워드 관리",
+        """
+매칭에 사용되는 키워드를 관리합니다.
+
+- **전체 키워드** — 모든 기업에 공통 적용. HIGH(★★★ 필수조건) / MID(★★ 조건)
+- **기업별 키워드** — 기업 관리 탭의 '키워드 보완' 필드 일괄 편집
+- **매칭 가중치** — 각 매칭 축의 점수 비중 조정
+        """,
+        "변경 후 반드시 '저장' → 매칭 재실행")
+
+    kw_data = load_json(drive, KEYWORDS_FILE) or {}
+    HIGH_kw, MID_kw = load_keywords(drive)
+    df_c = load_excel(drive, SELECTED_FILE)
+
+    tab_kw1, tab_kw2, tab_kw3 = st.tabs(["🎯 전체 키워드", "🏢 기업별 키워드", "⚖️ 매칭 가중치"])
+
+    # ── 탭1: 전체 키워드 ──────────────────────────────
+    with tab_kw1:
+        st.subheader("HIGH 키워드 (★★★ 필수조건)")
+        st.caption("이 키워드가 공고에 있으면 ★★★ 후보. 지원대상·공공조달 관련 핵심 단어.")
+        high_str = st.text_area(
+            "HIGH 키워드 (쉼표 구분)",
+            value=", ".join(HIGH_kw),
+            height=120, key="kw_high_edit"
+        )
+
+        st.divider()
+        st.subheader("MID 키워드 (★★ 조건)")
+        st.caption("이 키워드가 공고에 있으면 ★★ 후보. 해외진출·마케팅 관련 단어.")
+        mid_str = st.text_area(
+            "MID 키워드 (쉼표 구분)",
+            value=", ".join(MID_kw),
+            height=120, key="kw_mid_edit"
+        )
+
+        st.divider()
+
+        # 제외 키워드 (특정 단어가 있으면 매칭에서 감점)
+        st.subheader("제외 키워드 (매칭 감점)")
+        st.caption("공고에 이 단어가 있으면 점수를 낮춤. 예: 예비창업자, 소셜벤처 등 해당 없는 대상.")
+        exclude_kws = kw_data.get("exclude_keywords", [])
+        excl_str = st.text_area(
+            "제외 키워드 (쉼표 구분)",
+            value=", ".join(exclude_kws),
+            height=80, key="kw_excl_edit",
+            placeholder="예: 예비창업자, 창업팀, 소셜벤처, 사회적기업"
+        )
+
+        if st.button("💾 전체 키워드 저장", type="primary", key="save_global_kw"):
+            new_high  = [k.strip() for k in high_str.split(',') if k.strip()]
+            new_mid   = [k.strip() for k in mid_str.split(',')  if k.strip()]
+            new_excl  = [k.strip() for k in excl_str.split(',') if k.strip()]
+            kw_data["HIGH"] = new_high
+            kw_data["MID"]  = new_mid
+            kw_data["exclude_keywords"] = new_excl
+            if save_json(drive, kw_data, KEYWORDS_FILE):
+                st.success(f"저장 완료 — HIGH {len(new_high)}개 / MID {len(new_mid)}개 / 제외 {len(new_excl)}개")
+            else:
+                st.error("저장 실패")
+
+        # 현재 키워드 통계
+        with st.expander("📊 현재 키워드 현황"):
+            c1, c2, c3 = st.columns(3)
+            c1.metric("HIGH", f"{len(HIGH_kw)}개")
+            c2.metric("MID",  f"{len(MID_kw)}개")
+            c3.metric("제외", f"{len(exclude_kws)}개")
+
+            st.caption("**HIGH 키워드 목록**")
+            st.write(", ".join(HIGH_kw))
+            st.caption("**MID 키워드 목록**")
+            st.write(", ".join(MID_kw))
+
+    # ── 탭2: 기업별 키워드 ────────────────────────────
+    with tab_kw2:
+        st.subheader("기업별 키워드 보완")
+        st.caption("각 기업에 추가 키워드를 설정합니다. 기업 관리 탭과 동일한 필드이며 여기서 일괄 편집 가능합니다.")
+
+        if df_c.empty:
+            st.warning("선정기업 명단이 없습니다.")
+        else:
+            if '키워드보완' not in df_c.columns:
+                df_c['키워드보완'] = ''
+
+            # 검색
+            search = st.text_input("🔍 기업명 검색", key="kw_co_search")
+            df_show = df_c[df_c['기업명'].str.contains(search, na=False)] if search else df_c
+
+            # 키워드 없는 기업 수
+            no_kw = (df_c['키워드보완'].fillna('') == '').sum()
+            st.info(f"키워드 미입력 기업: {no_kw}개사 / 전체 {len(df_c)}개사 — 키워드 입력 시 매칭 정확도가 올라갑니다.")
+
+            changed = {}
+            for idx, row in df_show.iterrows():
+                c1, c2 = st.columns([2, 3])
+                with c1:
+                    nm = row.get('기업명', '')
+                    st.write(f"**{nm}**")
+                    st.caption(f"{row.get('제품분야','—')[:20]} | {row.get('소재지','—')}")
+                with c2:
+                    new_kw = st.text_input(
+                        "추가 키워드",
+                        value=row.get('키워드보완',''),
+                        key=f"co_kw_{idx}",
+                        placeholder="예: 스마트팜, IoT 센서, 환경모니터링",
+                        label_visibility="collapsed"
+                    )
+                    if new_kw != row.get('키워드보완',''):
+                        changed[idx] = new_kw
+
+            if changed:
+                if st.button(f"💾 변경된 {len(changed)}개사 키워드 저장", type="primary", key="save_co_kw"):
+                    for idx, val in changed.items():
+                        df_c.at[idx, '키워드보완'] = val
+                    if save_excel(drive, df_c, SELECTED_FILE, "선정기업명단", "1F4E79"):
+                        st.success(f"{len(changed)}개사 키워드 저장 완료")
+                        st.rerun()
+                    else:
+                        st.error("저장 실패")
+
+        # 피드백 패턴 (이전 검토에서 쌓인 데이터)
+        feedback = kw_data.get('feedback', {})
+        if feedback:
+            st.divider()
+            st.subheader("📋 피드백 패턴 (제외 이력)")
+            st.caption("이전 검토에서 제외한 공고의 사업성격 패턴입니다. 다음 매칭 시 자동 감점됩니다.")
+            for co, patterns in list(feedback.items())[:10]:
+                st.write(f"**{co}**: " + ", ".join([f"{k}({v}회)" for k,v in sorted(patterns.items(), key=lambda x:-x[1])]))
+
+    # ── 탭3: 매칭 가중치 ──────────────────────────────
+    with tab_kw3:
+        st.subheader("매칭 축별 가중치 조정")
+        st.caption("각 축의 점수 비중을 조정합니다. 합산 점수가 별점(★) 판정에 영향을 줍니다.")
+
+        weights = kw_data.get("weights", {
+            "지원대상": 3, "사업성격": 2, "기업키워드": 2,
+            "핵심수요": 3, "업종역방향": 1, "소재지가산": 3, "세그먼트": 2
+        })
+
+        st.markdown("**각 매칭 축의 기본 점수 (건당)**")
+        c1, c2 = st.columns(2)
+        with c1:
+            w_target  = st.slider("지원대상 매칭 (×건수)", 1, 6, weights.get("지원대상", 3), key="w1")
+            w_type    = st.slider("사업성격 매칭 (×건수)", 1, 6, weights.get("사업성격", 2), key="w2")
+            w_kw      = st.slider("기업키워드 매칭 (×건수)", 1, 6, weights.get("기업키워드", 2), key="w3")
+            w_demand  = st.slider("핵심수요 매칭 (×건수)", 1, 6, weights.get("핵심수요", 3), key="w4")
+        with c2:
+            w_ind     = st.slider("업종 역방향 매칭 (×건수)", 1, 6, weights.get("업종역방향", 1), key="w5")
+            w_loc     = st.slider("소재지 일치 가산점", 1, 6, weights.get("소재지가산", 3), key="w6")
+            w_seg     = st.slider("세그먼트 부스트 (최대)", 1, 8, weights.get("세그먼트", 4), key="w7")
+
+        st.divider()
+        st.subheader("★ 별점 판정 기준")
+        col1, col2 = st.columns(2)
+        with col1:
+            star3_threshold = st.slider("★★★ 최소 점수", 10, 40, kw_data.get("star3_threshold", 20), key="s3")
+        with col2:
+            star2_threshold = st.slider("★★ 최소 점수",  5, 30, kw_data.get("star2_threshold", 10), key="s2")
+        st.caption(f"현재 설정: ★★★ ≥ {star3_threshold}점, ★★ ≥ {star2_threshold}점")
+
+        if st.button("💾 가중치 저장", type="primary", key="save_weights"):
+            kw_data["weights"] = {
+                "지원대상": w_target, "사업성격": w_type,
+                "기업키워드": w_kw, "핵심수요": w_demand,
+                "업종역방향": w_ind, "소재지가산": w_loc, "세그먼트": w_seg
+            }
+            kw_data["star3_threshold"] = star3_threshold
+            kw_data["star2_threshold"] = star2_threshold
+            if save_json(drive, kw_data, KEYWORDS_FILE):
+                st.success("가중치 저장 완료 — 다음 매칭 실행 시 반영됩니다.")
+            else:
+                st.error("저장 실패")
+
+        with st.expander("ℹ️ 가중치 설명"):
+            st.markdown("""
+**지원대상 매칭** — 공고가 "수출기업", "벤처기업" 등 기업 유형을 명시한 경우
+
+**사업성격 매칭** — 공고가 "해외진출", "기술개발" 등 사업 유형에 해당하는 경우
+
+**기업키워드 매칭** — 기업의 기술키워드/제품분야가 공고 텍스트에 직접 등장하는 경우
+
+**핵심수요 매칭** — 기업의 핵심수요태그(G-PASS, 수출바우처 등)가 공고와 일치하는 경우
+
+**업종 역방향 매칭** — 기업 제품분야 → INDUSTRY_KW → 공고 텍스트로 간접 매칭된 경우
+
+**소재지 일치** — 지역 제한 공고에서 기업 소재지가 일치하는 경우
+
+**세그먼트 부스트** — 기업 세그먼트(해외진출형/조달강화형 등)에 맞는 공고 유형 보너스
+            """)
+
+
+
     drive = _get_drive()
     st.title("설정")
     info_box("설정",
