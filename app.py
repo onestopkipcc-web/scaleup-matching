@@ -2133,36 +2133,34 @@ elif page == "매칭 결과":
 
                 nav1, nav2, nav3, nav4 = st.columns([1, 5, 1, 2])
                 with nav1:
-                    if st.button("◀ 이전", disabled=current_idx==0):
-                        next_name = companies_in_result[current_idx - 1]
-                        st.session_state['review_co_name'] = next_name
-                        # selectbox key도 함께 갱신해서 충돌 방지
-                        next_label = next((l for l, c in co_map.items() if c == next_name), None)
-                        if next_label:
-                            st.session_state['review_co_select'] = next_label
-                        st.rerun()
+                    prev_clicked = st.button("◀ 이전", disabled=current_idx==0,
+                                             key="btn_prev_co")
                 with nav2:
-                    selected_label = st.selectbox(
+                    # selectbox는 표시용으로만 사용, 값 변경은 on_change 콜백으로 처리
+                    def _on_co_change():
+                        label = st.session_state['_co_select_widget']
+                        st.session_state['review_co_name'] = co_map.get(label, cur_name)
+
+                    st.selectbox(
                         "기업 선택", co_labels,
                         index=current_idx,
-                        key="review_co_select",
-                        label_visibility="collapsed"
+                        key="_co_select_widget",
+                        label_visibility="collapsed",
+                        on_change=_on_co_change
                     )
-                    sel_name = co_map.get(selected_label, cur_name)
-                    if sel_name != cur_name:
-                        st.session_state['review_co_name'] = sel_name
-                        st.rerun()
                 with nav3:
-                    if st.button("다음 ▶", disabled=current_idx==len(co_labels)-1):
-                        next_name = companies_in_result[current_idx + 1]
-                        st.session_state['review_co_name'] = next_name
-                        # selectbox key도 함께 갱신
-                        next_label = next((l for l, c in co_map.items() if c == next_name), None)
-                        if next_label:
-                            st.session_state['review_co_select'] = next_label
-                        st.rerun()
+                    next_clicked = st.button("다음 ▶", disabled=current_idx==len(co_labels)-1,
+                                             key="btn_next_co")
                 with nav4:
                     st.caption(f"{current_idx+1} / {len(co_labels)}개사")
+
+                # 버튼 처리 — 렌더링 완료 후 상태 변경 → rerun
+                if prev_clicked:
+                    st.session_state['review_co_name'] = companies_in_result[current_idx - 1]
+                    st.rerun()
+                if next_clicked:
+                    st.session_state['review_co_name'] = companies_in_result[current_idx + 1]
+                    st.rerun()
 
                 selected_co = st.session_state['review_co_name']
                 co_rows = filtered[filtered['기업명'] == selected_co].copy()
