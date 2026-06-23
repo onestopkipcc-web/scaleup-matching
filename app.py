@@ -487,6 +487,20 @@ def cal_insert_event(cal_id, body):
         json=body)
     return resp.json() if resp.ok else {}
 
+def cal_create(summary, description):
+    """캘린더 생성 → cal_id 반환"""
+    resp = gapi('POST',
+        'https://www.googleapis.com/calendar/v3/calendars',
+        json={'summary': summary, 'description': description, 'timeZone': 'Asia/Seoul'})
+    return resp.json().get('id', '') if resp.ok else ''
+
+def cal_share(cal_id, email):
+    """캘린더를 특정 이메일(reader)로 공유"""
+    resp = gapi('POST',
+        f'https://www.googleapis.com/calendar/v3/calendars/{cal_id}/acl',
+        json={'scope': {'type': 'user', 'value': email}, 'role': 'reader'})
+    return resp.ok
+
 # ── drive API (requests 기반) ──────────────────────────
 def drive_list_files(name, folder_id):
     params = {
@@ -1363,7 +1377,7 @@ with st.sidebar:
     page = st.radio("메뉴", [
         "대시보드", "기업 관리", "공고 수집",
         "매칭 결과", "발송 관리", "안내 메일",
-        "발송 이력", "성과 집계", "키워드 관리", "설정", "시스템 명세"
+        "발송 이력", "성과 집계", "캘린더 관리", "키워드 관리", "설정", "시스템 명세"
     ], label_visibility="collapsed")
     st.divider()
     test_mode = st.toggle("테스트 모드", value=True)
@@ -4179,7 +4193,248 @@ elif page == "키워드 관리":
             """)
 
 
-elif page == "설정":
+
+# ══════════════════════════════════════════════════════
+# 캘린더 관리
+# ══════════════════════════════════════════════════════
+elif page == "캘린더 관리":
+    drive = _get_drive()
+    st.title("캘린더 관리")
+    info_box("캘린더 관리",
+        """
+기업별 구글 캘린더를 생성하고 담당자에게 공유합니다.
+
+**운영 흐름**
+1. 기업 담당자 구글계정 수집 (기업 관리 탭 또는 DB 업로드)
+2. 캘린더 일괄 생성 → individual_calendars.json 저장
+3. 담당자 이메일로 공유 초대 자동 발송
+4. 이후 발송 시 공고 마감일이 캘린더에 자동 등록됨
+        """,
+        "테스트 먼저 → 전체 실행")
+
+    tab_cal1, tab_cal2, tab_cal3 = st.tabs([
+        "🧪 테스트 생성", "📋 기업별 현황", "⚙️ 전체 실행"
+    ])
+
+    # ── 공통 데이터 로드 ──────────────────────────────
+    df_c       = load_excel(drive, SELECTED_FILE)
+    ind_cals   = load_json(drive, INDCAL_FILE) or {}
+
+    # ── 탭1: 테스트 생성 ──────────────────────────────
+    with tab_cal1:
+        st.subheader("테스트용 캘린더 생성")
+        st.caption("실제 기업 DB와 무관하게 테스트 계정으로 먼저 동작 확인합니다.")
+
+        with st.form("test_cal_form"):
+            t_company  = st.text_input("테스트 기업명", value="테스트기업_홍길동",
+                                        placeholder="캘린더 이름에 표시될 기업명")
+            t_email    = st.text_input("공유할 구글 계정",
+                                        placeholder="example@gmail.com",
+                                        help="이 계정으로 캘린더 공유 초대가 발송됩니다")
+            t_interest = st.text_input("관심분야 (선택)", placeholder="수출, 기술개발")
+            t_keyword  = st.text_input("기술키워드 (선택)", placeholder="AI, IoT")
+            submitted  = st.form_submit_button("🗓 테스트 캘린더 생성", type="primary")
+
+        if submitted:
+            if not t_email or '@' not in t_email:
+                st.error("구글 계정 이메일을 올바르게 입력해주세요.")
+            else:
+                with st.spinner("캘린더 생성 중..."):
+                    try:
+                        cal_id = cal_create(
+                            f"[원스톱] {t_company} 지원공고 D-day",
+                            f"혁신제품지원센터 원스톱 스케일업 프로그램\n기업: {t_company}\n관심분야: {t_interest}\n기술키워드: {t_keyword}\n문의: onestop.kipcc@gmail.com"
+                        )
+                        if not cal_id:
+                            st.error("캘린더 생성 실패 — 인증 상태를 확인하세요.")
+                        else:
+                            sub_link = f"https://calendar.google.com/calendar?cid={cal_id}"
+                            st.success("✅ 캘린더 생성 완료!")
+                            st.code(f"캘린더 ID: {cal_id}")
+
+                            # 공유 초대
+                            if cal_share(cal_id, t_email):
+                                st.success(f"✅ {t_email} 으로 공유 초대 발송 완료!")
+                            else:
+                                st.warning("⚠️ 공유 초대 실패 — 이메일을 확인하세요.")
+                            st.markdown(f"[📅 캘린더 구독 링크]({sub_link})")
+
+                            # 테스트 이벤트 등록
+                            from datetime import timedelta
+                            test_date = (datetime.today() + timedelta(days=7)).strftime('%Y-%m-%d')
+                            event = {
+                                'summary': f"[D-7] 테스트공고 마감 — {t_company}",
+                                'description': "원스톱 스케일업 테스트 이벤트입니다.",
+                                'start': {'date': test_date, 'timeZone': 'Asia/Seoul'},
+                                'end':   {'date': test_date, 'timeZone': 'Asia/Seoul'},
+                            }
+                            cal_insert_event(cal_id, event)
+                            st.success(f"✅ 테스트 이벤트 등록 완료 ({test_date} D-7 알림)")
+                            st.info("📱 구글 캘린더 앱에서 공유 초대를 수락하면 캘린더가 추가됩니다.")
+
+                    except Exception as e:
+                        st.error(f"오류 발생: {str(e)}")
+
+    # ── 탭2: 기업별 현황 ──────────────────────────────
+    with tab_cal2:
+        st.subheader("기업별 캘린더 현황")
+
+        if not ind_cals:
+            st.info("아직 생성된 캘린더가 없습니다. '전체 실행' 탭에서 생성하세요.")
+        else:
+            total    = len(ind_cals)
+            shared   = sum(1 for v in ind_cals.values() if v.get('shared'))
+            noshare  = total - shared
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("전체 캘린더", f"{total}개")
+            c2.metric("✅ 공유 완료", f"{shared}개")
+            c3.metric("⏳ 공유 대기", f"{noshare}개")
+            st.divider()
+
+            for co, info in ind_cals.items():
+                status = "✅" if info.get('shared') else "⏳"
+                with st.expander(f"{status} {co}"):
+                    c1, c2 = st.columns(2)
+                    c1.caption("구글 계정")
+                    c1.write(info.get('google_account', '미입력') or '미입력')
+                    c2.caption("공유 상태")
+                    c2.write("공유 완료" if info.get('shared') else "미공유")
+                    if info.get('subscribe_link'):
+                        st.markdown(f"[📅 구독 링크]({info['subscribe_link']})")
+
+                    # 미공유 기업 수동 공유 버튼
+                    if not info.get('shared') and info.get('google_account'):
+                        if st.button(f"📨 {info['google_account']}에 공유", key=f"share_{co}"):
+                            try:
+                                ok = cal_share(info['calendar_id'], info['google_account'])
+                                if ok:
+                                    ind_cals[co]['shared'] = True
+                                    import json as _json
+                                    content = _json.dumps(ind_cals, ensure_ascii=False).encode('utf-8')
+                                    drive_upload(drive, INDCAL_FILE, content, "application/json")
+                                    st.success("공유 완료!")
+                                    st.rerun()
+                                else:
+                                    st.error("공유 실패 — 구글 계정을 확인하세요.")
+                            except Exception as e:
+                                st.error(f"공유 실패: {e}")
+
+        # DB 업로드 섹션
+        st.divider()
+        st.subheader("📁 individual_calendars.json 직접 업로드")
+        st.caption("로컬에서 create_individual_calendars.py 실행 후 생성된 파일을 업로드하세요.")
+        uploaded_cal = st.file_uploader("individual_calendars.json 업로드",
+                                         type=["json"], key="cal_upload")
+        if uploaded_cal:
+            import json as _json
+            cal_data = _json.loads(uploaded_cal.read().decode('utf-8'))
+            content  = _json.dumps(cal_data, ensure_ascii=False).encode('utf-8')
+            if drive_upload(drive, INDCAL_FILE, content, "application/json"):
+                st.success(f"✅ {len(cal_data)}개사 캘린더 정보 업로드 완료")
+                st.rerun()
+
+    # ── 탭3: 전체 실행 ────────────────────────────────
+    with tab_cal3:
+        st.subheader("전체 기업 캘린더 일괄 생성")
+
+        if df_c.empty:
+            st.warning("선정기업 명단이 없습니다.")
+        else:
+            has_google = '구글계정' in df_c.columns
+            google_filled = (df_c['구글계정'].fillna('') != '').sum() if has_google else 0
+            no_google     = len(df_c) - google_filled if has_google else len(df_c)
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("전체 기업", f"{len(df_c)}개사")
+            c2.metric("구글계정 입력", f"{google_filled}개사")
+            c3.metric("계정 미입력", f"{no_google}개사")
+
+            if no_google > 0:
+                st.warning(f"⚠️ {no_google}개사는 구글계정이 없어 캘린더 공유가 불가합니다. "
+                           f"기업 관리 탭에서 구글계정을 먼저 입력하세요.")
+            already_created = len(ind_cals)
+            remaining = len(df_c) - already_created
+            if already_created > 0:
+                st.info(f"이미 생성된 캘린더: {already_created}개사 / 새로 생성할: {remaining}개사")
+
+            st.divider()
+            st.warning("⚠️ 실행 전 테스트 탭에서 먼저 동작을 확인하세요.")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                confirm_text = st.text_input("확인코드 입력", placeholder="캘린더생성",
+                                              key="cal_create_confirm")
+            with col2:
+                st.caption("확인코드: **캘린더생성**")
+
+            if st.button("🗓 전체 캘린더 일괄 생성", type="primary", key="create_all_cal"):
+                if confirm_text != "캘린더생성":
+                    st.error("확인코드를 입력해주세요.")
+                else:
+                    prog = st.progress(0, text="캘린더 생성 중...")
+                    logs = []; ok = 0; fail = 0
+
+                    for i, (_, row) in enumerate(df_c.iterrows()):
+                        co       = row.get('기업명', '')
+                        g_email  = str(row.get('구글계정', '') or '').strip()
+                        interest = str(row.get('관심사업분야', '') or '')[:30]
+                        keywords = str(row.get('기술키워드', '') or '')[:40]
+
+                        if co in ind_cals:
+                            logs.append(f"⏭ {co} — 이미 생성됨")
+                            prog.progress((i+1)/len(df_c), text=f"{i+1}/{len(df_c)} 처리 중...")
+                            continue
+
+                        try:
+                            cal_id = cal_create(
+                                f"[원스톱] {co} 지원공고 D-day",
+                                f"혁신제품지원센터 원스톱 스케일업 프로그램\n기업: {co}\n관심분야: {interest}\n기술키워드: {keywords}\n문의: onestop.kipcc@gmail.com"
+                            )
+                            if not cal_id:
+                                raise Exception("캘린더 생성 실패")
+
+                            sub_link = f"https://calendar.google.com/calendar?cid={cal_id}"
+                            shared   = False
+
+                            if g_email and '@' in g_email:
+                                shared = cal_share(cal_id, g_email)
+
+                            ind_cals[co] = {
+                                'calendar_id':    cal_id,
+                                'google_account': g_email,
+                                'shared':         shared,
+                                'subscribe_link': sub_link,
+                                'interest':       interest,
+                            }
+                            ok += 1
+                            logs.append(f"✅ {co}" + (f" → {g_email} 공유완료" if shared else " (공유 대기)"))
+
+                            # 5개마다 중간 저장
+                            if ok % 5 == 0:
+                                import json as _json
+                                _c = _json.dumps(ind_cals, ensure_ascii=False).encode('utf-8')
+                                drive_upload(drive, INDCAL_FILE, _c, "application/json")
+
+                        except Exception as e:
+                            fail += 1
+                            logs.append(f"❌ {co}: {str(e)[:40]}")
+
+                        prog.progress((i+1)/len(df_c), text=f"{i+1}/{len(df_c)} 처리 중...")
+
+                    # 최종 저장
+                    import json as _json
+                    _c = _json.dumps(ind_cals, ensure_ascii=False).encode('utf-8')
+                    drive_upload(drive, INDCAL_FILE, _c, "application/json")
+
+                    st.success(f"✅ 완료 — 생성 {ok}개 / 실패 {fail}개")
+                    with st.expander("처리 로그"):
+                        for log in logs:
+                            st.caption(log)
+                    st.rerun()
+
+
+
     drive = _get_drive()
     st.title("설정")
     info_box("설정",
