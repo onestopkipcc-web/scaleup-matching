@@ -4814,7 +4814,7 @@ bizinfo API (매주 월요일, Streamlit 앱)
     ↓
 notices_db.xlsx → 구글 드라이브
 
-기업마당 크롤링 (매주 수요일, GitHub Actions 자동)
+기업마당 크롤링 (공고 수집 탭에서 수동 실행)
     ↓
 notices_detail.xlsx → 구글 드라이브
 
@@ -4827,19 +4827,7 @@ Calendar API → D-7·D-3·마감 캘린더 등록
 ```
         """)
 
-        st.divider()
-        st.subheader("GitHub Actions 크롤링")
-        st.markdown("""
-**자동 실행 일정**: 매주 수요일 오전 10시 (KST)
 
-**설정 방법**
-1. GitHub 저장소 → Settings → Secrets → `GOOGLE_TOKEN_JSON` 추가
-2. token.json 파일 내용을 그대로 붙여넣기
-3. 이후 매주 수요일 자동 실행
-
-**수동 실행**
-GitHub 저장소 → Actions 탭 → `공고 전문 크롤링` → Run workflow
-        """)
 
         st.divider()
         st.subheader("캘린더 구조")
@@ -5003,7 +4991,7 @@ GitHub 저장소 → Actions 탭 → `공고 전문 크롤링` → Run workflow
 |--------|------|-----------|
 | 선정기업_명단.xlsx | 기업 DB | walla_to_selected.py 로컬 실행 |
 | notices_db.xlsx | 공고 DB | 공고 수집 버튼 (매주 월요일) |
-| **notices_detail.xlsx** | **공고 전문 DB** | **GitHub Actions 자동 (매주 수요일)** |
+| **notices_detail.xlsx** | **공고 전문 DB** | **공고 수집 탭에서 크롤링 실행** |
 | send_history.xlsx | 발송 이력 | 발송 실행 시 자동 기록 |
 | keywords.json | 매칭 키워드 | 설정 탭에서 저장 시 자동 생성 |
 | calendar_id.txt | 공통 캘린더 ID | create_common_calendar.py 실행 |
@@ -5017,9 +5005,9 @@ GitHub 저장소 → Actions 탭 → `공고 전문 크롤링` → Run workflow
 |--------|------|
 | app.py | Streamlit 웹앱 메인 |
 | requirements.txt | 라이브러리 목록 |
-| **crawl_notices.py** | **공고 전문 크롤러 (GitHub Actions 자동 실행)** |
+| **crawl_notices.py** | **공고 전문 크롤러 (앱 내 직접 실행)** |
 | **walla_to_selected.py** | **WALLA → 선정기업 명단 변환 (선정 후 1회)** |
-| .github/workflows/crawl.yml | GitHub Actions 스케줄러 |
+
 | create_individual_calendars.py | 기업별 캘린더 생성 (선정 후) |
 | auth_test.py | 구글 인증 (최초 1회) |
 | logo.png | 혁신제품지원센터 CI |
