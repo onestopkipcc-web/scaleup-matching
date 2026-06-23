@@ -1093,277 +1093,276 @@ st.markdown("""
 
 /* ── 전역 변수 ── */
 :root {
-  --bg-base:    #0F1117;
-  --bg-surface: #161B27;
-  --bg-elevated:#1C2333;
-  --bg-border:  #2A3347;
-  --text-primary:   #F0F2F5;
-  --text-secondary: #8B95A8;
-  --text-muted:     #5A6477;
+  --bg:         #F8FAFC;
+  --surface:    #FFFFFF;
+  --surface-2:  #F1F5F9;
+  --border:     #E2E8F0;
+  --border-2:   #CBD5E1;
+  --text-1:     #0F172A;
+  --text-2:     #475569;
+  --text-3:     #94A3B8;
   --accent:     #10B981;
-  --accent-dim: rgba(16,185,129,0.12);
-  --accent-hover:#0EA472;
+  --accent-light: #D1FAE5;
+  --accent-dark:  #059669;
   --blue:       #3B82F6;
+  --blue-light: #DBEAFE;
   --yellow:     #F59E0B;
+  --yellow-light:#FEF3C7;
   --red:        #EF4444;
-  --radius-sm:  6px;
-  --radius-md:  10px;
-  --radius-lg:  14px;
+  --red-light:  #FEE2E2;
+  --radius:     8px;
+  --shadow:     0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:  0 4px 6px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
 }
 
-/* ── 전체 배경·폰트 ── */
+/* ── 전체 ── */
 .stApp {
-  background: var(--bg-base) !important;
-  font-family: 'Inter', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif !important;
+  background: var(--bg) !important;
+  font-family: 'Inter','Apple SD Gothic Neo','Malgun Gothic',sans-serif !important;
 }
-.stApp, .stApp * { color: var(--text-primary); }
+.stApp, .stApp * { color: var(--text-1) !important; }
 
-/* ── 타이포그래피 ── */
-h1 {
-  color: var(--text-primary) !important;
-  font-size: 24px !important;
-  font-weight: 700 !important;
-  letter-spacing: -0.3px !important;
-}
-h2 {
-  color: var(--text-primary) !important;
-  font-size: 18px !important;
-  font-weight: 600 !important;
-}
-h3 {
-  color: var(--text-primary) !important;
-  font-size: 15px !important;
-  font-weight: 600 !important;
-}
-p, li, div, label, span {
-  color: var(--text-primary) !important;
-  font-size: 14px !important;
-  line-height: 1.6 !important;
-}
-strong { color: var(--accent) !important; font-weight: 600 !important; }
+/* ── 타이포 ── */
+h1 { font-size:22px !important; font-weight:700 !important; color:var(--text-1) !important; letter-spacing:-0.3px !important; }
+h2 { font-size:17px !important; font-weight:600 !important; color:var(--text-1) !important; }
+h3 { font-size:15px !important; font-weight:600 !important; color:var(--text-1) !important; }
+p, li, div, label, span { color:var(--text-1) !important; font-size:14px !important; line-height:1.6 !important; }
+strong { color:var(--accent-dark) !important; font-weight:600 !important; }
 code {
-  color: var(--accent) !important;
-  background: var(--accent-dim) !important;
-  border-radius: 4px !important;
-  padding: 1px 6px !important;
-  font-size: 12px !important;
+  color:var(--accent-dark) !important;
+  background:var(--accent-light) !important;
+  border-radius:4px !important; padding:1px 6px !important; font-size:12px !important;
 }
 
 /* ── 사이드바 ── */
 [data-testid="stSidebar"] {
-  background: var(--bg-surface) !important;
-  border-right: 1px solid var(--bg-border) !important;
+  background: var(--surface) !important;
+  border-right: 1px solid var(--border) !important;
+  box-shadow: var(--shadow) !important;
 }
-[data-testid="stSidebar"] * { color: var(--text-primary) !important; }
-[data-testid="stSidebarNav"] { display: none; }
+[data-testid="stSidebar"] * { color: var(--text-1) !important; }
+[data-testid="stSidebarNav"] { display:none; }
 [data-testid="stSidebar"] .stRadio label {
+  border-radius: var(--radius) !important;
   padding: 6px 10px !important;
-  border-radius: var(--radius-sm) !important;
-  transition: background 0.15s !important;
+  color: var(--text-2) !important;
 }
-[data-testid="stSidebar"] .stRadio label:hover {
-  background: var(--bg-elevated) !important;
+[data-testid="stSidebar"] .stRadio [aria-checked="true"] + label,
+[data-testid="stSidebar"] .stRadio label:has(input:checked) {
+  background: var(--accent-light) !important;
+  color: var(--accent-dark) !important;
+  font-weight: 600 !important;
 }
 
 /* ── 메트릭 ── */
+[data-testid="metric-container"] {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  padding: 14px 18px !important;
+  box-shadow: var(--shadow) !important;
+}
 [data-testid="stMetricLabel"] {
-  color: var(--text-secondary) !important;
+  color: var(--text-2) !important;
   font-size: 11px !important;
   font-weight: 500 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
 }
 [data-testid="stMetricValue"] {
-  color: var(--text-primary) !important;
-  font-size: 22px !important;
+  color: var(--text-1) !important;
+  font-size: 24px !important;
   font-weight: 700 !important;
 }
 [data-testid="stMetricDelta"] { font-size: 12px !important; }
-[data-testid="metric-container"] {
-  background: var(--bg-surface) !important;
-  border: 1px solid var(--bg-border) !important;
-  border-radius: var(--radius-md) !important;
-  padding: 14px 18px !important;
-}
 
 /* ── 버튼 ── */
 .stButton button {
-  background: var(--bg-elevated) !important;
-  color: var(--text-primary) !important;
-  border: 1px solid var(--bg-border) !important;
-  border-radius: var(--radius-sm) !important;
+  background: var(--surface) !important;
+  color: var(--text-1) !important;
+  border: 1px solid var(--border-2) !important;
+  border-radius: var(--radius) !important;
   font-size: 13px !important;
   font-weight: 500 !important;
   padding: 6px 14px !important;
+  box-shadow: var(--shadow) !important;
   transition: all 0.15s !important;
 }
 .stButton button:hover {
-  background: var(--bg-border) !important;
-  border-color: var(--text-muted) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent-dark) !important;
+  box-shadow: var(--shadow-md) !important;
 }
 button[kind="primary"] {
   background: var(--accent) !important;
-  color: #000 !important;
+  color: #fff !important;
   border: none !important;
   font-weight: 600 !important;
+  box-shadow: 0 1px 3px rgba(16,185,129,0.3) !important;
 }
 button[kind="primary"]:hover {
-  background: var(--accent-hover) !important;
+  background: var(--accent-dark) !important;
+  box-shadow: 0 4px 8px rgba(16,185,129,0.3) !important;
 }
 
 /* ── 입력창 ── */
 .stTextInput input, .stTextArea textarea {
-  background: var(--bg-surface) !important;
-  color: var(--text-primary) !important;
-  border: 1px solid var(--bg-border) !important;
-  border-radius: var(--radius-sm) !important;
+  background: var(--surface) !important;
+  color: var(--text-1) !important;
+  border: 1px solid var(--border-2) !important;
+  border-radius: var(--radius) !important;
   font-size: 14px !important;
+  box-shadow: var(--shadow) !important;
 }
 .stTextInput input:focus, .stTextArea textarea:focus {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 2px var(--accent-dim) !important;
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.15) !important;
 }
 .stSelectbox div[data-baseweb="select"] {
-  background: var(--bg-surface) !important;
-  border: 1px solid var(--bg-border) !important;
-  border-radius: var(--radius-sm) !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border-2) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow) !important;
 }
-.stSelectbox div[data-baseweb="select"] * { color: var(--text-primary) !important; }
-.stMultiSelect div[data-baseweb="select"] {
-  background: var(--bg-surface) !important;
-  border-color: var(--bg-border) !important;
-}
+.stSelectbox div[data-baseweb="select"] * { color: var(--text-1) !important; }
+[data-baseweb="popover"] { background: var(--surface) !important; border: 1px solid var(--border) !important; }
+[data-baseweb="menu"]    { background: var(--surface) !important; }
+[data-baseweb="menu"] li { color: var(--text-1) !important; }
+[data-baseweb="menu"] li:hover { background: var(--accent-light) !important; }
 
 /* ── 탭 ── */
 .stTabs [data-baseweb="tab-list"] {
   background: transparent !important;
-  border-bottom: 1px solid var(--bg-border) !important;
-  gap: 4px !important;
+  border-bottom: 2px solid var(--border) !important;
+  gap: 2px !important;
 }
 .stTabs [data-baseweb="tab"] {
-  color: var(--text-secondary) !important;
+  color: var(--text-2) !important;
   font-size: 13px !important;
   font-weight: 500 !important;
   padding: 8px 16px !important;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0 !important;
   background: transparent !important;
+  border-radius: 6px 6px 0 0 !important;
 }
 .stTabs [aria-selected="true"] {
-  color: var(--accent) !important;
+  color: var(--accent-dark) !important;
+  font-weight: 600 !important;
   border-bottom: 2px solid var(--accent) !important;
-  background: var(--accent-dim) !important;
+  background: var(--accent-light) !important;
 }
 
 /* ── Expander ── */
 .streamlit-expanderHeader {
-  background: var(--bg-surface) !important;
-  border: 1px solid var(--bg-border) !important;
-  border-radius: var(--radius-sm) !important;
-  color: var(--text-primary) !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  color: var(--text-1) !important;
   font-size: 13px !important;
   font-weight: 500 !important;
+  box-shadow: var(--shadow) !important;
 }
 .streamlit-expanderContent {
-  background: var(--bg-elevated) !important;
-  border: 1px solid var(--bg-border) !important;
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
   border-top: none !important;
-  border-radius: 0 0 var(--radius-sm) var(--radius-sm) !important;
+  border-radius: 0 0 var(--radius) var(--radius) !important;
 }
 
 /* ── 알림 박스 ── */
 .stSuccess {
-  background: rgba(16,185,129,0.08) !important;
-  border: 1px solid rgba(16,185,129,0.25) !important;
+  background: var(--accent-light) !important;
+  border: 1px solid rgba(16,185,129,0.3) !important;
   border-left: 3px solid var(--accent) !important;
-  border-radius: var(--radius-sm) !important;
-  color: var(--text-primary) !important;
+  border-radius: var(--radius) !important;
+  color: var(--text-1) !important;
 }
+.stSuccess * { color: var(--accent-dark) !important; }
 .stWarning {
-  background: rgba(245,158,11,0.08) !important;
-  border: 1px solid rgba(245,158,11,0.25) !important;
+  background: var(--yellow-light) !important;
+  border: 1px solid rgba(245,158,11,0.3) !important;
   border-left: 3px solid var(--yellow) !important;
-  border-radius: var(--radius-sm) !important;
+  border-radius: var(--radius) !important;
 }
+.stWarning * { color: #92400E !important; }
 .stError {
-  background: rgba(239,68,68,0.08) !important;
-  border: 1px solid rgba(239,68,68,0.25) !important;
+  background: var(--red-light) !important;
+  border: 1px solid rgba(239,68,68,0.3) !important;
   border-left: 3px solid var(--red) !important;
-  border-radius: var(--radius-sm) !important;
+  border-radius: var(--radius) !important;
 }
+.stError * { color: #991B1B !important; }
 .stInfo {
-  background: rgba(59,130,246,0.08) !important;
-  border: 1px solid rgba(59,130,246,0.25) !important;
+  background: var(--blue-light) !important;
+  border: 1px solid rgba(59,130,246,0.3) !important;
   border-left: 3px solid var(--blue) !important;
-  border-radius: var(--radius-sm) !important;
+  border-radius: var(--radius) !important;
 }
+.stInfo * { color: #1E40AF !important; }
 
 /* ── 구분선 ── */
-hr { border: none !important; border-top: 1px solid var(--bg-border) !important; }
+hr { border: none !important; border-top: 1px solid var(--border) !important; }
 
 /* ── 캡션 ── */
 .stCaption, [data-testid="stCaptionContainer"] {
-  color: var(--text-secondary) !important;
-  font-size: 12px !important;
+  color: var(--text-3) !important; font-size: 12px !important;
 }
 
 /* ── 데이터프레임 ── */
-.stDataFrame { background: var(--bg-surface) !important; border-radius: var(--radius-md) !important; }
-.stDataFrame * { color: var(--text-primary) !important; font-size: 13px !important; }
+.stDataFrame {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow) !important;
+}
+.stDataFrame * { color: var(--text-1) !important; font-size: 13px !important; }
+.stDataFrame th { background: var(--surface-2) !important; font-weight:600 !important; }
 
 /* ── 슬라이더 ── */
-.stSlider * { color: var(--text-primary) !important; }
-[data-testid="stSlider"] > div > div > div { background: var(--accent) !important; }
+.stSlider * { color: var(--text-1) !important; }
+[data-testid="stSlider"] > div > div { background: var(--accent) !important; }
 
 /* ── 체크박스 / 토글 / 라디오 ── */
-.stCheckbox label, .stCheckbox span, .stCheckbox p { color: var(--text-primary) !important; }
-.stToggle label { color: var(--text-primary) !important; }
-.stRadio label  { color: var(--text-primary) !important; font-size: 14px !important; }
+.stCheckbox label, .stCheckbox span { color: var(--text-1) !important; }
+.stToggle label { color: var(--text-1) !important; }
+.stRadio label  { color: var(--text-1) !important; font-size:14px !important; }
 
-/* ── 사이드바 항상 표시 ── */
-[data-testid="stSidebarCollapseButton"] { display: none !important; }
-[data-testid="collapsedControl"]        { display: none !important; }
-section[data-testid="stSidebar"] {
-  display: block !important;
-  transform: translateX(0) !important;
-  min-width: 244px !important;
-  visibility: visible !important;
-}
-section[data-testid="stSidebar"][aria-expanded="false"] {
-  display: block !important;
-  transform: translateX(0) !important;
-  margin-left: 0 !important;
-}
-
-/* ── 시스템 UI 숨김 ── */
-.stTooltipIcon                       { display: none !important; }
-div[data-testid="stStatusWidget"]    { display: none !important; }
-#MainMenu { visibility: hidden; }
-footer    { visibility: hidden; }
-header    { visibility: hidden; }
+/* ── progress ── */
+.stProgress > div > div { background: var(--accent) !important; }
+[data-testid="stProgressBar"] > div { background: var(--accent) !important; }
 
 /* ── link button ── */
 .stLinkButton a {
-  background: var(--bg-elevated) !important;
-  color: var(--text-primary) !important;
-  border: 1px solid var(--bg-border) !important;
-  border-radius: var(--radius-sm) !important;
+  background: var(--surface) !important;
+  color: var(--text-1) !important;
+  border: 1px solid var(--border-2) !important;
+  border-radius: var(--radius) !important;
   font-size: 13px !important;
   text-decoration: none !important;
-  padding: 6px 12px !important;
+  padding: 5px 12px !important;
+  box-shadow: var(--shadow) !important;
 }
 .stLinkButton a:hover {
   border-color: var(--accent) !important;
-  color: var(--accent) !important;
+  color: var(--accent-dark) !important;
 }
 
-/* ── 로그인 화면 ── */
-.stApp [data-testid="stVerticalBlock"] input[type="password"] {
-  border-color: var(--bg-border) !important;
+/* ── 사이드바 항상 표시 ── */
+[data-testid="stSidebarCollapseButton"] { display:none !important; }
+[data-testid="collapsedControl"]        { display:none !important; }
+section[data-testid="stSidebar"] {
+  display:block !important; transform:translateX(0) !important;
+  min-width:244px !important; visibility:visible !important;
+}
+section[data-testid="stSidebar"][aria-expanded="false"] {
+  display:block !important; transform:translateX(0) !important; margin-left:0 !important;
 }
 
-/* ── progress bar ── */
-.stProgress > div > div { background: var(--accent) !important; }
-[data-testid="stProgressBar"] > div { background: var(--accent) !important; }
+/* ── 시스템 UI 숨김 ── */
+.stTooltipIcon                    { display:none !important; }
+div[data-testid="stStatusWidget"] { display:none !important; }
+#MainMenu { visibility:hidden; }
+footer    { visibility:hidden; }
+header    { visibility:hidden; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1498,7 +1497,7 @@ if page == "대시보드":
         with c2:
             st.caption(s['detail'])
         with c3:
-            badge_color = "#63FFA8" if s['ok'] else ("#FFC863" if icon=="🟡" else "rgba(255,255,255,0.2)")
+            badge_color = "#10B981" if s['ok'] else ("#F59E0B" if icon=="🟡" else "#E2E8F0")
             st.markdown(
                 f"<span style='background:{badge_color};color:#000;padding:2px 10px;"
                 f"border-radius:10px;font-size:11px;font-weight:700;'>{s['status']}</span>",
@@ -2800,7 +2799,7 @@ elif page == "매칭 결과":
                                 rec       = ai_result.get('추천여부','')
                                 fit       = ai_result.get('적합도','')
                                 rec_color = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
-                                fit_color = {"높음":"#63FFA8","보통":"#FFC863","낮음":"#FF6363"}.get(fit,"#E8EDF2")
+                                fit_color = {"높음":"#10B981","보통":"#F59E0B","낮음":"#EF4444"}.get(fit,"#0F172A")
                                 icon_map  = {"O":"✅","X":"❌","△":"⚠️"}
                                 checks = {
                                     "업종일치": ai_result.get('업종일치','—'),
@@ -2817,14 +2816,14 @@ elif page == "매칭 결과":
 <div style="background:rgba(74,158,255,0.08);border:1px solid rgba(74,158,255,0.2);
             border-radius:8px;padding:14px 16px;margin-top:8px;">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-    <span style="font-size:11px;font-weight:700;color:#4A9EFF;letter-spacing:1px;">🤖 CLAUDE 분석</span>
+    <span style="font-size:11px;font-weight:700;color:#10B981;letter-spacing:1px;">🤖 CLAUDE 분석</span>
     <span style="font-size:13px;font-weight:700;color:{fit_color};">{rec_color} {rec}</span>
     <span style="font-size:12px;color:rgba(255,255,255,0.5);">적합도: {fit}</span>
   </div>
-  <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#E8EDF2;">{ai_result.get('한줄요약','')}</p>
+  <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#0F172A;">{ai_result.get('한줄요약','')}</p>
   <div style="margin-bottom:10px;">{check_html}</div>
   <p style="margin:0 0 6px;font-size:12px;color:rgba(255,255,255,0.65);line-height:1.7;">{ai_result.get('판단근거', ai_result.get('적합이유',''))}</p>
-  {"<p style=\\'margin:8px 0 0;font-size:11px;color:#FFC863;\\'>⚠️ " + ai_result.get('주의사항','') + "</p>" if ai_result.get('주의사항','') not in ['없음','','nan'] else ''}
+  {"<p style=\\'margin:8px 0 0;font-size:11px;color:#F59E0B;\\'>⚠️ " + ai_result.get('주의사항','') + "</p>" if ai_result.get('주의사항','') not in ['없음','','nan'] else ''}
 </div>
                                 """, unsafe_allow_html=True)
             st.divider()
@@ -3020,7 +3019,7 @@ elif page == "발송 관리":
                       <tr>
                         <td style="padding:16px 18px;">
                           <a href="{n.get('공고링크','#')}"
-                             style="font-size:14px;font-weight:700;color:#E8EDF2;
+                             style="font-size:14px;font-weight:700;color:#0F172A;
                                     text-decoration:none;line-height:1.5;display:block;">
                             {n.get('공고명','')}
                           </a>
@@ -3035,7 +3034,7 @@ elif page == "발송 관리":
                                    border-left:1px solid rgba(255,255,255,0.06);">
                           <a href="{n.get('공고링크','#')}"
                              style="display:inline-block;font-size:12px;font-weight:600;
-                                    color:#4A9EFF;text-decoration:none;white-space:nowrap;">
+                                    color:#10B981;text-decoration:none;white-space:nowrap;">
                             보기 →
                           </a>
                         </td>
@@ -3048,7 +3047,7 @@ elif page == "발송 관리":
                 if notices_sss:
                     rows_html += """
                     <p style="margin:0 0 10px;font-size:10px;font-weight:700;
-                               color:#FFC863;letter-spacing:2px;text-transform:uppercase;">
+                               color:#F59E0B;letter-spacing:2px;text-transform:uppercase;">
                       ★★★ &nbsp;직접 연계 추천
                     </p>"""
                     for i,n in enumerate(notices_sss): rows_html += notice_card(n, i)
@@ -3057,7 +3056,7 @@ elif page == "발송 관리":
                 if notices_ss:
                     rows_html += """
                     <p style="margin:0 0 10px;font-size:10px;font-weight:700;
-                               color:#4A9EFF;letter-spacing:2px;text-transform:uppercase;">
+                               color:#10B981;letter-spacing:2px;text-transform:uppercase;">
                       ★★ &nbsp;참고 추천
                     </p>"""
                     for i,n in enumerate(notices_ss): rows_html += notice_card(n, i)
@@ -3086,14 +3085,14 @@ elif page == "발송 관리":
                 cal_sec=f"""
                 <div style="background:rgba(74,158,255,0.08);border-radius:10px;
                             padding:16px 18px;border:1px solid rgba(74,158,255,0.2);">
-                  <p style="margin:0 0 4px;color:#4A9EFF;font-weight:700;font-size:11px;
+                  <p style="margin:0 0 4px;color:#10B981;font-weight:700;font-size:11px;
                              letter-spacing:1.5px;text-transform:uppercase;">
                     📅 마감일 알림 캘린더
                   </p>
                   <p style="margin:0 0 12px;font-size:12px;color:rgba(255,255,255,0.4);">
                     D-7 · D-3 자동 알림을 받아보세요.
                   </p>
-                  {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#4A9EFF;color:#0A1628;padding:8px 18px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700;'>구독하기 →</a>" if CALENDAR_LINK else ""}
+                  {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#10B981;color:#0A1628;padding:8px 18px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700;'>구독하기 →</a>" if CALENDAR_LINK else ""}
                   {ind_link}
                 </div>""" if (CALENDAR_LINK or ind_link) else ""
 
@@ -3166,7 +3165,7 @@ elif page == "발송 관리":
                               border:1px solid rgba(74,158,255,0.28);
                               border-radius:12px;padding:10px 0;width:60px;
                               text-align:center;">
-                    <p style="margin:0;font-size:22px;font-weight:800;color:#4A9EFF;
+                    <p style="margin:0;font-size:22px;font-weight:800;color:#10B981;
                                line-height:1;">{len(notices)}</p>
                     <p style="margin:3px 0 0;font-size:9px;letter-spacing:1.2px;
                                color:rgba(74,158,255,0.6);text-transform:uppercase;">picks</p>
@@ -3177,7 +3176,7 @@ elif page == "발송 관리":
             <!-- 기업명 카드 -->
             <div style="margin-top:20px;padding:14px 18px;
                         background:rgba(255,255,255,0.05);
-                        border-radius:8px;border-left:3px solid #4A9EFF;">
+                        border-radius:8px;border-left:3px solid #10B981;">
               <p style="margin:0 0 3px;font-size:15px;font-weight:700;color:#FFFFFF;">
                 {company}
                 <span style="font-size:13px;font-weight:400;
@@ -3479,10 +3478,10 @@ elif page == "안내 메일":
             form_section = f"""
             <div style="background:rgba(74,158,255,0.1);border:1px solid rgba(74,158,255,0.3);
                         border-radius:8px;padding:16px 18px;margin:16px 0;">
-              <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#4A9EFF;letter-spacing:1.5px;">
+              <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#10B981;letter-spacing:1.5px;">
                 📋 설문/폼 링크
               </p>
-              <a href="{form_link}" style="font-size:13px;color:#4A9EFF;">{form_link}</a>
+              <a href="{form_link}" style="font-size:13px;color:#10B981;">{form_link}</a>
             </div>"""
 
         body_html = mail_body.replace('\n', '<br>')
@@ -3529,7 +3528,7 @@ elif page == "안내 메일":
         <tr>
           <td style="padding:24px 28px;background:#0F1D2E;">
             <div style="padding:14px 18px;background:rgba(255,255,255,0.05);
-                        border-radius:8px;border-left:3px solid #4A9EFF;margin-bottom:20px;">
+                        border-radius:8px;border-left:3px solid #10B981;margin-bottom:20px;">
               <p style="margin:0;font-size:14px;font-weight:600;color:#FFFFFF;">
                 {sample_company}
                 <span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);margin-left:4px;">담당자님</span>
@@ -3597,10 +3596,10 @@ elif page == "안내 메일":
                     form_sec_co = f"""
                     <div style="background:rgba(74,158,255,0.1);border:1px solid rgba(74,158,255,0.3);
                                 border-radius:8px;padding:16px 18px;margin:16px 0;">
-                      <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#4A9EFF;letter-spacing:1.5px;">
+                      <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#10B981;letter-spacing:1.5px;">
                         📋 설문/폼 링크
                       </p>
-                      <a href="{form_link}" style="font-size:13px;color:#4A9EFF;">{form_link}</a>
+                      <a href="{form_link}" style="font-size:13px;color:#10B981;">{form_link}</a>
                     </div>"""
 
                 html_body = f"""<!DOCTYPE html>
@@ -3644,7 +3643,7 @@ elif page == "안내 메일":
         <tr>
           <td style="padding:24px 28px;background:#0F1D2E;">
             <div style="padding:14px 18px;background:rgba(255,255,255,0.05);
-                        border-radius:8px;border-left:3px solid #4A9EFF;margin-bottom:20px;">
+                        border-radius:8px;border-left:3px solid #10B981;margin-bottom:20px;">
               <p style="margin:0;font-size:14px;font-weight:600;color:#FFFFFF;">
                 {company}
                 <span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);margin-left:4px;">담당자님</span>
