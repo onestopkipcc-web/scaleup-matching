@@ -2133,28 +2133,26 @@ elif page == "매칭 결과":
 
                 nav1, nav2, nav3, nav4 = st.columns([1, 5, 1, 2])
                 with nav1:
-                    prev_clicked = st.button("◀ 이전", disabled=current_idx==0,
-                                             key="btn_prev_co")
+                    prev_clicked = st.button("◀ 이전", disabled=current_idx==0, key="btn_prev_co")
                 with nav2:
-                    # selectbox는 표시용으로만 사용, 값 변경은 on_change 콜백으로 처리
-                    def _on_co_change():
-                        label = st.session_state['_co_select_widget']
-                        st.session_state['review_co_name'] = co_map.get(label, cur_name)
-
-                    st.selectbox(
+                    # 드롭다운 선택 (표시용) — index를 current_idx로 고정
+                    # on_change 없이 매 rerun마다 index로 위치를 강제 지정
+                    chosen = st.selectbox(
                         "기업 선택", co_labels,
                         index=current_idx,
-                        key="_co_select_widget",
                         label_visibility="collapsed",
-                        on_change=_on_co_change
+                        key=f"co_select_{cur_name}"   # 기업명이 바뀌면 key도 바뀌어 위젯 초기화
                     )
+                    # 드롭다운으로 직접 선택한 경우
+                    chosen_name = co_map.get(chosen, cur_name)
+                    if chosen_name != cur_name:
+                        st.session_state['review_co_name'] = chosen_name
+                        st.rerun()
                 with nav3:
-                    next_clicked = st.button("다음 ▶", disabled=current_idx==len(co_labels)-1,
-                                             key="btn_next_co")
+                    next_clicked = st.button("다음 ▶", disabled=current_idx==len(co_labels)-1, key="btn_next_co")
                 with nav4:
                     st.caption(f"{current_idx+1} / {len(co_labels)}개사")
 
-                # 버튼 처리 — 렌더링 완료 후 상태 변경 → rerun
                 if prev_clicked:
                     st.session_state['review_co_name'] = companies_in_result[current_idx - 1]
                     st.rerun()
