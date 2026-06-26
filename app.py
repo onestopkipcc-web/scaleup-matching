@@ -2908,6 +2908,12 @@ elif page == "매칭 결과":
                                     f"{icon_map.get(v,'—')} {k}</span>"
                                     for k,v in checks.items()
                                 ])
+                                caution_html = ""
+                                if ai_result.get('주의사항','') not in ['없음','','nan']:
+                                    caution_txt = ai_result.get('주의사항','')
+                                    caution_html = f"<p style='margin:8px 0 0;font-size:11px;color:#F59E0B;'>⚠️ {caution_txt}</p>"
+                                judgment = ai_result.get('판단근거', ai_result.get('적합이유',''))
+                                summary_txt = ai_result.get('한줄요약','')
                                 st.markdown(f"""
 <div style="background:rgba(74,158,255,0.08);border:1px solid rgba(74,158,255,0.2);
             border-radius:8px;padding:14px 16px;margin-top:8px;">
@@ -2916,10 +2922,10 @@ elif page == "매칭 결과":
     <span style="font-size:13px;font-weight:700;color:{fit_color};">{rec_color} {rec}</span>
     <span style="font-size:12px;color:rgba(255,255,255,0.5);">적합도: {fit}</span>
   </div>
-  <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#0F172A;">{ai_result.get('한줄요약','')}</p>
+  <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#0F172A;">{summary_txt}</p>
   <div style="margin-bottom:10px;">{check_html}</div>
-  <p style="margin:0 0 6px;font-size:12px;color:rgba(255,255,255,0.65);line-height:1.7;">{ai_result.get('판단근거', ai_result.get('적합이유',''))}</p>
-  {"<p style=\\'margin:8px 0 0;font-size:11px;color:#F59E0B;\\'>⚠️ " + ai_result.get('주의사항','') + "</p>" if ai_result.get('주의사항','') not in ['없음','','nan'] else ''}
+  <p style="margin:0 0 6px;font-size:12px;color:rgba(255,255,255,0.65);line-height:1.7;">{judgment}</p>
+  {caution_html}
 </div>
                                 """, unsafe_allow_html=True)
             st.divider()
