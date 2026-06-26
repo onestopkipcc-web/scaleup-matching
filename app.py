@@ -4147,12 +4147,29 @@ JSON 형식으로만 응답 (다른 텍스트 없이):
                             alt = MIMEMultipart('alternative')
                             alt.attach(MIMEText(html_body, 'html', 'utf-8'))
                             msg.attach(alt)
-                            # PDF 첨부
+                            # 첨부파일명 인코딩 (한글/특수문자 대응)
+                            from email.utils import encode_rfc2231
                             part = MIMEBase('application', 'octet-stream')
                             part.set_payload(attach_data)
                             encoders.encode_base64(part)
-                            part.add_header('Content-Disposition',
-                                            f'attachment; filename="{attach_name}"')
+                            # RFC2231 방식으로 파일명 인코딩
+                            try:
+                                attach_name.encode('ascii')
+                                # ASCII만 있으면 그대로
+                                part.add_header('Content-Disposition',
+                                                f'attachment; filename="{attach_name}"')
+                            except UnicodeEncodeError:
+                                # 한글 등 비ASCII 파일명 → RFC2231
+                                encoded_name = encode_rfc2231(attach_name, charset='utf-8')
+                                part.add_header('Content-Disposition',
+                                                f"attachment; filename*={encoded_name}")
+                            # Content-Type에도 파일명 명시
+                            import mimetypes
+                            mime_type, _ = mimetypes.guess_type(attach_name)
+                            if mime_type:
+                                main, sub = mime_type.split('/')
+                                part.replace_header('Content-Type',
+                                                    f'{mime_type}; name="{attach_name}"')
                             msg.attach(part)
                         else:
                             msg = MIMEMultipart('alternative')
