@@ -3964,13 +3964,41 @@ JSON 형식으로만 응답 (다른 텍스트 없이):
                 if not no_email.empty:
                     st.warning(f"이메일 없는 기업 {len(no_email)}개사는 발송 제외됩니다.")
 
+            # ── 첨부파일 + 기업 키워드 옵션 ──────────────
+            opt1, opt2 = st.columns(2)
+            with opt1:
+                attach_file = st.file_uploader(
+                    "📎 첨부파일 (선택)",
+                    type=["pdf", "docx", "xlsx", "hwp"],
+                    help="공고문 등 첨부할 파일을 선택하세요. 전체 기업에게 동일하게 첨부됩니다."
+                )
+                if attach_file:
+                    st.caption(f"✅ {attach_file.name} ({attach_file.size//1024}KB)")
+            with opt2:
+                insert_kw = st.checkbox(
+                    "📊 기업별 키워드 본문 삽입",
+                    value=True,
+                    help="각 기업의 관심분야·기술키워드를 메일 본문에 자동 삽입합니다."
+                )
+                if insert_kw:
+                    st.caption("관심분야 / 기술키워드 / 기업유형이 메일에 표시됩니다.")
+
             if test_mode:
                 st.warning("⚠️ 테스트 모드 — 본인 메일로만 발송됩니다.")
 
             if st.button("📤 안내 메일 발송", type="primary", key="notice_mail_send"):
                 from email.mime.multipart import MIMEMultipart
                 from email.mime.text import MIMEText
+                from email.mime.base import MIMEBase
+                from email import encoders
                 import base64
+
+                # 첨부파일 미리 읽기
+                attach_data = None
+                attach_name = None
+                if attach_file:
+                    attach_data = attach_file.read()
+                    attach_name = attach_file.name
 
                 df_send = df_target[df_target['이메일'].str.strip() != '']
                 prog = st.progress(0); log_area = st.empty(); logs = []
@@ -3978,9 +4006,55 @@ JSON 형식으로만 응답 (다른 텍스트 없이):
 
                 for i, (_, row) in enumerate(df_send.iterrows()):
                     company  = row['기업명']
-                    to_email = row['이메일'].strip() if not test_mode else get_test_recipients()[0]
+                    to_email  = row['이메일'].strip() if not test_mode else get_test_recipients()[0]
                     today_str = datetime.today().strftime('%Y.%m.%d')
-                    body_html_co = mail_body.replace('\n', '<br>')
+
+                    # 기업별 키워드 섹션 생성
+                    kw_section_html = ""
+                    kw_section_text = ""
+                    if insert_kw:
+                        co_interest = str(row.get('관심사업분야', '') or row.get('관심분야', '') or '')
+                        co_keywords = str(row.get('기술키워드', '') or '')
+                        co_biztype  = str(row.get('기업유형', '') or '')
+                        co_kw_extra = str(row.get('키워드보완', '') or '')
+                        if any([co_interest, co_keywords, co_biztype]):
+                            kw_section_html = f"""
+                        <div style="background:#F0FDF4;border:1px solid #BBF7D0;
+                                    border-left:4px solid #10B981;border-radius:8px;
+                                    padding:16px 18px;margin:16px 0;">
+                          <p style="margin:0 0 10px;font-size:11px;font-weight:700;
+                                    color:#059669;letter-spacing:1px;">
+                            📊 저희가 파악한 귀사 정보
+                          </p>
+                          {'<p style="margin:4px 0;font-size:13px;color:#0F172A;"><b>관심분야:</b> ' + co_interest + '</p>' if co_interest else ''}
+                          {'<p style="margin:4px 0;font-size:13px;color:#0F172A;"><b>기술키워드:</b> ' + co_keywords + '</p>' if co_keywords else ''}
+                          {'<p style="margin:4px 0;font-size:13px;color:#0F172A;"><b>기업유형:</b> ' + co_biztype + '</p>' if co_biztype else ''}
+                          {'<p style="margin:4px 0;font-size:13px;color:#0F172A;"><b>추가 키워드:</b> ' + co_kw_extra + '</p>' if co_kw_extra else ''}
+                          <p style="margin:10px 0 0;font-size:12px;color:#64748B;">
+                            위 정보를 기반으로 맞춤 공고를 선별하고 있습니다.<br>
+                            다르거나 추가하고 싶은 내용은 Q1, Q2 답변에 자유롭게 적어주세요.
+                          </p>
+                        </div>"""
+                            kw_section_text = f"""
+─────────────────────────────────
+▣ 저희가 파악한 귀사 정보
+─────────────────────────────────
+{'관심분야: ' + co_interest if co_interest else ''}
+{'기술키워드: ' + co_keywords if co_keywords else ''}
+{'기업유형: ' + co_biztype if co_biztype else ''}
+
+위 정보를 기반으로 맞춤 공고를 선별하고 있습니다.
+다르거나 추가하고 싶은 내용은 Q1, Q2 답변에 자유롭게 적어주세요.
+"""
+
+                    # 본문에 키워드 섹션 삽입 (▣ 한 가지 부탁드립니다 앞에)
+                    body_with_kw = mail_body
+                    if kw_section_text and '▣ 한 가지 부탁드립니다' in body_with_kw:
+                        body_with_kw = body_with_kw.replace(
+                            '▣ 한 가지 부탁드립니다',
+                            kw_section_text + '\n─────────────────────────────────\n▣ 한 가지 부탁드립니다'
+                        )
+                    body_html_co = body_with_kw.replace('\n', '<br>')
 
                     form_sec_co = ""
                     if form_link:
@@ -4043,6 +4117,7 @@ JSON 형식으로만 응답 (다른 텍스트 없이):
                 <div style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.9;">
                   {body_html_co}
                 </div>
+                {kw_section_html}
                 {form_sec_co}
               </td>
             </tr>
@@ -4066,15 +4141,31 @@ JSON 형식으로만 응답 (다른 텍스트 없이):
     </body></html>"""
 
                     try:
-                        msg = MIMEMultipart('alternative')
+                        # 첨부파일 있으면 mixed, 없으면 alternative
+                        if attach_data:
+                            msg = MIMEMultipart('mixed')
+                            alt = MIMEMultipart('alternative')
+                            alt.attach(MIMEText(html_body, 'html', 'utf-8'))
+                            msg.attach(alt)
+                            # PDF 첨부
+                            part = MIMEBase('application', 'octet-stream')
+                            part.set_payload(attach_data)
+                            encoders.encode_base64(part)
+                            part.add_header('Content-Disposition',
+                                            f'attachment; filename="{attach_name}"')
+                            msg.attach(part)
+                        else:
+                            msg = MIMEMultipart('alternative')
+                            msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+
                         msg['Subject'] = mail_subject if not test_mode else f"[TEST] {mail_subject}"
                         msg['From']    = "onestop.kipcc@gmail.com"
                         msg['To']      = to_email
-                        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
                         raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
                         gmail_send(raw)
                         ok_count += 1
-                        logs.append(f"✅ {company} → {to_email}")
+                        logs.append(f"✅ {company} → {to_email}"
+                                    + (" 📎" if attach_data else ""))
                     except Exception as e:
                         fail_count += 1
                         logs.append(f"❌ {company} — {str(e)[:40]}")
