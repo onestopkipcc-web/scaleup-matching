@@ -4047,14 +4047,16 @@ JSON 형식으로만 응답 (다른 텍스트 없이):
 다르거나 추가하고 싶은 내용은 Q1, Q2 답변에 자유롭게 적어주세요.
 """
 
-                    # 본문에 키워드 섹션 삽입 (▣ 한 가지 부탁드립니다 앞에)
-                    body_with_kw = mail_body
-                    if kw_section_text and '▣ 한 가지 부탁드립니다' in body_with_kw:
-                        body_with_kw = body_with_kw.replace(
+                    # HTML 본문 생성
+                    body_html_co = mail_body.replace('\n', '<br>')
+
+                    # 기업 키워드 카드를 "▣ 한 가지 부탁드립니다" 앞에 삽입
+                    if kw_section_html and '▣ 한 가지 부탁드립니다' in body_html_co:
+                        body_html_co = body_html_co.replace(
                             '▣ 한 가지 부탁드립니다',
-                            kw_section_text + '\n─────────────────────────────────\n▣ 한 가지 부탁드립니다'
+                            f'</div>{kw_section_html}<div style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.9;">▣ 한 가지 부탁드립니다'
                         )
-                    body_html_co = body_with_kw.replace('\n', '<br>')
+                        kw_section_html = ""  # 이미 삽입했으므로 하단 중복 방지
 
                     form_sec_co = ""
                     if form_link:
