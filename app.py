@@ -3426,18 +3426,23 @@ elif page == "안내 메일":
             with st.spinner("Gmail 회신 검색 중..."):
                 try:
                     after_date = (datetime.today() - timedelta(days=int(reply_days))).strftime('%Y/%m/%d')
-                    # 넓게 검색 - 받은편지함 전체에서 기간 내 메일
                     query = f'in:inbox after:{after_date}'
                     resp = gapi('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/messages',
                                 params={'q': query, 'maxResults': 100})
-                    all_msgs = resp.json().get('messages', []) if resp.ok else []
-                    st.session_state['reply_msgs'] = all_msgs
-                    st.session_state['reply_label_filter'] = reply_label
 
-                    if not all_msgs:
-                        st.info(f"최근 {reply_days}일 내 받은 메일이 없습니다.")
+                    # 응답 상태 디버그 표시
+                    if not resp.ok:
+                        st.error(f"Gmail API 오류 {resp.status_code}: {resp.text[:200]}")
                     else:
-                        st.success(f"메일 {len(all_msgs)}건 로드 — 아래에서 확인하세요.")
+                        all_msgs = resp.json().get('messages', [])
+                        st.session_state['reply_msgs'] = all_msgs
+                        st.session_state['reply_label_filter'] = reply_label
+
+                        if not all_msgs:
+                            st.info(f"최근 {reply_days}일 내 받은 메일이 없습니다.")
+                            st.caption(f"검색 쿼리: {query}")
+                        else:
+                            st.success(f"메일 {len(all_msgs)}건 로드 — 아래에서 확인하세요.")
                 except Exception as e:
                     st.error(f"Gmail 검색 실패: {e}")
 
