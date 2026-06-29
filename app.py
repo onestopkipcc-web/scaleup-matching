@@ -3501,7 +3501,11 @@ elif page == "안내 메일":
                         hdrs_b = {h['name']: h['value'] for h in msg_b.get('payload',{}).get('headers',[])}
                         sender_b = hdrs_b.get('From','')
                         em_b = _re2.search(r'<(.+?)>', sender_b)
-                        em_b = em_b.group(1).lower() if em_b else sender_b.lower()
+                        if em_b:
+                            em_b = em_b.group(1).lower().strip()
+                        else:
+                            # <> 없으면 전체가 이메일
+                            em_b = sender_b.lower().strip().strip('"')
                         co_b = co_emails.get(em_b, '')
                         if not co_b:
                             bulk_log.append(f"⏭ {sender_b[:30]} — 미매칭 스킵")
@@ -3527,11 +3531,19 @@ JSON만 응답 (코드블록 없이):
 {{"기술키워드": ["키워드1", "키워드2"], "필요지원": ["지원유형"], "수출관심국": [], "요약": "요약"}}"""
 
                         res_b = claude_call_raw(prompt_b)
-                        res_b = _re2.sub(r'```(?:json)?\s*', '', res_b).strip().rstrip('`')
-                        jm = _re2.search(r'\{.*\}', res_b, _re2.DOTALL)
+                        if not res_b or not res_b.strip():
+                            bulk_fail += 1
+                            bulk_log.append(f"❌ {co_b} — Claude 응답 없음 (API 오류)")
+                            prog_bulk.progress((bi+1)/min(total_msgs,50))
+                            continue
+                        res_b = _re2.sub(r'```(?:json)?\s*', '', res_b).strip().rstrip('`').strip()
+                        # { } 사이 내용 추출 (중첩 포함)
+                        jm = _re2.search(r'\{[^}]*\}', res_b, _re2.DOTALL)
+                        if not jm:
+                            jm = _re2.search(r'\{.*\}', res_b, _re2.DOTALL)
                         if not jm:
                             bulk_fail += 1
-                            bulk_log.append(f"❌ {co_b} — JSON 파싱 실패")
+                            bulk_log.append(f"❌ {co_b} — JSON 파싱 실패: [{res_b[:80]}]")
                             prog_bulk.progress((bi+1)/min(total_msgs,50))
                             continue
 
