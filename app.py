@@ -3471,7 +3471,8 @@ elif page == "안내 메일":
         # 회신 목록 표시
         if 'reply_msgs' in st.session_state and st.session_state['reply_msgs']:
             st.divider()
-            st.subheader(f"회신 목록 ({len(st.session_state['reply_msgs'])}건)")
+            total_msgs = len(st.session_state['reply_msgs'])
+            st.subheader(f"회신 목록 ({total_msgs}건)")
 
             # 선정기업 이메일 목록 미리 구성
             co_emails = {}
@@ -3480,6 +3481,94 @@ elif page == "안내 메일":
                     em = str(row.get('이메일','')).strip().lower()
                     if em:
                         co_emails[em] = row.get('기업명','')
+
+            # ── 일괄 추출 버튼 ─────────────────────────
+            st.info("💡 개별 메일을 열어 '🤖 키워드 자동 추출' 후 저장하거나, 아래 버튼으로 전체 일괄 추출할 수 있습니다.")
+            if st.button("🤖 전체 일괄 추출 + 자동 저장", type="primary", key="bulk_extract"):
+                import json as _json, re as _re2
+                df_bulk = load_excel(drive, SELECTED_FILE)
+                prog_bulk = st.progress(0, text="일괄 추출 중...")
+                bulk_ok = 0; bulk_fail = 0; bulk_log = []
+
+                for bi, msg_ref in enumerate(st.session_state['reply_msgs'][:50]):
+                    try:
+                        resp = gapi('GET',
+                            f'https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_ref["id"]}',
+                            params={'format': 'full'})
+                        if not resp.ok:
+                            bulk_fail += 1; continue
+                        msg_b = resp.json()
+                        hdrs_b = {h['name']: h['value'] for h in msg_b.get('payload',{}).get('headers',[])}
+                        sender_b = hdrs_b.get('From','')
+                        em_b = _re2.search(r'<(.+?)>', sender_b)
+                        em_b = em_b.group(1).lower() if em_b else sender_b.lower()
+                        co_b = co_emails.get(em_b, '')
+                        if not co_b:
+                            bulk_log.append(f"⏭ {sender_b[:30]} — 미매칭 스킵")
+                            prog_bulk.progress((bi+1)/min(total_msgs,50))
+                            continue
+
+                        body_b = extract_body(msg_b.get('payload',{}))
+                        for sep in ['On ', '-----', '보낸 사람', 'From:']:
+                            idx = body_b.find(sep)
+                            if idx > 100: body_b = body_b[:idx]; break
+                        body_b = body_b.strip()
+                        if not body_b:
+                            bulk_log.append(f"⏭ {co_b} — 본문 없음")
+                            prog_bulk.progress((bi+1)/min(total_msgs,50))
+                            continue
+
+                        prompt_b = f"""기업 담당자 회신에서 키워드를 추출하세요.
+
+회신:
+{body_b[:1000]}
+
+JSON만 응답 (코드블록 없이):
+{{"기술키워드": ["키워드1", "키워드2"], "필요지원": ["지원유형"], "수출관심국": [], "요약": "요약"}}"""
+
+                        res_b = claude_call_raw(prompt_b)
+                        res_b = _re2.sub(r'```(?:json)?\s*', '', res_b).strip().rstrip('`')
+                        jm = _re2.search(r'\{.*\}', res_b, _re2.DOTALL)
+                        if not jm:
+                            bulk_fail += 1
+                            bulk_log.append(f"❌ {co_b} — JSON 파싱 실패")
+                            prog_bulk.progress((bi+1)/min(total_msgs,50))
+                            continue
+
+                        ext_b = _json.loads(jm.group())
+                        kws_b = ext_b.get('기술키워드', [])
+                        sup_b = ext_b.get('필요지원', [])
+                        exp_b = ext_b.get('수출관심국', [])
+
+                        # 드라이브 저장
+                        mask_b = df_bulk['기업명'] == co_b
+                        if mask_b.any():
+                            existing_b = str(df_bulk.loc[mask_b, '키워드보완'].values[0] or '')
+                            new_kws_b  = ', '.join(kws_b + sup_b)
+                            df_bulk.loc[mask_b, '키워드보완'] = ', '.join(filter(None, [existing_b, new_kws_b]))
+                            if exp_b:
+                                existing_exp = str(df_bulk.loc[mask_b, '수출국가'].values[0] or '')
+                                df_bulk.loc[mask_b, '수출국가'] = ', '.join(filter(None, [existing_exp, ', '.join(exp_b)]))
+                            bulk_ok += 1
+                            bulk_log.append(f"✅ {co_b} — {', '.join(kws_b[:3])}")
+                        prog_bulk.progress((bi+1)/min(total_msgs,50))
+
+                    except Exception as e_b:
+                        bulk_fail += 1
+                        bulk_log.append(f"❌ {sender_b[:20]}: {str(e_b)[:30]}")
+
+                # 일괄 저장
+                if bulk_ok > 0:
+                    save_excel(drive, df_bulk, SELECTED_FILE, "선정기업명단", "1F4E79")
+                    st.success(f"✅ {bulk_ok}개사 키워드 저장 완료 / 실패 {bulk_fail}건")
+                else:
+                    st.warning(f"저장된 기업 없음 (실패 {bulk_fail}건)")
+
+                with st.expander("처리 로그"):
+                    for log in bulk_log:
+                        st.caption(log)
+
+            st.divider()
 
             shown = 0
             for i, msg_ref in enumerate(st.session_state['reply_msgs'][:50]):
@@ -3546,24 +3635,22 @@ elif page == "안내 메일":
 - [Q2] 답변(→ 답변: 이후 텍스트)에서 필요 지원 유형과 목표
 - Q1/Q2 형식이 없으면 전체 내용에서 추출
 
-JSON 형식으로만 응답 (다른 텍스트 없이):
-{{
-  "기술키워드": ["구체적인 기술/제품 키워드 (2~6개)"],
-  "필요지원": ["필요한 지원 유형 (1~3개)"],
-  "수출관심국": ["관심 수출 국가 (있다면)"],
-  "요약": "한 줄 요약"
-}}"""
+반드시 아래 JSON 형식으로만 응답하세요. 코드블록이나 설명 텍스트 없이 JSON만:
+{{"기술키워드": ["키워드1", "키워드2"], "필요지원": ["지원유형1"], "수출관심국": [], "요약": "한 줄 요약"}}"""
                                 try:
-                                    import json as _json
+                                    import json as _json, re as _re2
                                     res = claude_call_raw(prompt)
-                                    # JSON 블록만 추출
-                                    import re as _re2
-                                    json_match = _re2.search(r'\{.*\}', res, _re2.DOTALL)
+                                    # 코드블록 제거
+                                    res = _re2.sub(r'```(?:json)?\s*', '', res).strip().rstrip('`').strip()
+                                    # 중첩 JSON 추출
+                                    json_match = _re2.search(r'\{[^{}]*\}', res, _re2.DOTALL)
+                                    if not json_match:
+                                        json_match = _re2.search(r'\{.*\}', res, _re2.DOTALL)
                                     if json_match:
                                         extracted = _json.loads(json_match.group())
                                         st.session_state[f'extracted_{i}'] = extracted
                                     else:
-                                        st.error("JSON 파싱 실패")
+                                        st.error(f"JSON 파싱 실패 — Claude 응답: {res[:100]}")
                                 except Exception as e:
                                     st.error(f"추출 실패: {e}")
 
