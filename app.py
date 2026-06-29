@@ -3426,20 +3426,18 @@ elif page == "안내 메일":
             with st.spinner("Gmail 회신 검색 중..."):
                 try:
                     after_date = (datetime.today() - timedelta(days=int(reply_days))).strftime('%Y/%m/%d')
-                    # Re: 포함 + 받은 편지함 + 기간 필터
-                    query = f'subject:Re in:inbox after:{after_date}'
+                    # 넓게 검색 - 받은편지함 전체에서 기간 내 메일
+                    query = f'in:inbox after:{after_date}'
                     resp = gapi('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/messages',
                                 params={'q': query, 'maxResults': 100})
                     all_msgs = resp.json().get('messages', []) if resp.ok else []
-
-                    # reply_label 키워드로 추가 필터 (스레드 제목 확인)
                     st.session_state['reply_msgs'] = all_msgs
                     st.session_state['reply_label_filter'] = reply_label
 
                     if not all_msgs:
-                        st.info(f"최근 {reply_days}일 내 받은 회신이 없습니다.")
+                        st.info(f"최근 {reply_days}일 내 받은 메일이 없습니다.")
                     else:
-                        st.success(f"회신 후보 {len(all_msgs)}건 로드 — 아래에서 확인하세요.")
+                        st.success(f"메일 {len(all_msgs)}건 로드 — 아래에서 확인하세요.")
                 except Exception as e:
                     st.error(f"Gmail 검색 실패: {e}")
 
@@ -3486,12 +3484,22 @@ elif page == "안내 메일":
                     sender  = hdrs.get('From', '')
                     date_str= hdrs.get('Date', '')[:16]
 
-                    # label_filter로 필터링 (제목 또는 스레드에 포함 여부)
-                    if label_filter and label_filter not in subject and label_filter not in sender:
-                        # 스레드 확인 없이 제목으로만 필터 — 포함 안 되면 스킵
-                        # (Re: [원스톱 스케일업] 제목이면 포함됨)
-                        if not any(w in subject for w in ['원스톱', 'scaleup', '스케일업', '지원사업']):
-                            continue
+                    # label_filter 또는 발신자가 선정기업이면 표시
+                    sender_email_clean = _re.search(r'<(.+?)>', sender)
+                    sender_email_clean = sender_email_clean.group(1).lower() if sender_email_clean else sender.lower()
+
+                    # 선정기업 이메일 목록
+                    co_emails = set()
+                    if not df_c_reply.empty and '이메일' in df_c_reply.columns:
+                        co_emails = {str(e).strip().lower() for e in df_c_reply['이메일'].dropna() if e}
+
+                    is_co_reply = sender_email_clean in co_emails
+                    has_keyword = label_filter and any(
+                        w in subject for w in [label_filter, '원스톱', '스케일업', 'Re:', 'RE:', '답장']
+                    )
+
+                    if not is_co_reply and not has_keyword:
+                        continue
 
                     body_text = extract_body(msg.get('payload', {}))
                     # 이메일 인용 구분선 이전 내용만 (답장 본문)
@@ -3506,14 +3514,12 @@ elif page == "안내 메일":
                     shown += 1
                     with st.expander(f"**{sender[:35]}** — {subject[:40]} ({date_str})"):
 
-                        # 기업명 자동 매칭 (이메일 주소 기준)
+                        # 기업명 자동 매칭
                         matched_co = ''
-                        sender_email = _re.search(r'<(.+?)>', sender)
-                        sender_email = sender_email.group(1) if sender_email else sender
                         if not df_c_reply.empty:
                             for _, row in df_c_reply.iterrows():
                                 co_email = str(row.get('이메일', '')).strip().lower()
-                                if co_email and co_email == sender_email.lower():
+                                if co_email and co_email == sender_email_clean:
                                     matched_co = row.get('기업명', '')
                                     break
 
