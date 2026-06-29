@@ -3471,9 +3471,15 @@ elif page == "안내 메일":
         # 회신 목록 표시
         if 'reply_msgs' in st.session_state and st.session_state['reply_msgs']:
             st.divider()
-            label_filter = st.session_state.get('reply_label_filter', '')
-            st.subheader(f"회신 목록")
-            st.caption(f"'{label_filter}' 관련 회신만 표시됩니다.")
+            st.subheader(f"회신 목록 ({len(st.session_state['reply_msgs'])}건)")
+
+            # 선정기업 이메일 목록 미리 구성
+            co_emails = {}
+            if not df_c_reply.empty and '이메일' in df_c_reply.columns:
+                for _, row in df_c_reply.iterrows():
+                    em = str(row.get('이메일','')).strip().lower()
+                    if em:
+                        co_emails[em] = row.get('기업명','')
 
             shown = 0
             for i, msg_ref in enumerate(st.session_state['reply_msgs'][:50]):
@@ -3489,22 +3495,13 @@ elif page == "안내 메일":
                     sender  = hdrs.get('From', '')
                     date_str= hdrs.get('Date', '')[:16]
 
-                    # label_filter 또는 발신자가 선정기업이면 표시
+                    import re as _re
                     sender_email_clean = _re.search(r'<(.+?)>', sender)
                     sender_email_clean = sender_email_clean.group(1).lower() if sender_email_clean else sender.lower()
 
-                    # 선정기업 이메일 목록
-                    co_emails = set()
-                    if not df_c_reply.empty and '이메일' in df_c_reply.columns:
-                        co_emails = {str(e).strip().lower() for e in df_c_reply['이메일'].dropna() if e}
-
-                    is_co_reply = sender_email_clean in co_emails
-                    has_keyword = label_filter and any(
-                        w in subject for w in [label_filter, '원스톱', '스케일업', 'Re:', 'RE:', '답장']
-                    )
-
-                    if not is_co_reply and not has_keyword:
-                        continue
+                    # 선정기업 여부 확인
+                    matched_co = co_emails.get(sender_email_clean, '')
+                    badge = f"✅ {matched_co}" if matched_co else "❓ 미매칭"
 
                     body_text = extract_body(msg.get('payload', {}))
                     # 이메일 인용 구분선 이전 내용만 (답장 본문)
@@ -3517,21 +3514,13 @@ elif page == "안내 메일":
                     body_text = body_text.strip()
 
                     shown += 1
-                    with st.expander(f"**{sender[:35]}** — {subject[:40]} ({date_str})"):
+                    with st.expander(f"{badge} | **{sender[:30]}** — {subject[:35]} ({date_str})"):
 
-                        # 기업명 자동 매칭
-                        matched_co = ''
-                        if not df_c_reply.empty:
-                            for _, row in df_c_reply.iterrows():
-                                co_email = str(row.get('이메일', '')).strip().lower()
-                                if co_email and co_email == sender_email_clean:
-                                    matched_co = row.get('기업명', '')
-                                    break
-
+                        # 기업명 자동 매칭 (이미 위에서 계산됨)
                         if matched_co:
                             st.success(f"✅ 매칭 기업: **{matched_co}**")
                         else:
-                            st.caption(f"발신: {sender_email}")
+                            st.caption(f"발신: {sender_email_clean}")
                             matched_co = st.selectbox("기업 선택 (수동 매칭)",
                                 [''] + (df_c_reply['기업명'].tolist() if not df_c_reply.empty else []),
                                 key=f"reply_co_{i}")
@@ -3623,7 +3612,7 @@ JSON 형식으로만 응답 (다른 텍스트 없이):
                     continue
 
             if shown == 0:
-                st.info(f"'{label_filter}' 관련 회신이 없습니다. 검색 키워드를 변경해보세요.")
+                st.info("메일 내용을 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
 
     with mail_tab1:
         info_box("안내 메일",
