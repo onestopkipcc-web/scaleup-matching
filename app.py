@@ -1074,17 +1074,37 @@ def estimate_cost(n_notices):
 
 def claude_call_raw(prompt, max_tokens=1000):
     """단순 텍스트 프롬프트 → Claude 응답 문자열 반환"""
-    headers = {"Content-Type": "application/json"}
+    api_key = ""
+    try:
+        api_key = st.secrets["ANTHROPIC_API_KEY"]
+    except Exception:
+        try:
+            api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+        except Exception:
+            pass
+    if not api_key:
+        st.warning("⚠️ ANTHROPIC_API_KEY 없음")
+        return ''
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01"
+    }
     payload = {
         "model": "claude-sonnet-4-6",
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}]
     }
-    resp = requests.post("https://api.anthropic.com/v1/messages",
-                         headers=headers, json=payload)
-    if resp.ok:
-        content = resp.json().get('content', [])
-        return content[0].get('text', '') if content else ''
+    try:
+        resp = requests.post("https://api.anthropic.com/v1/messages",
+                             headers=headers, json=payload, timeout=30)
+        if resp.ok:
+            content = resp.json().get('content', [])
+            return content[0].get('text', '') if content else ''
+        else:
+            st.warning(f"⚠️ Claude API 오류 {resp.status_code}: {resp.text[:100]}")
+    except Exception as e:
+        st.warning(f"⚠️ Claude API 예외: {e}")
     return ''
 
 
