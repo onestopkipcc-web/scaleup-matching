@@ -2773,8 +2773,49 @@ elif page == "공고·매칭":
                                 st.markdown("**🗒 운영 메모**")
                                 st.write(co_info_panel.get('메모',''))
 
+                    # ── AI 추천 필터 (상단 배치) ────────────────
+                    ai_analysis_map = st.session_state.get('ai_analysis', {})
+                    ai_rec_n = sum(1 for _, r in co_rows.iterrows()
+                                   if ai_analysis_map.get(f"{r['기업명']}_{r.get('공고ID','')}", {}).get('추천여부') == '추천')
+                    ai_rev_n = sum(1 for _, r in co_rows.iterrows()
+                                   if ai_analysis_map.get(f"{r['기업명']}_{r.get('공고ID','')}", {}).get('추천여부') == '검토')
+                    ai_bad_n = sum(1 for _, r in co_rows.iterrows()
+                                   if ai_analysis_map.get(f"{r['기업명']}_{r.get('공고ID','')}", {}).get('추천여부') == '비추천')
+
+                    tog_c1, tog_c2 = st.columns([2, 4])
+                    with tog_c1:
+                        ai_only = st.toggle(
+                            "🟢 AI 추천 공고만 보기",
+                            key="toggle_ai_only",
+                            help="AI가 추천한 공고만 표시합니다. 꺼두면 전체 확인 가능합니다."
+                        )
+                    with tog_c2:
+                        st.markdown(
+                            f"<div style='padding:8px 0;font-size:13px;'>"                            f"🟢 추천 <b>{ai_rec_n}</b>건 &nbsp;&nbsp;"                            f"🟡 검토 <b>{ai_rev_n}</b>건 &nbsp;&nbsp;"                            f"🔴 비추천 <b>{ai_bad_n}</b>건"                            f"</div>",
+                            unsafe_allow_html=True
+                        )
+
+                    # AI 필터 적용
+                    display_rows = co_rows.copy()
+                    if ai_only:
+                        display_rows = co_rows[[
+                            ai_analysis_map.get(f"{r['기업명']}_{r.get('공고ID','')}", {}).get('추천여부') == '추천'
+                            for _, r in co_rows.iterrows()
+                        ]]
+                        if len(display_rows) > 0:
+                            if st.button(f"✅ AI 추천 {len(display_rows)}건 일괄 승인",
+                                         type="primary", key="bulk_ai_approve"):
+                                for _, r in display_rows.iterrows():
+                                    st.session_state['review_state'][
+                                        f"{r['기업명']}_{r.get('공고ID','')}"] = "○"
+                                st.rerun()
+                        else:
+                            st.info("AI 추천 공고가 없습니다.")
+
+                    st.divider()
+
                     # ── 일괄 처리 버튼 ──────────────────────────
-                    ba1, ba2, ba3, ba4 = st.columns([1, 1, 2, 2])
+                    ba1, ba2, ba3 = st.columns([1, 1, 3])
                     with ba1:
                         if st.button("✅ 전체 승인", key="bulk_approve"):
                             for _, r in co_rows.iterrows():
@@ -2805,30 +2846,6 @@ elif page == "공고·매칭":
                                 prog_co_ai.progress((ai_i+1)/co_ai_total, text=f"AI 분석 중... {ai_i+1}/{co_ai_total}")
                             save_ai_analysis(_get_drive())
                             st.success(f"✅ {selected_co} AI 분석 완료 — 드라이브 저장됨"); st.rerun()
-                    with ba4:
-                        # AI 추천만 보기 토글
-                        ai_only = st.toggle("🟢 AI 추천만 보기", key="toggle_ai_only",
-                                            help="AI가 '추천'으로 판단한 공고만 표시합니다. 비추천도 확인하려면 꺼주세요.")
-
-                    # AI 추천만 보기 필터 적용
-                    display_rows = co_rows.copy()
-                    if ai_only:
-                        ai_analysis = st.session_state.get('ai_analysis', {})
-                        def is_ai_recommended(r):
-                            k = f"{r['기업명']}_{r.get('공고ID','')}"
-                            res = ai_analysis.get(k)
-                            return res and res.get('추천여부') == '추천'
-                        mask = [is_ai_recommended(r) for _, r in display_rows.iterrows()]
-                        display_rows = display_rows[mask]
-                        ai_rec_count = mask.count(True)
-                        st.info(f"🟢 AI 추천 {ai_rec_count}건 표시 중 / 전체 {len(co_rows)}건 — 토글 끄면 전체 확인 가능")
-
-                        # AI 추천만 일괄 승인 버튼
-                        if ai_rec_count > 0:
-                            if st.button(f"✅ AI 추천 {ai_rec_count}건 일괄 승인", type="primary", key="bulk_ai_approve"):
-                                for _, r in display_rows.iterrows():
-                                    st.session_state['review_state'][f"{r['기업명']}_{r.get('공고ID','')}"] = "○"
-                                st.rerun()
 
                     st.divider()
 
