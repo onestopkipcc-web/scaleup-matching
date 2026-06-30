@@ -1545,6 +1545,145 @@ if page == "대시보드":
 
     st.divider()
 
+    # ── 월간 공고 캘린더 ─────────────────────────────────
+    st.subheader("📅 공고 마감 캘린더")
+
+    import calendar as cal_mod
+
+    # 월 선택
+    cal_col1, cal_col2, _ = st.columns([1, 1, 4])
+    with cal_col1:
+        cal_year  = st.selectbox("연도", [2025, 2026, 2027],
+                                  index=1, key="cal_year", label_visibility="collapsed")
+    with cal_col2:
+        cal_month = st.selectbox("월", list(range(1, 13)),
+                                  index=datetime.today().month - 1,
+                                  key="cal_month", label_visibility="collapsed",
+                                  format_func=lambda x: f"{x}월")
+
+    # 해당 월 공고 필터링
+    if not df_n.empty and '마감일' in df_n.columns:
+        month_str = f"{cal_year}-{cal_month:02d}"
+        df_cal = df_n[df_n['마감일'].astype(str).str.startswith(month_str)].copy()
+
+        # 날짜별 공고 그룹핑
+        notices_by_day = {}
+        for _, row in df_cal.iterrows():
+            try:
+                day = int(str(row['마감일'])[8:10])
+                n_name = str(row.get('공고명', ''))[:18]
+                if day not in notices_by_day:
+                    notices_by_day[day] = []
+                notices_by_day[day].append(n_name)
+            except Exception:
+                pass
+    else:
+        notices_by_day = {}
+        df_cal = pd.DataFrame()
+
+    # 달력 HTML 생성
+    first_weekday, days_in_month = cal_mod.monthrange(cal_year, cal_month)
+    # 0=월요일 기준으로 변환 (일요일=6 → 0으로)
+    first_weekday = (first_weekday + 1) % 7  # 일요일 시작
+
+    today = datetime.today()
+    is_current_month = (today.year == cal_year and today.month == cal_month)
+
+    # 요일 헤더
+    day_headers = ["일", "월", "화", "수", "목", "금", "토"]
+    header_html = "".join([
+        f"<th style='padding:8px;text-align:center;font-size:12px;font-weight:600;"
+        f"color:{'#EF4444' if i==0 else '#3B82F6' if i==6 else '#475569'};'>{d}</th>"
+        for i, d in enumerate(day_headers)
+    ])
+
+    # 날짜 칸 생성
+    cells = ["<td></td>"] * first_weekday
+    for day in range(1, days_in_month + 1):
+        ns = notices_by_day.get(day, [])
+        is_today = is_current_month and day == today.day
+        is_sun   = (first_weekday + day - 1) % 7 == 0
+        is_sat   = (first_weekday + day - 1) % 7 == 6
+
+        day_color = "#EF4444" if is_sun else "#3B82F6" if is_sat else "#0F172A"
+        bg_color  = "#ECFDF5" if is_today else "#FFFFFF"
+        border    = "2px solid #10B981" if is_today else "1px solid #E2E8F0"
+
+        notices_html = ""
+        for n in ns[:2]:  # 최대 2개 표시
+            notices_html += (
+                f"<div style='background:#EFF6FF;border-left:2px solid #3B82F6;"
+                f"border-radius:3px;padding:1px 4px;margin-top:2px;"
+                f"font-size:10px;color:#1E40AF;line-height:1.4;"
+                f"white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>"
+                f"📌 {n}</div>"
+            )
+        if len(ns) > 2:
+            notices_html += (
+                f"<div style='font-size:10px;color:#94A3B8;margin-top:2px;'>"
+                f"+{len(ns)-2}건 더</div>"
+            )
+
+        cells.append(
+            f"<td style='padding:6px;vertical-align:top;min-width:80px;min-height:80px;"
+            f"background:{bg_color};border:{border};border-radius:4px;'>"
+            f"<div style='font-size:13px;font-weight:700;color:{day_color};"
+            f"margin-bottom:3px;'>{day}</div>"
+            f"{notices_html}</td>"
+        )
+
+    # 7칸씩 행으로 나누기
+    while len(cells) % 7 != 0:
+        cells.append("<td style='background:#F8FAFC;border:1px solid #E2E8F0;'></td>")
+
+    rows_html = ""
+    for i in range(0, len(cells), 7):
+        row_cells = "".join(cells[i:i+7])
+        rows_html += f"<tr>{row_cells}</tr>"
+
+    cal_html = f"""
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:separate;border-spacing:3px;
+                  font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;">
+      <thead>
+        <tr style="background:#F8FAFC;">{header_html}</tr>
+      </thead>
+      <tbody>{rows_html}</tbody>
+    </table>
+    </div>
+    """
+
+    if notices_by_day:
+        notice_cnt = len(df_cal)
+        st.caption(f"{cal_year}년 {cal_month}월 마감 공고 총 **{notice_cnt}건** — 파란 테두리: 오늘")
+    else:
+        st.caption(f"{cal_year}년 {cal_month}월 마감 공고 없음 (공고 수집 후 표시)")
+
+    st.markdown(cal_html, unsafe_allow_html=True)
+
+    # 해당 월 공고 목록 (클릭 시 상세)
+    if notices_by_day:
+        with st.expander(f"📋 {cal_month}월 공고 전체 목록 ({len(df_cal)}건)"):
+            for _, row in df_cal.sort_values('마감일').iterrows():
+                c1, c2, c3 = st.columns([4, 2, 1])
+                with c1:
+                    st.write(f"**{row.get('공고명','')[:35]}**")
+                with c2:
+                    dl = str(row.get('마감일',''))
+                    try:
+                        days_left = (datetime.strptime(dl, '%Y-%m-%d') - datetime.today()).days
+                        d_label = f"D-{days_left}" if days_left >= 0 else f"마감 {abs(days_left)}일 전"
+                        color = "#EF4444" if days_left <= 3 else "#F59E0B" if days_left <= 7 else "#10B981"
+                        st.markdown(f"<span style='color:{color};font-weight:600;font-size:12px;'>{d_label}</span>",
+                                    unsafe_allow_html=True)
+                    except Exception:
+                        st.caption(dl)
+                with c3:
+                    if row.get('공고링크'):
+                        st.markdown(f"[🔗]({row.get('공고링크','')})")
+
+    st.divider()
+
     # ── 현황 분석 탭 ────────────────────────────────────
     st.subheader("📈 현황 분석")
     tab_c1, tab_c2, tab_c3, tab_c4 = st.tabs(["분야별 공고", "기업 관심분야", "매칭 현황", "발송 추이"])
