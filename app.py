@@ -1906,7 +1906,7 @@ elif page == "공고·매칭":
     drive = _get_drive()
     st.title("공고·매칭")
 
-    tab_cm1, tab_cm2 = st.tabs(["📥 공고 수집", "🎯 매칭 실행·검토"])
+    tab_cm1, tab_cm1b, tab_cm2 = st.tabs(["📥 공고 수집", "🔍 전문 크롤링", "🎯 매칭 실행·검토"])
 
     with tab_cm1:
         info_box("공고 수집",
@@ -2059,264 +2059,265 @@ elif page == "공고·매칭":
         cols = [c for c in ["공고명","주관기관","분야","접수기간","마감일"] if c in df_n.columns]
         st.dataframe(df_n[cols].head(20), use_container_width=True, hide_index=True)
 
-    st.divider()
-    st.subheader("📄 공고 전문 크롤링")
+    with tab_cm1b:
+        st.subheader("📄 공고 전문 크롤링")
+        st.caption("수집된 공고의 상세 내용을 크롤링합니다. 전문이 있어야 매칭 정확도가 높아집니다.")
 
-    with st.spinner("전문 DB 현황 확인 중..."):
-        df_detail = load_excel(drive, DETAIL_FILE)
+        with st.spinner("전문 DB 현황 확인 중..."):
+            df_detail = load_excel(drive, DETAIL_FILE)
 
-    today_str = datetime.today().strftime('%Y-%m-%d')
-    FRESHNESS_DAYS = 7  # 7일 이내 크롤링 = 최신
+        today_str = datetime.today().strftime('%Y-%m-%d')
+        FRESHNESS_DAYS = 7  # 7일 이내 크롤링 = 최신
 
-    if not df_detail.empty and '크롤링일' in df_detail.columns:
-        df_detail['크롤링일'] = df_detail['크롤링일'].astype(str)
-        fresh   = df_detail[df_detail['크롤링일'] >= (datetime.today() - timedelta(days=FRESHNESS_DAYS)).strftime('%Y-%m-%d')]
-        stale   = df_detail[df_detail['크롤링일'] <  (datetime.today() - timedelta(days=FRESHNESS_DAYS)).strftime('%Y-%m-%d')]
-        ok_pids = set(df_detail[df_detail['크롤링성공']=='Y']['pblancId'].tolist())
-    else:
-        fresh = stale = pd.DataFrame(); ok_pids = set()
+        if not df_detail.empty and '크롤링일' in df_detail.columns:
+            df_detail['크롤링일'] = df_detail['크롤링일'].astype(str)
+            fresh   = df_detail[df_detail['크롤링일'] >= (datetime.today() - timedelta(days=FRESHNESS_DAYS)).strftime('%Y-%m-%d')]
+            stale   = df_detail[df_detail['크롤링일'] <  (datetime.today() - timedelta(days=FRESHNESS_DAYS)).strftime('%Y-%m-%d')]
+            ok_pids = set(df_detail[df_detail['크롤링성공']=='Y']['pblancId'].tolist())
+        else:
+            fresh = stale = pd.DataFrame(); ok_pids = set()
 
-    # 최신화 필요 공고 계산
-    if not df_n.empty:
-        active_pids = set(df_n[
-            (df_n['마감일'] == '') | (df_n['마감일'] >= today_str)
-        ]['pblancId'].tolist())
-        need_crawl_pids = active_pids - ok_pids
-    else:
-        active_pids = need_crawl_pids = set()
+        # 최신화 필요 공고 계산
+        if not df_n.empty:
+            active_pids = set(df_n[
+                (df_n['마감일'] == '') | (df_n['마감일'] >= today_str)
+            ]['pblancId'].tolist())
+            need_crawl_pids = active_pids - ok_pids
+        else:
+            active_pids = need_crawl_pids = set()
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("전문 수집", f"{len(ok_pids):,}건")
-    c2.metric("7일 이내 최신", f"{len(fresh):,}건")
-    c3.metric("갱신 필요", f"{len(stale):,}건")
-    c4.metric("미수집 (활성공고)", f"{len(need_crawl_pids):,}건")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("전문 수집", f"{len(ok_pids):,}건")
+        c2.metric("7일 이내 최신", f"{len(fresh):,}건")
+        c3.metric("갱신 필요", f"{len(stale):,}건")
+        c4.metric("미수집 (활성공고)", f"{len(need_crawl_pids):,}건")
 
-    if st.session_state.get('pending_crawl'):
-        st.info(f"💡 공고 수집 완료 — 전문 크롤링을 실행하면 매칭 정확도가 높아져요.")
+        if st.session_state.get('pending_crawl'):
+            st.info(f"💡 공고 수집 완료 — 전문 크롤링을 실행하면 매칭 정확도가 높아져요.")
 
-    col_a, col_b = st.columns([2,1])
-    with col_a:
-        st.caption(f"7일 이내 수집된 전문은 재수집 안 함. 미수집 {len(need_crawl_pids)}건 + 갱신필요 {len(stale)}건 대상.")
-    with col_b:
-        crawl_toggle = st.toggle("크롤링 실행", value=bool(st.session_state.get('pending_crawl')), key="crawl_toggle")
+        col_a, col_b = st.columns([2,1])
+        with col_a:
+            st.caption(f"7일 이내 수집된 전문은 재수집 안 함. 미수집 {len(need_crawl_pids)}건 + 갱신필요 {len(stale)}건 대상.")
+        with col_b:
+            crawl_toggle = st.toggle("크롤링 실행", value=bool(st.session_state.get('pending_crawl')), key="crawl_toggle")
 
-    if crawl_toggle:
-        st.warning("⚠️ 수동 크롤링 — 공고 수에 따라 수십 분 소요될 수 있습니다. 설정한 건수마다 자동 중간 저장되어, 중간에 끊겨도 이미 처리한 건은 보존됩니다. 끊기면 그냥 다시 실행하면 미수집분부터 이어집니다.")
+        if crawl_toggle:
+            st.warning("⚠️ 수동 크롤링 — 공고 수에 따라 수십 분 소요될 수 있습니다. 설정한 건수마다 자동 중간 저장되어, 중간에 끊겨도 이미 처리한 건은 보존됩니다. 끊기면 그냥 다시 실행하면 미수집분부터 이어집니다.")
 
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            crawl_limit = st.number_input(
-                "최대 크롤링 건수 (0 = 전체)",
-                min_value=0, max_value=2000, value=50,
-                help="테스트 시 50건 권장, 전체는 0 입력"
-            )
-        with col2:
-            crawl_delay = st.selectbox(
-                "요청 간격",
-                ["빠름 (0.5초)", "보통 (1.2초)", "느림 (2초)"],
-                index=1
-            )
-            delay_map = {"빠름 (0.5초)": 0.5, "보통 (1.2초)": 1.2, "느림 (2초)": 2.0}
-            delay_sec = delay_map[crawl_delay]
-        with col3:
-            batch_size = st.number_input(
-                "중간 저장 단위 (건)",
-                min_value=10, max_value=200, value=30,
-                help="이 건수마다 드라이브에 저장 → 중간에 끊겨도 이전 작업 보존"
-            )
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                crawl_limit = st.number_input(
+                    "최대 크롤링 건수 (0 = 전체)",
+                    min_value=0, max_value=2000, value=50,
+                    help="테스트 시 50건 권장, 전체는 0 입력"
+                )
+            with col2:
+                crawl_delay = st.selectbox(
+                    "요청 간격",
+                    ["빠름 (0.5초)", "보통 (1.2초)", "느림 (2초)"],
+                    index=1
+                )
+                delay_map = {"빠름 (0.5초)": 0.5, "보통 (1.2초)": 1.2, "느림 (2초)": 2.0}
+                delay_sec = delay_map[crawl_delay]
+            with col3:
+                batch_size = st.number_input(
+                    "중간 저장 단위 (건)",
+                    min_value=10, max_value=200, value=30,
+                    help="이 건수마다 드라이브에 저장 → 중간에 끊겨도 이전 작업 보존"
+                )
 
-        if st.button("🕷️ 지금 크롤링 실행", type="primary", key="crawl_btn"):
-            import time as _time
-            from bs4 import BeautifulSoup
+            if st.button("🕷️ 지금 크롤링 실행", type="primary", key="crawl_btn"):
+                import time as _time
+                from bs4 import BeautifulSoup
 
-            today = datetime.today().strftime('%Y-%m-%d')
+                today = datetime.today().strftime('%Y-%m-%d')
 
-            def clean_notice_text(raw_text):
-                """bizinfo 공고 본문에서 사이트 네비게이션/추천목록/평점위젯/첨부파일 영역을
-                제거하고 실제 사업개요+신청자격+지원내용 영역만 남긴다.
-                (실측 검증: 평균 1723자 -> 805자로 잡음 약 50% 제거, 핵심 정보는 보존)"""
-                text = re.sub(r'본문\s*바로가기.*?화면크기', ' ', raw_text, flags=re.DOTALL)
-                end_markers = [
-                    r'이\s*공고를\s*열람한\s*사용자',  # 관련 공고 추천 영역 시작
-                    r'NO\.\s*1\b',                      # 추천 목록 항목 시작
-                    r'정보에\s*만족하셨나요',            # 평점 위젯
-                    r'본문출력파일',                    # 첨부파일 목록 시작
-                ]
-                cut_idx = len(text)
-                for pat in end_markers:
-                    m = re.search(pat, text)
-                    if m:
-                        cut_idx = min(cut_idx, m.start())
-                text = text[:cut_idx]
-                text = re.sub(r'\s+', ' ', text).strip()
-                return text
+                def clean_notice_text(raw_text):
+                    """bizinfo 공고 본문에서 사이트 네비게이션/추천목록/평점위젯/첨부파일 영역을
+                    제거하고 실제 사업개요+신청자격+지원내용 영역만 남긴다.
+                    (실측 검증: 평균 1723자 -> 805자로 잡음 약 50% 제거, 핵심 정보는 보존)"""
+                    text = re.sub(r'본문\s*바로가기.*?화면크기', ' ', raw_text, flags=re.DOTALL)
+                    end_markers = [
+                        r'이\s*공고를\s*열람한\s*사용자',  # 관련 공고 추천 영역 시작
+                        r'NO\.\s*1\b',                      # 추천 목록 항목 시작
+                        r'정보에\s*만족하셨나요',            # 평점 위젯
+                        r'본문출력파일',                    # 첨부파일 목록 시작
+                    ]
+                    cut_idx = len(text)
+                    for pat in end_markers:
+                        m = re.search(pat, text)
+                        if m:
+                            cut_idx = min(cut_idx, m.start())
+                    text = text[:cut_idx]
+                    text = re.sub(r'\s+', ' ', text).strip()
+                    return text
 
-            import re
+                import re
 
-            # 크롤링 대상 필터
-            # 날짜 기반 최신화: 미수집 + 7일 초과 갱신필요 + 마감 안 지난 것
-            stale_pids = set(stale['pblancId'].tolist()) if not stale.empty else set()
-            fresh_pids = set(fresh[fresh['크롤링성공']=='Y']['pblancId'].tolist()) if not fresh.empty else set()
-            df_target = df_n[
-                (~df_n['pblancId'].isin(fresh_pids)) &  # 최신 성공 건 제외
-                ((df_n['마감일'] == '') | (df_n['마감일'] >= today))
-            ].copy()
+                # 크롤링 대상 필터
+                # 날짜 기반 최신화: 미수집 + 7일 초과 갱신필요 + 마감 안 지난 것
+                stale_pids = set(stale['pblancId'].tolist()) if not stale.empty else set()
+                fresh_pids = set(fresh[fresh['크롤링성공']=='Y']['pblancId'].tolist()) if not fresh.empty else set()
+                df_target = df_n[
+                    (~df_n['pblancId'].isin(fresh_pids)) &  # 최신 성공 건 제외
+                    ((df_n['마감일'] == '') | (df_n['마감일'] >= today))
+                ].copy()
 
-            if crawl_limit > 0:
-                df_target = df_target.head(crawl_limit)
+                if crawl_limit > 0:
+                    df_target = df_target.head(crawl_limit)
 
-            st.info(f"크롤링 대상: {len(df_target)}건 (총 {-(-len(df_target)//batch_size)}개 배치, {batch_size}건씩 저장)")
-            prog = st.progress(0); log_area = st.empty(); batch_status = st.empty()
-            logs = []; new_records = []; success = fail = 0
-            total_saved = 0
+                st.info(f"크롤링 대상: {len(df_target)}건 (총 {-(-len(df_target)//batch_size)}개 배치, {batch_size}건씩 저장)")
+                prog = st.progress(0); log_area = st.empty(); batch_status = st.empty()
+                logs = []; new_records = []; success = fail = 0
+                total_saved = 0
 
-            HEADERS = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Accept-Language": "ko-KR,ko;q=0.9",
-                "Referer": "https://www.bizinfo.go.kr/",
-            }
+                HEADERS = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Accept-Language": "ko-KR,ko;q=0.9",
+                    "Referer": "https://www.bizinfo.go.kr/",
+                }
 
-            def save_batch(records_to_save):
-                """new_records를 notices_detail.xlsx에 누적 저장. 매번 드라이브에서 최신본을 다시 읽어 합친다."""
-                if not records_to_save:
-                    return True
-                with st.spinner(f"드라이브 저장 중... (누적 {total_saved + len(records_to_save)}건)"):
-                    df_latest = load_excel(drive, DETAIL_FILE)  # 다른 배치/실행과 충돌 방지 위해 매번 최신본 로드
-                    df_new_batch = pd.DataFrame(records_to_save)
-                    df_merged = pd.concat([df_latest, df_new_batch], ignore_index=True) if not df_latest.empty else df_new_batch
-                    # pblancId 중복 시 가장 마지막(최신) 레코드만 유지
-                    if 'pblancId' in df_merged.columns:
-                        df_merged = df_merged.drop_duplicates('pblancId', keep='last')
-                    buf = io.BytesIO()
-                    with pd.ExcelWriter(buf, engine='openpyxl') as w:
-                        df_merged.to_excel(w, index=False)
-                    return drive_upload(drive, DETAIL_FILE, buf.getvalue(),
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                def save_batch(records_to_save):
+                    """new_records를 notices_detail.xlsx에 누적 저장. 매번 드라이브에서 최신본을 다시 읽어 합친다."""
+                    if not records_to_save:
+                        return True
+                    with st.spinner(f"드라이브 저장 중... (누적 {total_saved + len(records_to_save)}건)"):
+                        df_latest = load_excel(drive, DETAIL_FILE)  # 다른 배치/실행과 충돌 방지 위해 매번 최신본 로드
+                        df_new_batch = pd.DataFrame(records_to_save)
+                        df_merged = pd.concat([df_latest, df_new_batch], ignore_index=True) if not df_latest.empty else df_new_batch
+                        # pblancId 중복 시 가장 마지막(최신) 레코드만 유지
+                        if 'pblancId' in df_merged.columns:
+                            df_merged = df_merged.drop_duplicates('pblancId', keep='last')
+                        buf = io.BytesIO()
+                        with pd.ExcelWriter(buf, engine='openpyxl') as w:
+                            df_merged.to_excel(w, index=False)
+                        return drive_upload(drive, DETAIL_FILE, buf.getvalue(),
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-            # bizinfo 상세페이지는 SPA(JS 렌더링) 구조라 requests로는 빈 body만 받아온다
-            # (실측: html 8~9만자, body 자식태그 0개 — 진단 확정됨) → Playwright로 브라우저를 띄워 렌더링 후 텍스트 추출
-            from playwright.sync_api import sync_playwright
+                # bizinfo 상세페이지는 SPA(JS 렌더링) 구조라 requests로는 빈 body만 받아온다
+                # (실측: html 8~9만자, body 자식태그 0개 — 진단 확정됨) → Playwright로 브라우저를 띄워 렌더링 후 텍스트 추출
+                from playwright.sync_api import sync_playwright
 
-            with sync_playwright() as pw:
-                browser = pw.chromium.launch(headless=True)
-                page = browser.new_page(user_agent=HEADERS["User-Agent"])
+                with sync_playwright() as pw:
+                    browser = pw.chromium.launch(headless=True)
+                    page = browser.new_page(user_agent=HEADERS["User-Agent"])
 
-                for i, (_, row) in enumerate(df_target.iterrows()):
-                    url = row.get('공고링크','')
-                    pid = row.get('pblancId','')
-                    name = row.get('공고명','')[:25]
-                    if not url or not pid: continue
+                    for i, (_, row) in enumerate(df_target.iterrows()):
+                        url = row.get('공고링크','')
+                        pid = row.get('pblancId','')
+                        name = row.get('공고명','')[:25]
+                        if not url or not pid: continue
 
-                    try:
-                        _time.sleep(delay_sec)
-                        page.goto(url, timeout=20000, wait_until="networkidle")
-                        full_text = ""
-                        for sel in ['.view-content','.detail-content','#bizSumryCn',
-                                    '.bbs-view-content','#content','.board-view']:
-                            try:
-                                el = page.query_selector(sel)
-                                if el:
-                                    t = el.inner_text()
-                                    if len(t) > 200:
-                                        full_text = t
-                                        break
-                            except Exception:
-                                continue
-                        if len(full_text) < 100:
-                            full_text = page.inner_text('body')
+                        try:
+                            _time.sleep(delay_sec)
+                            page.goto(url, timeout=20000, wait_until="networkidle")
+                            full_text = ""
+                            for sel in ['.view-content','.detail-content','#bizSumryCn',
+                                        '.bbs-view-content','#content','.board-view']:
+                                try:
+                                    el = page.query_selector(sel)
+                                    if el:
+                                        t = el.inner_text()
+                                        if len(t) > 200:
+                                            full_text = t
+                                            break
+                                except Exception:
+                                    continue
+                            if len(full_text) < 100:
+                                full_text = page.inner_text('body')
 
-                        full_text = clean_notice_text(full_text)
+                            full_text = clean_notice_text(full_text)
 
-                        amount = ""
-                        for pat in [
-                            r'(?:지원|보조|사업비?)\s{0,3}(?:금액|한도)[^0-9]{0,10}([0-9][0-9,]*\s{0,2}(?:백만원|천만원|만원|억원))',
-                            r'(?:총|최대)\s{0,3}([0-9][0-9,]*\s{0,2}(?:백만원|천만원|만원|억원))\s{0,3}(?:이내|한도|지원)',
-                            r'([0-9][0-9,]*\s{0,2}(?:백만원|천만원|만원|억원))\s{0,3}이내\s{0,3}지원',
-                        ]:
-                            m = re.search(pat, full_text)
-                            if m: amount = m.group(0)[:30]; break
-                        scale = ""
-                        for pat in [
-                            r'([0-9]+)\s{0,2}개\s{0,3}(?:사|업체|기업)\s{0,4}(?:내외|이내|선정|모집)',
-                            r'선정\s{0,4}(?:규모|예정)[^0-9]{0,10}([0-9]+)\s{0,2}(?:개|개사|개업체)',
-                            r'모집\s{0,4}(?:규모|인원)[^0-9]{0,10}([0-9]+)\s{0,2}(?:개|개사|개업체|명)',
-                        ]:
-                            m = re.search(pat, full_text)
-                            if m: scale = m.group(0)[:30]; break
+                            amount = ""
+                            for pat in [
+                                r'(?:지원|보조|사업비?)\s{0,3}(?:금액|한도)[^0-9]{0,10}([0-9][0-9,]*\s{0,2}(?:백만원|천만원|만원|억원))',
+                                r'(?:총|최대)\s{0,3}([0-9][0-9,]*\s{0,2}(?:백만원|천만원|만원|억원))\s{0,3}(?:이내|한도|지원)',
+                                r'([0-9][0-9,]*\s{0,2}(?:백만원|천만원|만원|억원))\s{0,3}이내\s{0,3}지원',
+                            ]:
+                                m = re.search(pat, full_text)
+                                if m: amount = m.group(0)[:30]; break
+                            scale = ""
+                            for pat in [
+                                r'([0-9]+)\s{0,2}개\s{0,3}(?:사|업체|기업)\s{0,4}(?:내외|이내|선정|모집)',
+                                r'선정\s{0,4}(?:규모|예정)[^0-9]{0,10}([0-9]+)\s{0,2}(?:개|개사|개업체)',
+                                r'모집\s{0,4}(?:규모|인원)[^0-9]{0,10}([0-9]+)\s{0,2}(?:개|개사|개업체|명)',
+                            ]:
+                                m = re.search(pat, full_text)
+                                if m: scale = m.group(0)[:30]; break
 
-                        MIN_TEXT_LEN = 200
-                        ok = len(full_text) >= MIN_TEXT_LEN
-                        if ok:
-                            # ── ③ 키워드 태그 자동 추출 ─────────────
-                            # 전문에서 TARGET_KW/TYPE_KW 매칭 결과를 사전 계산
-                            tag_target = [cat for cat, kws in TARGET_KW.items()
-                                          if any(kw in full_text for kw in kws)]
-                            tag_type   = [cat for cat, kws in TYPE_KW.items()
-                                          if any(kw in full_text for kw in kws)]
-                            # 지역 태그
-                            bracket_m = re.search(r'\[([^\]]+)\]', name or '')
-                            tag_region = bracket_m.group(1) if bracket_m else ''
-                            # 업력 제한
-                            age_m = re.findall(r'창업\s*(\d+)년\s*이내', full_text)
-                            tag_age_limit = age_m[0] if age_m else ''
-                            # 선착순 여부
-                            tag_urgent = '선착순' if '선착순' in full_text else ''
+                            MIN_TEXT_LEN = 200
+                            ok = len(full_text) >= MIN_TEXT_LEN
+                            if ok:
+                                # ── ③ 키워드 태그 자동 추출 ─────────────
+                                # 전문에서 TARGET_KW/TYPE_KW 매칭 결과를 사전 계산
+                                tag_target = [cat for cat, kws in TARGET_KW.items()
+                                              if any(kw in full_text for kw in kws)]
+                                tag_type   = [cat for cat, kws in TYPE_KW.items()
+                                              if any(kw in full_text for kw in kws)]
+                                # 지역 태그
+                                bracket_m = re.search(r'\[([^\]]+)\]', name or '')
+                                tag_region = bracket_m.group(1) if bracket_m else ''
+                                # 업력 제한
+                                age_m = re.findall(r'창업\s*(\d+)년\s*이내', full_text)
+                                tag_age_limit = age_m[0] if age_m else ''
+                                # 선착순 여부
+                                tag_urgent = '선착순' if '선착순' in full_text else ''
 
-                            new_records.append({
-                                'pblancId':    pid,
-                                '전문내용':    full_text[:4000],
-                                '지원금액':    amount,
-                                '선정규모':    scale,
-                                '크롤링방법':  'Playwright',
-                                '크롤링일':    today,
-                                '크롤링성공':  'Y',
-                                '태그_지원대상': ', '.join(tag_target),
-                                '태그_사업성격': ', '.join(tag_type),
-                                '태그_지역':    tag_region,
-                                '태그_업력제한': tag_age_limit,
-                                '태그_긴급':    tag_urgent,
-                            })
-                            success += 1
-                            logs.append(f"✅ {name} ({len(full_text)}자)")
-                        else:
-                            new_records.append({'pblancId':pid,'전문내용':f"[진단] Playwright 렌더링 후에도 본문 {len(full_text)}자",
-                                               '지원금액':'','선정규모':'','크롤링방법':'Playwright-diag',
-                                               '크롤링일':today,'크롤링성공':'N'})
+                                new_records.append({
+                                    'pblancId':    pid,
+                                    '전문내용':    full_text[:4000],
+                                    '지원금액':    amount,
+                                    '선정규모':    scale,
+                                    '크롤링방법':  'Playwright',
+                                    '크롤링일':    today,
+                                    '크롤링성공':  'Y',
+                                    '태그_지원대상': ', '.join(tag_target),
+                                    '태그_사업성격': ', '.join(tag_type),
+                                    '태그_지역':    tag_region,
+                                    '태그_업력제한': tag_age_limit,
+                                    '태그_긴급':    tag_urgent,
+                                })
+                                success += 1
+                                logs.append(f"✅ {name} ({len(full_text)}자)")
+                            else:
+                                new_records.append({'pblancId':pid,'전문내용':f"[진단] Playwright 렌더링 후에도 본문 {len(full_text)}자",
+                                                   '지원금액':'','선정규모':'','크롤링방법':'Playwright-diag',
+                                                   '크롤링일':today,'크롤링성공':'N'})
+                                fail += 1
+                                logs.append(f"❌ {name} (본문 {len(full_text)}자 — 렌더링 후에도 부족)")
+                        except Exception as e:
+                            new_records.append({'pblancId':pid,'전문내용':f"[진단] 예외: {str(e)[:100]}",'지원금액':'',
+                                               '선정규모':'','크롤링방법':'Playwright','크롤링일':today,'크롤링성공':'N'})
                             fail += 1
-                            logs.append(f"❌ {name} (본문 {len(full_text)}자 — 렌더링 후에도 부족)")
-                    except Exception as e:
-                        new_records.append({'pblancId':pid,'전문내용':f"[진단] 예외: {str(e)[:100]}",'지원금액':'',
-                                           '선정규모':'','크롤링방법':'Playwright','크롤링일':today,'크롤링성공':'N'})
-                        fail += 1
-                        logs.append(f"❌ {name} ({str(e)[:30]})")
+                            logs.append(f"❌ {name} ({str(e)[:30]})")
 
-                    prog.progress((i+1)/len(df_target))
-                    log_area.code("\n".join(logs[-10:]))
+                        prog.progress((i+1)/len(df_target))
+                        log_area.code("\n".join(logs[-10:]))
 
-                    # ── 배치 단위 중간 저장 ──────────────────
-                    if len(new_records) >= batch_size:
-                        if save_batch(new_records):
-                            total_saved += len(new_records)
-                            batch_status.success(f"💾 중간 저장 완료 — 누적 {total_saved}건 ({i+1}/{len(df_target)} 진행)")
-                            new_records = []  # 저장된 건 비우고 다음 배치 시작
-                        else:
-                            batch_status.error("⚠️ 중간 저장 실패 — 다음 배치에서 재시도")
+                        # ── 배치 단위 중간 저장 ──────────────────
+                        if len(new_records) >= batch_size:
+                            if save_batch(new_records):
+                                total_saved += len(new_records)
+                                batch_status.success(f"💾 중간 저장 완료 — 누적 {total_saved}건 ({i+1}/{len(df_target)} 진행)")
+                                new_records = []  # 저장된 건 비우고 다음 배치 시작
+                            else:
+                                batch_status.error("⚠️ 중간 저장 실패 — 다음 배치에서 재시도")
 
-                browser.close()
+                    browser.close()
 
-            # 잔여분(배치 크기 미만으로 남은 마지막 묶음) 저장
-            if new_records:
-                if save_batch(new_records):
-                    total_saved += len(new_records)
+                # 잔여분(배치 크기 미만으로 남은 마지막 묶음) 저장
+                if new_records:
+                    if save_batch(new_records):
+                        total_saved += len(new_records)
+                        st.success(f"✅ 크롤링 완료 — 성공 {success}건 / 실패 {fail}건 / 총 저장 {total_saved}건 → notices_detail.xlsx")
+                        st.rerun()
+                    else:
+                        st.error(f"드라이브 저장 실패 — 단, 이전 배치 {total_saved}건은 이미 저장되어 있습니다.")
+                elif total_saved > 0:
                     st.success(f"✅ 크롤링 완료 — 성공 {success}건 / 실패 {fail}건 / 총 저장 {total_saved}건 → notices_detail.xlsx")
                     st.rerun()
                 else:
-                    st.error(f"드라이브 저장 실패 — 단, 이전 배치 {total_saved}건은 이미 저장되어 있습니다.")
-            elif total_saved > 0:
-                st.success(f"✅ 크롤링 완료 — 성공 {success}건 / 실패 {fail}건 / 총 저장 {total_saved}건 → notices_detail.xlsx")
-                st.rerun()
-            else:
-                st.info("새로 크롤링할 공고 없음")
+                    st.info("새로 크롤링할 공고 없음")
 
     with tab_cm2:
         info_box("매칭 실행·검토",
@@ -2947,6 +2948,39 @@ elif page == "공고·매칭":
                                     f"🤖 {summary}</div>",
                                     unsafe_allow_html=True
                                 )
+                            # AI 체크리스트 항상 표시
+                            checks = {
+                                "업종일치": ai_res.get('업종일치','—'),
+                                "자격충족": ai_res.get('자격충족','—'),
+                                "지역적합": ai_res.get('지역적합','—'),
+                                "수요일치": ai_res.get('수요일치','—')
+                            }
+                            icon_map = {"O":"✅","X":"❌","△":"⚠️"}
+                            checks_html = " &nbsp; ".join([
+                                f"<span style='font-size:12px;'>{icon_map.get(v,'—')} {k}</span>"
+                                for k, v in checks.items()
+                            ])
+                            st.markdown(
+                                f"<div style='padding:4px 0;'>{checks_html}</div>",
+                                unsafe_allow_html=True
+                            )
+
+                        # ── 핵심 정보 요약 (상세 클릭 없이 바로 표시) ──
+                        info_parts = []
+                        if row.get('지원대상','') and row.get('지원대상','') != '—':
+                            info_parts.append(f"<b>지원대상</b> {str(row.get('지원대상',''))[:40]}")
+                        if row.get('지원금액','') and str(row.get('지원금액','')) not in ['','nan']:
+                            info_parts.append(f"<b>지원금액</b> {str(row.get('지원금액',''))[:30]}")
+                        if row.get('접수기간','') and str(row.get('접수기간','')) not in ['','nan']:
+                            info_parts.append(f"<b>접수기간</b> {str(row.get('접수기간',''))[:30]}")
+                        if info_parts:
+                            st.markdown(
+                                "<div style='background:#F8FAFC;border-radius:6px;padding:8px 12px;"
+                                "margin:6px 0;font-size:12px;color:#374151;line-height:1.8;'>"
+                                + "<br>".join(info_parts) +
+                                "</div>",
+                                unsafe_allow_html=True
+                            )
 
                         # ── 액션 버튼 행 ──
                         b1, b2, b3, b4, _ = st.columns([1.5, 1.5, 1.5, 1.5, 3])
