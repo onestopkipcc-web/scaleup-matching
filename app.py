@@ -2699,7 +2699,14 @@ elif page == "공고·매칭":
                     selected_co = st.session_state['review_co_name']
                     co_rows = filtered[filtered['기업명'] == selected_co].copy()
                     co_rows['점수_num'] = pd.to_numeric(co_rows['점수'], errors='coerce').fillna(0)
-                    co_rows = co_rows.sort_values('점수_num', ascending=False)
+                    # AI 적합도 순 우선 정렬 (추천→검토→비추천→미분석), 동점 시 점수 순
+                    ai_map = st.session_state.get('ai_analysis', {})
+                    def ai_order(r):
+                        k   = f"{r['기업명']}_{r.get('공고ID','')}"
+                        rec = ai_map.get(k, {}).get('추천여부', '')
+                        return {"추천": 0, "검토": 1, "비추천": 2}.get(rec, 3)
+                    co_rows['_ai_order'] = co_rows.apply(ai_order, axis=1)
+                    co_rows = co_rows.sort_values(['_ai_order', '점수_num'], ascending=[True, False])
 
                     co_ap  = sum(1 for _, r in co_rows.iterrows() if st.session_state['review_state'].get(f"{r['기업명']}_{r.get('공고ID','')}", "")=="○")
                     co_rj  = sum(1 for _, r in co_rows.iterrows() if st.session_state['review_state'].get(f"{r['기업명']}_{r.get('공고ID','')}", "")=="✕")
@@ -2911,7 +2918,8 @@ elif page == "공고·매칭":
                                 badges += f" &nbsp;<span style='font-size:11px;background:{ai_col}22;color:{ai_col};padding:2px 7px;border-radius:10px;font-weight:600;'>{ai_badge}</span>"
                             st.markdown(
                                 f"{badges}<br>"
-                                f"<span style='font-size:15px;font-weight:700;color:#0F172A;'>{nm}</span><br>"
+                                f"<span style='font-size:15px;font-weight:700;color:#0F172A;'>{nm}</span>"
+                                f"<span style='font-size:12px;color:#94A3B8;font-weight:400;'> ({int(row.get('점수', 0))}점)</span><br>"
                                 f"<span style='font-size:12px;color:#64748B;'>{org}</span>",
                                 unsafe_allow_html=True
                             )
