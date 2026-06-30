@@ -2983,26 +2983,25 @@ elif page == "공고·매칭":
                             )
 
                         # ── 액션 버튼 행 ──
-                        b1, b2, b3, b4, _ = st.columns([1.5, 1.5, 1.5, 1.5, 3])
+                        b1, b2, b3, b4 = st.columns([2, 2, 2, 2])
                         with b1:
-                            lbl = "✅ 승인" if current != "○" else "↩ 취소"
+                            lbl = "✅ 승인" if current != "○" else "↩ 승인취소"
                             btn_type = "primary" if current != "○" else "secondary"
                             if st.button(lbl, key=f"o_{key}_{i}", use_container_width=True, type=btn_type):
                                 st.session_state['review_state'][key] = "" if current=="○" else "○"
                                 st.rerun()
                         with b2:
-                            lbl = "❌ 제외" if current != "✕" else "↩ 취소"
+                            lbl = "❌ 제외" if current != "✕" else "↩ 제외취소"
                             if st.button(lbl, key=f"x_{key}_{i}", use_container_width=True):
                                 st.session_state['review_state'][key] = "" if current=="✕" else "✕"
                                 st.rerun()
                         with b3:
-                            if st.button("📋 상세", key=f"det_{key}_{i}", use_container_width=True):
-                                toggle_key = f"show_detail_{key}"
-                                st.session_state[toggle_key] = not st.session_state.get(toggle_key, False)
-                                st.rerun()
+                            if row.get('공고링크',''):
+                                st.link_button("🔗 공고 원문", row.get('공고링크',''),
+                                               use_container_width=True)
                         with b4:
                             if not ai_res:
-                                if st.button("🤖 AI분석", key=f"ai_{key}_{i}", use_container_width=True):
+                                if st.button("🤖 AI 분석", key=f"ai_{key}_{i}", use_container_width=True):
                                     with st.spinner("분석 중..."):
                                         ci = {}
                                         if 'df_companies_cache' in st.session_state:
@@ -3013,59 +3012,33 @@ elif page == "공고·매칭":
                                         if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = {}
                                         st.session_state['ai_analysis'][key] = claude_analyze(ci, row.to_dict())
                                     st.rerun()
-                            else:
-                                if st.button("🤖 AI상세", key=f"ai_{key}_{i}", use_container_width=True):
-                                    toggle_ai = f"show_ai_{key}"
-                                    st.session_state[toggle_ai] = not st.session_state.get(toggle_ai, False)
-                                    st.rerun()
 
-                        # ── 공고 상세 펼침 (토글) ──
-                        if st.session_state.get(f"show_detail_{key}", False):
-                            with st.container():
-                                st.markdown("<div style='background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:14px;margin:6px 0;'>", unsafe_allow_html=True)
-                                d1, d2 = st.columns(2)
-                                with d1:
-                                    st.caption("**지원대상**"); st.write(row.get('지원대상','—'))
-                                    if row.get('지원금액'): st.caption("**지원금액**"); st.write(row.get('지원금액',''))
-                                    if row.get('선정규모'): st.caption("**선정규모**"); st.write(row.get('선정규모',''))
-                                with d2:
-                                    st.caption("**접수기간**"); st.write(row.get('접수기간','—'))
-                                    if row.get('공고링크'):
-                                        st.link_button("🔗 공고 원문 보러가기", row.get('공고링크',''))
-                                overview = row.get('사업개요','')
-                                if 'HOME' in overview[:30]:
-                                    cut = overview.find('소관부처')
-                                    if cut > 0: overview = overview[cut:]
-                                st.caption("**사업개요**"); st.write(overview[:500])
-                                st.markdown("</div>", unsafe_allow_html=True)
-
-                        # ── AI 분석 상세 펼침 (토글) ──
-                        if ai_res and not ai_res.get('error') and st.session_state.get(f"show_ai_{key}", False):
+                        # ── AI 분석 상세 (항상 펼침) ──
+                        if ai_res and not ai_res.get('error'):
                             rec       = ai_res.get('추천여부','')
                             fit       = ai_res.get('적합도','')
-                            summary   = ai_res.get('한줄요약','')
                             reason_ai = ai_res.get('판단근거', ai_res.get('적합이유',''))
                             caution   = ai_res.get('주의사항','')
-                            checks    = {"업종일치": ai_res.get('업종일치','—'), "자격충족": ai_res.get('자격충족','—'),
-                                         "지역적합": ai_res.get('지역적합','—'), "수요일치": ai_res.get('수요일치','—')}
-                            icon_map  = {"O":"✅","X":"❌","△":"⚠️"}
                             rec_icon  = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
+                            rec_color_map = {"추천":"#ECFDF5","검토":"#FFFBEB","비추천":"#FEF2F2"}
+                            rec_border_map = {"추천":"#10B981","검토":"#F59E0B","비추천":"#EF4444"}
+                            bg    = rec_color_map.get(rec, "#F8FAFC")
+                            bdr   = rec_border_map.get(rec, "#E2E8F0")
 
                             st.markdown(
-                                f"<div style='background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:14px;margin:6px 0;'>",
+                                f"<div style='background:{bg};border:1px solid {bdr};"
+                                f"border-left:4px solid {bdr};border-radius:8px;"
+                                f"padding:12px 16px;margin:6px 0;'>",
                                 unsafe_allow_html=True
                             )
-                            ai_top, ai_body = st.columns([1, 5])
+                            ai_top, ai_body = st.columns([1, 6])
                             with ai_top:
                                 st.markdown(f"**{rec_icon} {rec}**")
                                 st.caption(f"적합도 {fit}")
                             with ai_body:
-                                st.markdown(f"**{summary}**")
                                 st.write(reason_ai)
                                 if caution and caution not in ['없음','','nan']:
                                     st.warning(f"⚠️ {caution}")
-                                check_str = "  ".join([f"{icon_map.get(v,'—')} {k}" for k,v in checks.items()])
-                                st.caption(check_str)
                             st.markdown("</div>", unsafe_allow_html=True)
 
                         st.divider()
