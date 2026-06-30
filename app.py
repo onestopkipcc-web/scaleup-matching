@@ -941,77 +941,13 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=
         ):
             return None
 
-    # ── 별점 판정 (두 축 교차 + 기업 키워드) ────────
-    has_procurement   = '공공조달'   in matched_type
-    has_overseas      = '해외진출'   in matched_type
-    has_marketing     = '마케팅홍보' in matched_type
-    has_cert          = '인증특허'   in matched_type
-    has_tech          = '기술개발'   in matched_type
-    has_finance       = '금융융자'   in matched_type
-    has_domestic      = '내수판로'   in matched_type
-
-    has_procurement_target = '조달기업특화' in matched_target
-    has_export_target      = '수출기업특화' in matched_target
-    has_general_target     = '중소벤처일반' in matched_target
-
-    has_co_match    = bool(matched_co or matched_demand)
-    has_demand_hit  = bool(matched_demand)  # 핵심수요태그 직접 매칭
-
-    stars = None  # 초기화
-
-    # ★★★ 판정
-    if has_demand_hit:
-        # 핵심수요태그 직접 매칭 → 무조건 ★★★
-        stars = "★★★"
-    elif has_procurement_target and has_procurement:
-        # 조달기업 대상 + 공공조달 사업
-        stars = "★★★"
-    elif has_procurement_target and has_overseas:
-        # 조달기업 대상 + 해외진출 사업
-        stars = "★★★"
-    elif has_export_target and has_overseas:
-        # 수출기업 대상 + 해외진출 사업
-        stars = "★★★"
-    elif has_co_match and has_procurement:
-        # 기업 키워드 매칭 + 공공조달
-        stars = "★★★"
-
-    # ★★ 판정
-    elif has_procurement_target and (has_tech or has_cert or has_marketing):
-        stars = "★★"
-    elif has_export_target and (has_marketing or has_cert or has_domestic):
-        stars = "★★"
-    elif has_co_match and (has_overseas or has_marketing or has_cert):
-        stars = "★★"
-    elif has_co_match and matched_target:
-        stars = "★★"
-    elif has_general_target and (has_procurement or has_overseas):
-        stars = "★★"
-    elif has_general_target and has_co_match:
-        stars = "★★"
-
-    # 매칭 없음
-    if not stars:
-        return None
-
-    # ── 소재지 불일치 시 별점 강등 ───────────────────────
-    # 지역 공고(location_score < 0)인데 기업 소재지가 다르면 별점 강등
-    # 매칭 자체는 유지하되 점수 하단으로 밀어내 검토 순위를 낮춤
-    if location_score < 0:
-        if stars == "★★★":
-            stars = "★★"   # ★★★ → ★★ 강등
-        elif stars == "★★":
-            stars = "★"    # ★★ → ★ 강등 (이후 필터에서 걸러짐)
-
-    # ── 점수 계산 (정렬용) ────────────────────────────
-    # 세그먼트 부스트: 해당 기업 세그먼트와 맞는 사업성격 카테고리에 가산
+    # ── 점수 계산 ────────────────────────────────────
     seg_score = sum(min(seg_boost.get(cat, 0), W_SEG) for cat in matched_type.keys())
 
-    # ── 피드백 페널티: 이전 검토에서 자주 제외된 사업성격 감산 ──
     feedback_penalty = 0
     fb = feedback or (kw_config.get("feedback", {}) if kw_config else {})
     if fb:
-        co_feedback = fb.get(row.get('기업명',''), {})
+        co_feedback = fb.get(row.get("기업명",""), {})
         for cat in matched_type.keys():
             reject_count = co_feedback.get(cat, 0)
             if reject_count >= 3:   feedback_penalty -= 6
@@ -1025,8 +961,34 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=
         ind_score * W_IND   +
         xs + (location_score * W_LOC // 3) + seg_score + feedback_penalty
     )
-    if stars == "★★★": score += 5
+    if matched_demand: score += 8   # 핵심수요 직접매칭 강력 보너스
     if score <= 0: return None
+
+    # ── ④ 별점 판정 — 점수 기반 통합 ──────────────────
+    star3_threshold = kw_config.get("star3_threshold", 18) if kw_config else 18
+    star2_threshold = kw_config.get("star2_threshold",  8) if kw_config else 8
+
+    hard_star3 = (
+        bool(matched_demand)
+        or ("조달기업특화" in matched_target and "공공조달" in matched_type)
+        or ("조달기업특화" in matched_target and "해외진출" in matched_type)
+        or ("수출기업특화" in matched_target and "해외진출" in matched_type)
+        or (bool(matched_co) and "공공조달" in matched_type)
+    )
+
+    if hard_star3 or score >= star3_threshold:
+        stars = "★★★"
+    elif score >= star2_threshold:
+        stars = "★★"
+    else:
+        return None
+
+    # 소재지 불일치 시 별점 강등
+    if location_score < 0:
+        if stars == "★★★":   stars = "★★"
+        elif stars == "★★":  stars = "★"
+    if stars == "★": return None
+
 
     # ── 매칭 근거 텍스트 ──────────────────────────────
     target_str = " / ".join([f"{k}({','.join(v)})" for k,v in matched_target.items()])
@@ -2285,9 +2247,35 @@ elif page == "공고·매칭":
                         MIN_TEXT_LEN = 200
                         ok = len(full_text) >= MIN_TEXT_LEN
                         if ok:
-                            new_records.append({'pblancId':pid,'전문내용':full_text[:4000],
-                                               '지원금액':amount,'선정규모':scale,'크롤링방법':'Playwright',
-                                               '크롤링일':today,'크롤링성공':'Y'})
+                            # ── ③ 키워드 태그 자동 추출 ─────────────
+                            # 전문에서 TARGET_KW/TYPE_KW 매칭 결과를 사전 계산
+                            tag_target = [cat for cat, kws in TARGET_KW.items()
+                                          if any(kw in full_text for kw in kws)]
+                            tag_type   = [cat for cat, kws in TYPE_KW.items()
+                                          if any(kw in full_text for kw in kws)]
+                            # 지역 태그
+                            bracket_m = re.search(r'\[([^\]]+)\]', name or '')
+                            tag_region = bracket_m.group(1) if bracket_m else ''
+                            # 업력 제한
+                            age_m = re.findall(r'창업\s*(\d+)년\s*이내', full_text)
+                            tag_age_limit = age_m[0] if age_m else ''
+                            # 선착순 여부
+                            tag_urgent = '선착순' if '선착순' in full_text else ''
+
+                            new_records.append({
+                                'pblancId':    pid,
+                                '전문내용':    full_text[:4000],
+                                '지원금액':    amount,
+                                '선정규모':    scale,
+                                '크롤링방법':  'Playwright',
+                                '크롤링일':    today,
+                                '크롤링성공':  'Y',
+                                '태그_지원대상': ', '.join(tag_target),
+                                '태그_사업성격': ', '.join(tag_type),
+                                '태그_지역':    tag_region,
+                                '태그_업력제한': tag_age_limit,
+                                '태그_긴급':    tag_urgent,
+                            })
                             success += 1
                             logs.append(f"✅ {name} ({len(full_text)}자)")
                         else:
@@ -2549,6 +2537,47 @@ elif page == "공고·매칭":
                     f"(전문 DB {enriched_count}건 반영 / 공고 총 {df_n.shape[0]}건 중 매칭) "
                     f"→ '검토 & 승인' 탭으로 이동"
                 )
+
+                # ── ① 버려진 공고 분석 ───────────────────────
+                matched_pids = {r.get('공고ID','') for r in all_results}
+                all_pids     = set(df_n['pblancId'].astype(str)) if 'pblancId' in df_n.columns else set()
+                dropped_pids = all_pids - matched_pids
+                dropped_df   = df_n[df_n['pblancId'].astype(str).isin(dropped_pids)]
+
+                with st.expander(f"🗑️ 버려진 공고 분석 ({len(dropped_df)}건 / 전체 {len(df_n)}건)", expanded=False):
+                    if not dropped_df.empty:
+                        # 분야별 분포
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            st.caption("**버려진 공고 분야 분포**")
+                            if '분야' in dropped_df.columns:
+                                realm_drop = dropped_df['분야'].value_counts().head(8)
+                                for realm, cnt in realm_drop.items():
+                                    pct = cnt / len(dropped_df) * 100
+                                    st.write(f"• {realm}: {cnt}건 ({pct:.0f}%)")
+                        with c2:
+                            st.caption("**버려진 공고 키워드 빈도**")
+                            # 버려진 공고들에서 TARGET_KW/TYPE_KW 빈도 계산
+                            kw_counter = {}
+                            for _, row_d in dropped_df.iterrows():
+                                text_d = str(row_d.get('사업개요','')) + str(row_d.get('공고명',''))
+                                for cat, kws in {**TARGET_KW, **TYPE_KW}.items():
+                                    if any(kw in text_d for kw in kws):
+                                        kw_counter[cat] = kw_counter.get(cat, 0) + 1
+                            for cat, cnt in sorted(kw_counter.items(), key=lambda x:-x[1])[:8]:
+                                st.write(f"• {cat}: {cnt}건")
+
+                        st.divider()
+                        # 역제안: 버려진 공고 중 키워드 추가 시 매칭 가능한 것
+                        st.caption("**💡 키워드 추가 시 매칭 가능할 수 있는 공고 (상위 10건)**")
+                        st.caption("아래 공고들은 기업 키워드가 보완되면 매칭될 수 있습니다.")
+                        dropped_sample = dropped_df[dropped_df['마감일'] >= datetime.today().strftime('%Y-%m-%d')].head(10)
+                        for _, row_d in dropped_sample.iterrows():
+                            name_d = str(row_d.get('공고명',''))[:40]
+                            dl_d   = str(row_d.get('마감일',''))
+                            realm_d = str(row_d.get('분야',''))
+                            st.write(f"📌 **{name_d}** | {realm_d} | 마감 {dl_d}")
+
                 if enriched_count == 0 and detail_ok_count > 0:
                     st.error("⚠️ 전문 DB 로드 실패 — '공고 수집' 탭에서 크롤링 상태를 확인하세요.")
 
@@ -3357,18 +3386,21 @@ elif page == "발송":
                          style="color:#2E75B6;font-size:13px">📅 {company} 전용 캘린더 구독</a></div>"""
 
                 cal_sec=f"""
-                <div style="background:rgba(74,158,255,0.08);border-radius:10px;
-                            padding:16px 18px;border:1px solid rgba(74,158,255,0.2);">
-                  <p style="margin:0 0 4px;color:#10B981;font-weight:700;font-size:11px;
+                <div style="background:#F0FDF4;border-radius:10px;
+                            padding:16px 18px;border:1px solid #A7F3D0;margin:16px 0;">
+                  <p style="margin:0 0 4px;color:#059669;font-weight:700;font-size:11px;
                              letter-spacing:1.5px;text-transform:uppercase;">
-                    📅 마감일 알림 캘린더
+                    📅 공고 마감일 캘린더 알림
                   </p>
-                  <p style="margin:0 0 12px;font-size:12px;color:rgba(255,255,255,0.4);">
-                    D-7 · D-3 자동 알림을 받아보세요.
+                  <p style="margin:0 0 12px;font-size:12px;color:#374151;">
+                    D-7 · D-3 자동 알림을 받아보세요. 구글 계정만 있으면 1회 클릭으로 설정됩니다.
                   </p>
-                  {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#10B981;color:#0A1628;padding:8px 18px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700;'>구독하기 →</a>" if CALENDAR_LINK else ""}
+                  {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#10B981;color:#fff;padding:8px 18px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700;'>📅 공통 캘린더 구독하기 →</a>" if CALENDAR_LINK else "<p style='margin:0;font-size:12px;color:#6B7280;'>※ 캘린더 링크는 별도 안내 예정입니다.</p>"}
                   {ind_link}
-                </div>""" if (CALENDAR_LINK or ind_link) else ""
+                  <p style="margin:10px 0 0;font-size:11px;color:#9CA3AF;">
+                    구글 계정이 없으신 경우 담당자에게 문의 주시면 안내해드립니다.
+                  </p>
+                </div>"""
 
                 today_str = datetime.today().strftime('%Y.%m.%d')
                 html=f"""<!DOCTYPE html>
