@@ -1410,10 +1410,19 @@ with st.sidebar:
     st.markdown("### 📢 원스톱 스케일업")
     st.caption("혁신제품지원센터")
     st.divider()
+
+    # 메뉴 그룹핑
+    st.caption("▸ 운영")
     page = st.radio("메뉴", [
-        "대시보드", "기업 관리", "공고 수집",
-        "매칭 결과", "발송 관리", "안내 메일",
-        "발송 이력", "성과 집계", "캘린더 관리", "키워드 관리", "설정", "시스템 명세"
+        "대시보드",
+        "기업 관리",
+        "공고·매칭",
+        "발송",
+        "안내 메일",
+        "발송 이력",
+        "캘린더",
+        "설정",
+        "시스템 명세",
     ], label_visibility="collapsed")
     st.divider()
     test_mode = st.toggle("테스트 모드", value=True)
@@ -1931,11 +1940,15 @@ elif page == "기업 관리":
 # ══════════════════════════════════════════════════════
 # 공고 수집
 # ══════════════════════════════════════════════════════
-elif page == "공고 수집":
+elif page == "공고·매칭":
     drive = _get_drive()
-    st.title("공고 수집")
-    info_box("공고 수집",
-        """
+    st.title("공고·매칭")
+
+    tab_cm1, tab_cm2 = st.tabs(["📥 공고 수집", "🎯 매칭 실행·검토"])
+
+    with tab_cm1:
+        info_box("공고 수집",
+            """
 기업마당 API → 전체 공고 수집 → `notices_db.xlsx` 누적 저장
 
 **수집 방식**
@@ -1945,10 +1958,8 @@ elif page == "공고 수집":
 - 마감일 자동 파싱 (비정형 마감일은 공란 처리)
 
 **권장 수집 주기** — 주 1회 (매주 월요일)
-        """,
-        "수집 분야 변경 → 화면의 '수집 분야 선택' 옵션에서 체크박스로 선택")
-
-    drive = _get_drive()
+            """,
+            "수집 분야 변경 → 화면의 '수집 분야 선택' 옵션에서 체크박스로 선택")
     with st.spinner("드라이브에서 공고 DB 로딩 중..."):
         df_n = load_excel(drive, NOTICES_FILE)
 
@@ -2319,853 +2330,846 @@ elif page == "공고 수집":
             else:
                 st.info("새로 크롤링할 공고 없음")
 
-
-# ══════════════════════════════════════════════════════
-# 매칭 결과
-# ══════════════════════════════════════════════════════
-elif page == "매칭 결과":
-    drive = _get_drive()
-    st.title("매칭 결과")
-    info_box("매칭 결과",
-        """
+    with tab_cm2:
+        info_box("매칭 실행·검토",
+            """
 선정기업 × 공고 DB 교차 매칭 → 담당자 검토 → 발송 승인
 
 **매칭 로직**
 - 공고 전문(크롤링 완료 건) + API 사업개요를 통합 반영해 한 번에 매칭
-- 키워드 4개 축 × 별점 판정 → 점수 높은 순 정렬 → 기업당 최대 N건 추출
+- 키워드 7개 축 × 별점 판정 → 점수 높은 순 정렬 → 기업당 최대 N건 추출
 - 이미 발송한 공고 / 마감 지난 공고 / 수신거부 기업 자동 제외
 
 **검토 방법** — ○ 승인 / ✕ 제외 클릭 → 공고 원문 링크로 내용 확인 후 판단
-★★★ 위주 먼저 검토 권장
-        """,
-        "기업당 건수 → 슬라이더 조정 / 키워드 → 설정 메뉴에서 변경")
+            """,
+            "★★★ 위주 먼저 검토 권장")
 
-    tab1, tab2 = st.tabs(["▶ 매칭 실행", "🔍 검토 & 승인"])
+        tab1, tab2 = st.tabs(["▶ 매칭 실행", "🔍 검토 & 승인"])
 
-    with tab1:
-        col1, col2 = st.columns(2)
-        with col1:
-            max_per = st.slider("기업당 최대 추천 건수", 5, 20, 12)
-        with col2:
-            st.markdown("**발송 대상 그룹**")
-            target_group = st.radio(
-                "발송 대상 그룹", ["선정 50개사", "예비 20개사", "전체 70개사"],
-                horizontal=True, label_visibility="collapsed", key="match_target_group"
-            )
+        with tab1:
+            col1, col2 = st.columns(2)
+            with col1:
+                max_per = st.slider("기업당 최대 추천 건수", 5, 20, 12)
+            with col2:
+                st.markdown("**발송 대상 그룹**")
+                target_group = st.radio(
+                    "발송 대상 그룹", ["선정 50개사", "예비 20개사", "전체 70개사"],
+                    horizontal=True, label_visibility="collapsed", key="match_target_group"
+                )
 
-        # ── 스마트 매칭 권고 알림 ────────────────────────
-        df_n_check = load_excel(drive, NOTICES_FILE)
+            # ── 스마트 매칭 권고 알림 ────────────────────────
+            df_n_check = load_excel(drive, NOTICES_FILE)
 
-        # 드라이브에서 마지막 매칭 정보 복원 (앱 재시작 후에도 유지)
-        if 'last_match_info' not in st.session_state:
-            kw_saved = load_json(drive, KEYWORDS_FILE) or {}
-            if 'last_match' in kw_saved:
-                st.session_state['last_match_info'] = kw_saved['last_match']
+            # 드라이브에서 마지막 매칭 정보 복원 (앱 재시작 후에도 유지)
+            if 'last_match_info' not in st.session_state:
+                kw_saved = load_json(drive, KEYWORDS_FILE) or {}
+                if 'last_match' in kw_saved:
+                    st.session_state['last_match_info'] = kw_saved['last_match']
 
-        last_match_info = st.session_state.get('last_match_info', {})
-        need_rematch    = False
-        rematch_reason  = ""
+            last_match_info = st.session_state.get('last_match_info', {})
+            need_rematch    = False
+            rematch_reason  = ""
 
-        if not df_n_check.empty:
-            # 공고 DB 최신 날짜
-            latest_notice_date = ""
-            if '수정일' in df_n_check.columns:
-                latest_notice_date = df_n_check['수정일'].max()[:10] if df_n_check['수정일'].max() else ""
+            if not df_n_check.empty:
+                # 공고 DB 최신 날짜
+                latest_notice_date = ""
+                if '수정일' in df_n_check.columns:
+                    latest_notice_date = df_n_check['수정일'].max()[:10] if df_n_check['수정일'].max() else ""
 
-            last_match_date    = last_match_info.get('date','')
-            last_match_notices = last_match_info.get('notice_count', 0)
-            cur_notice_count   = len(df_n_check)
+                last_match_date    = last_match_info.get('date','')
+                last_match_notices = last_match_info.get('notice_count', 0)
+                cur_notice_count   = len(df_n_check)
 
-            if not last_match_date:
-                need_rematch  = True
-                rematch_reason = "아직 매칭을 실행한 적이 없습니다."
-            elif latest_notice_date and latest_notice_date > last_match_date:
-                new_cnt = cur_notice_count - last_match_notices
-                need_rematch  = True
-                rematch_reason = f"마지막 매칭({last_match_date}) 이후 공고 {new_cnt:+d}건 변동이 있습니다."
-            else:
-                days_since = (datetime.today() - datetime.strptime(last_match_date, '%Y-%m-%d')).days
-                if days_since >= 3:
+                if not last_match_date:
                     need_rematch  = True
-                    rematch_reason = f"마지막 매칭({last_match_date})으로부터 {days_since}일 경과했습니다."
-
-        if need_rematch:
-            st.warning(f"🔄 **매칭 재실행 권장** — {rematch_reason}")
-        elif last_match_info:
-            st.success(f"✅ 매칭 최신 상태 — 마지막 실행: {last_match_info.get('date','')} / {last_match_info.get('result_count',0)}건")
-
-        # 전문 수집 현황
-        df_det_check = load_excel(drive, DETAIL_FILE)
-        detail_ok_count = 0
-        if not df_det_check.empty and '크롤링성공' in df_det_check.columns:
-            detail_ok_count = (df_det_check['크롤링성공']=='Y').sum()
-        if detail_ok_count > 0:
-            st.success(f"📄 전문 수집 완료: {detail_ok_count}건 — 매칭에 자동 반영됩니다.")
-        else:
-            st.info("📄 전문 미수집 — API 사업개요만으로 매칭합니다.")
-
-        if st.button("🔍 매칭 실행", type="primary"):
-            with st.spinner("드라이브 데이터 로딩 중..."):
-                df_c    = load_excel(drive, SELECTED_FILE)
-                df_n    = load_excel(drive, NOTICES_FILE)
-                df_h    = load_excel(drive, HISTORY_FILE)
-                df_det  = load_excel(drive, DETAIL_FILE)
-                HIGH, MID = load_keywords(drive)
-
-            if df_n.empty: st.error("notices_db 없음 → 공고 수집 먼저"); st.stop()
-            if df_c.empty: st.error("선정기업 명단 없음 → 기업 관리에서 업로드"); st.stop()
-
-            # 발송 대상 필터
-            if '선정구분' in df_c.columns:
-                if target_group == "선정 50개사":
-                    df_c = df_c[df_c['선정구분'] == '선정']
-                elif target_group == "예비 20개사":
-                    df_c = df_c[df_c['선정구분'] == '예비']
-            else:
-                st.warning("선정기업 명단에 '선정구분' 컬럼이 없어 전체 기업으로 매칭합니다.")
-            if df_c.empty:
-                st.error(f"'{target_group}' 대상 기업이 없습니다."); st.stop()
-            if '수신거부' in df_c.columns: df_c = df_c[df_c['수신거부']!='Y']
-
-            # 전문내용 enrich 맵 구성
-            detail_map = {}
-            if not df_det.empty and 'pblancId' in df_det.columns:
-                # 버그 수정: df.get()은 컬럼 Series를 반환 → == 'Y' 비교 시 항상 빈 결과
-                # 올바른 방식: df['컬럼'] == 'Y'
-                if '크롤링성공' in df_det.columns:
-                    df_det_ok = df_det[df_det['크롤링성공'] == 'Y']
+                    rematch_reason = "아직 매칭을 실행한 적이 없습니다."
+                elif latest_notice_date and latest_notice_date > last_match_date:
+                    new_cnt = cur_notice_count - last_match_notices
+                    need_rematch  = True
+                    rematch_reason = f"마지막 매칭({last_match_date}) 이후 공고 {new_cnt:+d}건 변동이 있습니다."
                 else:
-                    df_det_ok = df_det
-                df_det_ok = df_det_ok.drop_duplicates(subset='pblancId', keep='last')
-                detail_map = df_det_ok.set_index('pblancId').to_dict('index')
+                    days_since = (datetime.today() - datetime.strptime(last_match_date, '%Y-%m-%d')).days
+                    if days_since >= 3:
+                        need_rematch  = True
+                        rematch_reason = f"마지막 매칭({last_match_date})으로부터 {days_since}일 경과했습니다."
 
-            # 진단: notices_db × notices_detail 교집합 확인
-            notice_pids_set = set(df_n['pblancId'].str.strip()) if 'pblancId' in df_n.columns else set()
-            overlap_count = len(notice_pids_set & set(detail_map.keys()))
-            st.caption(f"📄 전문 DB {len(detail_map)}건 로드 | notices_db {len(df_n)}건 | 교집합(전문 반영 가능): {overlap_count}건")
+            if need_rematch:
+                st.warning(f"🔄 **매칭 재실행 권장** — {rematch_reason}")
+            elif last_match_info:
+                st.success(f"✅ 매칭 최신 상태 — 마지막 실행: {last_match_info.get('date','')} / {last_match_info.get('result_count',0)}건")
 
-            def enrich(n_dict):
-                """공고 dict에 전문내용을 병합해 매칭 정확도를 높인다.
-                score_notice()는 '사업개요'와 '전문내용' 두 필드를 모두 읽으므로 양쪽에 반영."""
-                pid = n_dict.get('pblancId','')
-                if pid in detail_map:
-                    d = detail_map[pid]
-                    full = str(d.get('전문내용',''))
-                    if len(full) >= 200:
-                        n_dict['전문내용'] = full   # score_notice 502줄에서 직접 읽힘
-                        n_dict['사업개요'] = full   # 소재지 판정(578줄)에도 전문 내용 반영
-                    n_dict['지원금액'] = d.get('지원금액','')
-                    n_dict['선정규모'] = d.get('선정규모','')
-                return n_dict
+            # 전문 수집 현황
+            df_det_check = load_excel(drive, DETAIL_FILE)
+            detail_ok_count = 0
+            if not df_det_check.empty and '크롤링성공' in df_det_check.columns:
+                detail_ok_count = (df_det_check['크롤링성공']=='Y').sum()
+            if detail_ok_count > 0:
+                st.success(f"📄 전문 수집 완료: {detail_ok_count}건 — 매칭에 자동 반영됩니다.")
+            else:
+                st.info("📄 전문 미수집 — API 사업개요만으로 매칭합니다.")
 
-            already_sent = set(zip(df_h['기업명'], df_h['pblancId'])) if not df_h.empty else set()
-            all_results  = []
-            prog         = st.progress(0, text="매칭 준비 중...")
-            status_area  = st.empty()
-            notice_recommend_count = {}
-            match_errors = []
+            if st.button("🔍 매칭 실행", type="primary"):
+                with st.spinner("드라이브 데이터 로딩 중..."):
+                    df_c    = load_excel(drive, SELECTED_FILE)
+                    df_n    = load_excel(drive, NOTICES_FILE)
+                    df_h    = load_excel(drive, HISTORY_FILE)
+                    df_det  = load_excel(drive, DETAIL_FILE)
+                    HIGH, MID = load_keywords(drive)
 
-            # 피드백 + 가중치 + 제외키워드 통합 로드
-            kw_config = load_kw_config(drive)
-            feedback_map = kw_config.get('feedback', {})
-            if feedback_map:
-                st.caption(f"🔄 피드백 반영 중 — {len(feedback_map)}개사 패턴 로드")
-            if kw_config.get('exclude_keywords'):
-                st.caption(f"🚫 제외 키워드 {len(kw_config['exclude_keywords'])}개 적용")
+                if df_n.empty: st.error("notices_db 없음 → 공고 수집 먼저"); st.stop()
+                if df_c.empty: st.error("선정기업 명단 없음 → 기업 관리에서 업로드"); st.stop()
 
-            total_cos = len(df_c)
-            for idx, (_, row) in enumerate(df_c.iterrows()):
-                co_name = row.get('기업명', f'기업{idx+1}')
-                prog.progress((idx+1)/total_cos,
-                              text=f"매칭 중... {idx+1}/{total_cos} ({co_name[:10]})")
+                # 발송 대상 필터
+                if '선정구분' in df_c.columns:
+                    if target_group == "선정 50개사":
+                        df_c = df_c[df_c['선정구분'] == '선정']
+                    elif target_group == "예비 20개사":
+                        df_c = df_c[df_c['선정구분'] == '예비']
+                else:
+                    st.warning("선정기업 명단에 '선정구분' 컬럼이 없어 전체 기업으로 매칭합니다.")
+                if df_c.empty:
+                    st.error(f"'{target_group}' 대상 기업이 없습니다."); st.stop()
+                if '수신거부' in df_c.columns: df_c = df_c[df_c['수신거부']!='Y']
 
-                try:
-                    scored = []
-                    for _, n in df_n.iterrows():
-                        try:
-                            r = score_notice(enrich(n.to_dict()), row, already_sent,
-                                             HIGH, MID, feedback_map, kw_config)
-                            if r:
-                                scored.append(r)
-                        except Exception as e_inner:
-                            # 개별 공고 오류는 skip
-                            pass
-
-                    for r in scored:
-                        pid = r.get('공고ID','')
-                        cnt = notice_recommend_count.get(pid, 0)
-                        if cnt >= 15:   r['점수'] -= 20
-                        elif cnt >= 10: r['점수'] -= 15
-                        elif cnt >= 7:  r['점수'] -= 10
-                        elif cnt >= 4:  r['점수'] -= 6
-                        elif cnt >= 2:  r['점수'] -= 3
-
-                    scored.sort(key=lambda x: -x['점수'])
-                    top = scored[:max_per]
-
-                    for r in top:
-                        pid = r.get('공고ID','')
-                        notice_recommend_count[pid] = notice_recommend_count.get(pid, 0) + 1
-                        r['_recommend_count'] = notice_recommend_count[pid]
-
-                    all_results.extend(top)
-
-                except Exception as e_outer:
-                    match_errors.append(f"{co_name}: {str(e_outer)[:60]}")
-                    continue
-
-            prog.progress(1.0, text="매칭 완료!")
-
-            if match_errors:
-                with st.expander(f"⚠️ 처리 중 오류 {len(match_errors)}건"):
-                    for err in match_errors:
-                        st.caption(err)
-
-            for r in all_results:
-                r['공고유형'] = '공통' if notice_recommend_count.get(r.get('공고ID',''), 1) >= 4 else '맞춤'
-
-            enriched_count = len(detail_map)
-            st.session_state['match_results'] = all_results
-            st.session_state['df_companies_cache'] = df_c
-            # 매칭 실행 정보 저장 — session_state + 드라이브 JSON (앱 재시작 후에도 유지)
-            match_info = {
-                'date':         datetime.today().strftime('%Y-%m-%d'),
-                'time':         datetime.today().strftime('%H:%M'),
-                'notice_count': len(df_n),
-                'result_count': len(all_results),
-                'target_group': target_group,
-            }
-            st.session_state['last_match_info'] = match_info
-            # 드라이브에도 저장
-            kw_data_save = load_json(drive, KEYWORDS_FILE) or {}
-            kw_data_save['last_match'] = match_info
-            save_json(drive, kw_data_save, KEYWORDS_FILE)
-            st.success(
-                f"✅ 매칭 완료 — 총 {len(all_results)}건 "
-                f"(전문 DB {enriched_count}건 반영 / 공고 총 {df_n.shape[0]}건 중 매칭) "
-                f"→ '검토 & 승인' 탭으로 이동"
-            )
-            if enriched_count == 0 and detail_ok_count > 0:
-                st.error("⚠️ 전문 DB 로드 실패 — '공고 수집' 탭에서 크롤링 상태를 확인하세요.")
-
-    with tab2:
-        results = st.session_state.get('match_results', [])
-        if not results:
-            st.info("매칭 실행 탭에서 먼저 실행 필요")
-        else:
-            df_show = pd.DataFrame(results)
-            if 'review_state'  not in st.session_state: st.session_state['review_state']  = {}
-            if 'ai_analysis'   not in st.session_state: st.session_state['ai_analysis']   = {}
-            if 'custom_deadline' not in st.session_state: st.session_state['custom_deadline'] = {}
-
-            # ── 검토 상태 저장/불러오기 ─────────────────────
-            sv1, sv2, sv3 = st.columns([2, 2, 4])
-            with sv1:
-                if st.button("💾 검토 상태 저장", help="드라이브에 현재 검토 상태를 저장합니다"):
-                    import json
-                    review_data = {
-                        'review_state': st.session_state['review_state'],
-                        'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M')
-                    }
-                    drive_upload(drive, "review_state.json",
-                                 json.dumps(review_data, ensure_ascii=False).encode('utf-8'),
-                                 "application/json")
-                    st.success("검토 상태 저장 완료")
-            with sv2:
-                if st.button("📂 검토 상태 불러오기", help="드라이브에서 이전에 저장한 검토 상태를 불러옵니다"):
-                    import json
-                    saved = load_json(drive, "review_state.json")
-                    if saved and 'review_state' in saved:
-                        st.session_state['review_state'] = saved['review_state']
-                        st.success(f"불러오기 완료 ({saved.get('saved_at','날짜 미상')} 저장본)")
-                        st.rerun()
+                # 전문내용 enrich 맵 구성
+                detail_map = {}
+                if not df_det.empty and 'pblancId' in df_det.columns:
+                    # 버그 수정: df.get()은 컬럼 Series를 반환 → == 'Y' 비교 시 항상 빈 결과
+                    # 올바른 방식: df['컬럼'] == 'Y'
+                    if '크롤링성공' in df_det.columns:
+                        df_det_ok = df_det[df_det['크롤링성공'] == 'Y']
                     else:
-                        st.warning("저장된 검토 상태가 없습니다")
-            with sv3:
-                saved_json = load_json(drive, "review_state.json")
-                if saved_json:
-                    st.caption(f"마지막 저장: {saved_json.get('saved_at','—')}")
+                        df_det_ok = df_det
+                    df_det_ok = df_det_ok.drop_duplicates(subset='pblancId', keep='last')
+                    detail_map = df_det_ok.set_index('pblancId').to_dict('index')
 
-            st.divider()
+                # 진단: notices_db × notices_detail 교집합 확인
+                notice_pids_set = set(df_n['pblancId'].str.strip()) if 'pblancId' in df_n.columns else set()
+                overlap_count = len(notice_pids_set & set(detail_map.keys()))
+                st.caption(f"📄 전문 DB {len(detail_map)}건 로드 | notices_db {len(df_n)}건 | 교집합(전문 반영 가능): {overlap_count}건")
 
-            # ── 필터 ────────────────────────────────────────
-            c1, c2 = st.columns(2)
-            with c1: filter_stars = st.multiselect("관련도", ["★★★","★★"], default=["★★★","★★"])
-            with c2: filter_co    = st.selectbox("기업", ["전체"]+sorted(df_show['기업명'].unique().tolist()))
-            filtered = df_show[df_show['관련도'].isin(filter_stars)]
-            if filter_co != "전체": filtered = filtered[filtered['기업명']==filter_co]
+                def enrich(n_dict):
+                    """공고 dict에 전문내용을 병합해 매칭 정확도를 높인다.
+                    score_notice()는 '사업개요'와 '전문내용' 두 필드를 모두 읽으므로 양쪽에 반영."""
+                    pid = n_dict.get('pblancId','')
+                    if pid in detail_map:
+                        d = detail_map[pid]
+                        full = str(d.get('전문내용',''))
+                        if len(full) >= 200:
+                            n_dict['전문내용'] = full   # score_notice 502줄에서 직접 읽힘
+                            n_dict['사업개요'] = full   # 소재지 판정(578줄)에도 전문 내용 반영
+                        n_dict['지원금액'] = d.get('지원금액','')
+                        n_dict['선정규모'] = d.get('선정규모','')
+                    return n_dict
 
-            ap      = sum(1 for v in st.session_state['review_state'].values() if v=="○")
-            rj      = sum(1 for v in st.session_state['review_state'].values() if v=="✕")
-            pending = len(filtered) - ap - rj
+                already_sent = set(zip(df_h['기업명'], df_h['pblancId'])) if not df_h.empty else set()
+                all_results  = []
+                prog         = st.progress(0, text="매칭 준비 중...")
+                status_area  = st.empty()
+                notice_recommend_count = {}
+                match_errors = []
 
-            # ── 상단 진행 현황 ──────────────────────────────
-            c1,c2,c3,c4 = st.columns(4)
-            c1.metric("전체", f"{len(filtered)}건")
-            c2.metric("✅ 승인", f"{ap}건")
-            c3.metric("❌ 제외", f"{rj}건")
-            c4.metric("⏳ 미검토", f"{pending}건")
+                # 피드백 + 가중치 + 제외키워드 통합 로드
+                kw_config = load_kw_config(drive)
+                feedback_map = kw_config.get('feedback', {})
+                if feedback_map:
+                    st.caption(f"🔄 피드백 반영 중 — {len(feedback_map)}개사 패턴 로드")
+                if kw_config.get('exclude_keywords'):
+                    st.caption(f"🚫 제외 키워드 {len(kw_config['exclude_keywords'])}개 적용")
 
-            # ── 뷰 모드 선택 ───────────────────────────────
-            view_mode = st.radio(
-                "보기 방식",
-                ["🏢 기업별 검토 (테이블)", "🤖 일괄 검토 (AI 활용)"],
-                horizontal=True, key="review_view_mode"
-            )
+                total_cos = len(df_c)
+                for idx, (_, row) in enumerate(df_c.iterrows()):
+                    co_name = row.get('기업명', f'기업{idx+1}')
+                    prog.progress((idx+1)/total_cos,
+                                  text=f"매칭 중... {idx+1}/{total_cos} ({co_name[:10]})")
 
-            st.divider()
+                    try:
+                        scored = []
+                        for _, n in df_n.iterrows():
+                            try:
+                                r = score_notice(enrich(n.to_dict()), row, already_sent,
+                                                 HIGH, MID, feedback_map, kw_config)
+                                if r:
+                                    scored.append(r)
+                            except Exception as e_inner:
+                                # 개별 공고 오류는 skip
+                                pass
 
-            # ══════════════════════════════════════════════
-            # 기업별 검토 모드
-            # ══════════════════════════════════════════════
-            if view_mode == "🏢 기업별 검토 (테이블)":
+                        for r in scored:
+                            pid = r.get('공고ID','')
+                            cnt = notice_recommend_count.get(pid, 0)
+                            if cnt >= 15:   r['점수'] -= 20
+                            elif cnt >= 10: r['점수'] -= 15
+                            elif cnt >= 7:  r['점수'] -= 10
+                            elif cnt >= 4:  r['점수'] -= 6
+                            elif cnt >= 2:  r['점수'] -= 3
 
-                companies_in_result = filtered['기업명'].unique().tolist()
+                        scored.sort(key=lambda x: -x['점수'])
+                        top = scored[:max_per]
 
-                def co_pending_count(co):
-                    return sum(1 for _, r in filtered[filtered['기업명']==co].iterrows()
-                               if st.session_state['review_state'].get(
-                                   f"{r['기업명']}_{r.get('공고ID','')}", "") == "")
+                        for r in top:
+                            pid = r.get('공고ID','')
+                            notice_recommend_count[pid] = notice_recommend_count.get(pid, 0) + 1
+                            r['_recommend_count'] = notice_recommend_count[pid]
 
-                co_labels = [
-                    f"{'✅' if co_pending_count(co)==0 else '⏳'} {co}  ({co_pending_count(co)}건 미검토)"
-                    for co in companies_in_result
-                ]
-                co_map = dict(zip(co_labels, companies_in_result))
+                        all_results.extend(top)
 
-                # 기업명 자체를 session_state에 저장 (레이블 재생성 시 인덱스 틀어짐 방지)
-                if 'review_co_name' not in st.session_state or \
-                   st.session_state['review_co_name'] not in companies_in_result:
-                    st.session_state['review_co_name'] = companies_in_result[0]
-                cur_name    = st.session_state['review_co_name']
-                current_idx = companies_in_result.index(cur_name)
+                    except Exception as e_outer:
+                        match_errors.append(f"{co_name}: {str(e_outer)[:60]}")
+                        continue
 
-                nav1, nav2, nav3, nav4 = st.columns([1, 5, 1, 2])
-                with nav1:
-                    prev_clicked = st.button("◀ 이전", disabled=current_idx==0, key="btn_prev_co")
-                with nav2:
-                    # 드롭다운 선택 (표시용) — index를 current_idx로 고정
-                    # on_change 없이 매 rerun마다 index로 위치를 강제 지정
-                    chosen = st.selectbox(
-                        "기업 선택", co_labels,
-                        index=current_idx,
-                        label_visibility="collapsed",
-                        key=f"co_select_{cur_name}"   # 기업명이 바뀌면 key도 바뀌어 위젯 초기화
-                    )
-                    # 드롭다운으로 직접 선택한 경우
-                    chosen_name = co_map.get(chosen, cur_name)
-                    if chosen_name != cur_name:
-                        st.session_state['review_co_name'] = chosen_name
-                        st.rerun()
-                with nav3:
-                    next_clicked = st.button("다음 ▶", disabled=current_idx==len(co_labels)-1, key="btn_next_co")
-                with nav4:
-                    st.caption(f"{current_idx+1} / {len(co_labels)}개사")
+                prog.progress(1.0, text="매칭 완료!")
 
-                if prev_clicked:
-                    st.session_state['review_co_name'] = companies_in_result[current_idx - 1]
-                    st.rerun()
-                if next_clicked:
-                    st.session_state['review_co_name'] = companies_in_result[current_idx + 1]
-                    st.rerun()
+                if match_errors:
+                    with st.expander(f"⚠️ 처리 중 오류 {len(match_errors)}건"):
+                        for err in match_errors:
+                            st.caption(err)
 
-                selected_co = st.session_state['review_co_name']
-                co_rows = filtered[filtered['기업명'] == selected_co].copy()
-                co_rows['점수_num'] = pd.to_numeric(co_rows['점수'], errors='coerce').fillna(0)
-                co_rows = co_rows.sort_values('점수_num', ascending=False)
+                for r in all_results:
+                    r['공고유형'] = '공통' if notice_recommend_count.get(r.get('공고ID',''), 1) >= 4 else '맞춤'
 
-                co_ap  = sum(1 for _, r in co_rows.iterrows() if st.session_state['review_state'].get(f"{r['기업명']}_{r.get('공고ID','')}", "")=="○")
-                co_rj  = sum(1 for _, r in co_rows.iterrows() if st.session_state['review_state'].get(f"{r['기업명']}_{r.get('공고ID','')}", "")=="✕")
-                co_pen = len(co_rows) - co_ap - co_rj
+                enriched_count = len(detail_map)
+                st.session_state['match_results'] = all_results
+                st.session_state['df_companies_cache'] = df_c
+                # 매칭 실행 정보 저장 — session_state + 드라이브 JSON (앱 재시작 후에도 유지)
+                match_info = {
+                    'date':         datetime.today().strftime('%Y-%m-%d'),
+                    'time':         datetime.today().strftime('%H:%M'),
+                    'notice_count': len(df_n),
+                    'result_count': len(all_results),
+                    'target_group': target_group,
+                }
+                st.session_state['last_match_info'] = match_info
+                # 드라이브에도 저장
+                kw_data_save = load_json(drive, KEYWORDS_FILE) or {}
+                kw_data_save['last_match'] = match_info
+                save_json(drive, kw_data_save, KEYWORDS_FILE)
+                st.success(
+                    f"✅ 매칭 완료 — 총 {len(all_results)}건 "
+                    f"(전문 DB {enriched_count}건 반영 / 공고 총 {df_n.shape[0]}건 중 매칭) "
+                    f"→ '검토 & 승인' 탭으로 이동"
+                )
+                if enriched_count == 0 and detail_ok_count > 0:
+                    st.error("⚠️ 전문 DB 로드 실패 — '공고 수집' 탭에서 크롤링 상태를 확인하세요.")
 
-                # ── 기업 정보 패널 ──────────────────────────
+        with tab2:
+            results = st.session_state.get('match_results', [])
+            if not results:
+                st.info("매칭 실행 탭에서 먼저 실행 필요")
+            else:
+                df_show = pd.DataFrame(results)
+                if 'review_state'  not in st.session_state: st.session_state['review_state']  = {}
+                if 'ai_analysis'   not in st.session_state: st.session_state['ai_analysis']   = {}
+                if 'custom_deadline' not in st.session_state: st.session_state['custom_deadline'] = {}
+
+                # ── 검토 상태 저장/불러오기 ─────────────────────
+                sv1, sv2, sv3 = st.columns([2, 2, 4])
+                with sv1:
+                    if st.button("💾 검토 상태 저장", help="드라이브에 현재 검토 상태를 저장합니다"):
+                        import json
+                        review_data = {
+                            'review_state': st.session_state['review_state'],
+                            'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M')
+                        }
+                        drive_upload(drive, "review_state.json",
+                                     json.dumps(review_data, ensure_ascii=False).encode('utf-8'),
+                                     "application/json")
+                        st.success("검토 상태 저장 완료")
+                with sv2:
+                    if st.button("📂 검토 상태 불러오기", help="드라이브에서 이전에 저장한 검토 상태를 불러옵니다"):
+                        import json
+                        saved = load_json(drive, "review_state.json")
+                        if saved and 'review_state' in saved:
+                            st.session_state['review_state'] = saved['review_state']
+                            st.success(f"불러오기 완료 ({saved.get('saved_at','날짜 미상')} 저장본)")
+                            st.rerun()
+                        else:
+                            st.warning("저장된 검토 상태가 없습니다")
+                with sv3:
+                    saved_json = load_json(drive, "review_state.json")
+                    if saved_json:
+                        st.caption(f"마지막 저장: {saved_json.get('saved_at','—')}")
+
                 st.divider()
-                with st.expander(f"🏢 {selected_co} 기업 정보", expanded=True):
-                    co_info_panel = {}
-                    if 'df_companies_cache' in st.session_state:
-                        df_co2 = st.session_state['df_companies_cache']
-                        m = df_co2[df_co2['기업명']==selected_co]
-                        if not m.empty: co_info_panel = m.iloc[0].to_dict()
 
-                    # 상단 핵심 지표
-                    pi1, pi2, pi3, pi4 = st.columns(4)
-                    pi1.metric("공고 현황", f"전체 {len(co_rows)}건",
-                               f"✅{co_ap} / ❌{co_rj} / ⏳{co_pen}")
-                    pi2.metric("소재지", co_info_panel.get('소재지','—'))
-                    biz_type = co_info_panel.get('기업유형','—')
-                    pi3.metric("기업유형", biz_type[:16] + ('...' if len(str(biz_type))>16 else '') if biz_type else '—')
-                    pi4.metric("TRL / 매출", f"TRL {co_info_panel.get('TRL단계','—')} / {co_info_panel.get('매출규모','—')[:6]}" if co_info_panel.get('매출규모') else f"TRL {co_info_panel.get('TRL단계','—')}")
+                # ── 필터 ────────────────────────────────────────
+                c1, c2 = st.columns(2)
+                with c1: filter_stars = st.multiselect("관련도", ["★★★","★★"], default=["★★★","★★"])
+                with c2: filter_co    = st.selectbox("기업", ["전체"]+sorted(df_show['기업명'].unique().tolist()))
+                filtered = df_show[df_show['관련도'].isin(filter_stars)]
+                if filter_co != "전체": filtered = filtered[filtered['기업명']==filter_co]
 
+                ap      = sum(1 for v in st.session_state['review_state'].values() if v=="○")
+                rj      = sum(1 for v in st.session_state['review_state'].values() if v=="✕")
+                pending = len(filtered) - ap - rj
+
+                # ── 상단 진행 현황 ──────────────────────────────
+                c1,c2,c3,c4 = st.columns(4)
+                c1.metric("전체", f"{len(filtered)}건")
+                c2.metric("✅ 승인", f"{ap}건")
+                c3.metric("❌ 제외", f"{rj}건")
+                c4.metric("⏳ 미검토", f"{pending}건")
+
+                # ── 뷰 모드 선택 ───────────────────────────────
+                view_mode = st.radio(
+                    "보기 방식",
+                    ["🏢 기업별 검토 (테이블)", "🤖 일괄 검토 (AI 활용)"],
+                    horizontal=True, key="review_view_mode"
+                )
+
+                st.divider()
+
+                # ══════════════════════════════════════════════
+                # 기업별 검토 모드
+                # ══════════════════════════════════════════════
+                if view_mode == "🏢 기업별 검토 (테이블)":
+
+                    companies_in_result = filtered['기업명'].unique().tolist()
+
+                    def co_pending_count(co):
+                        return sum(1 for _, r in filtered[filtered['기업명']==co].iterrows()
+                                   if st.session_state['review_state'].get(
+                                       f"{r['기업명']}_{r.get('공고ID','')}", "") == "")
+
+                    co_labels = [
+                        f"{'✅' if co_pending_count(co)==0 else '⏳'} {co}  ({co_pending_count(co)}건 미검토)"
+                        for co in companies_in_result
+                    ]
+                    co_map = dict(zip(co_labels, companies_in_result))
+
+                    # 기업명 자체를 session_state에 저장 (레이블 재생성 시 인덱스 틀어짐 방지)
+                    if 'review_co_name' not in st.session_state or \
+                       st.session_state['review_co_name'] not in companies_in_result:
+                        st.session_state['review_co_name'] = companies_in_result[0]
+                    cur_name    = st.session_state['review_co_name']
+                    current_idx = companies_in_result.index(cur_name)
+
+                    nav1, nav2, nav3, nav4 = st.columns([1, 5, 1, 2])
+                    with nav1:
+                        prev_clicked = st.button("◀ 이전", disabled=current_idx==0, key="btn_prev_co")
+                    with nav2:
+                        # 드롭다운 선택 (표시용) — index를 current_idx로 고정
+                        # on_change 없이 매 rerun마다 index로 위치를 강제 지정
+                        chosen = st.selectbox(
+                            "기업 선택", co_labels,
+                            index=current_idx,
+                            label_visibility="collapsed",
+                            key=f"co_select_{cur_name}"   # 기업명이 바뀌면 key도 바뀌어 위젯 초기화
+                        )
+                        # 드롭다운으로 직접 선택한 경우
+                        chosen_name = co_map.get(chosen, cur_name)
+                        if chosen_name != cur_name:
+                            st.session_state['review_co_name'] = chosen_name
+                            st.rerun()
+                    with nav3:
+                        next_clicked = st.button("다음 ▶", disabled=current_idx==len(co_labels)-1, key="btn_next_co")
+                    with nav4:
+                        st.caption(f"{current_idx+1} / {len(co_labels)}개사")
+
+                    if prev_clicked:
+                        st.session_state['review_co_name'] = companies_in_result[current_idx - 1]
+                        st.rerun()
+                    if next_clicked:
+                        st.session_state['review_co_name'] = companies_in_result[current_idx + 1]
+                        st.rerun()
+
+                    selected_co = st.session_state['review_co_name']
+                    co_rows = filtered[filtered['기업명'] == selected_co].copy()
+                    co_rows['점수_num'] = pd.to_numeric(co_rows['점수'], errors='coerce').fillna(0)
+                    co_rows = co_rows.sort_values('점수_num', ascending=False)
+
+                    co_ap  = sum(1 for _, r in co_rows.iterrows() if st.session_state['review_state'].get(f"{r['기업명']}_{r.get('공고ID','')}", "")=="○")
+                    co_rj  = sum(1 for _, r in co_rows.iterrows() if st.session_state['review_state'].get(f"{r['기업명']}_{r.get('공고ID','')}", "")=="✕")
+                    co_pen = len(co_rows) - co_ap - co_rj
+
+                    # ── 기업 정보 패널 ──────────────────────────
                     st.divider()
+                    with st.expander(f"🏢 {selected_co} 기업 정보", expanded=True):
+                        co_info_panel = {}
+                        if 'df_companies_cache' in st.session_state:
+                            df_co2 = st.session_state['df_companies_cache']
+                            m = df_co2[df_co2['기업명']==selected_co]
+                            if not m.empty: co_info_panel = m.iloc[0].to_dict()
 
-                    # 매칭 관련 정보
-                    ic1, ic2 = st.columns(2)
-                    with ic1:
-                        st.markdown("**관심사업분야**")
-                        st.write(co_info_panel.get('관심사업분야','—'))
-                        st.markdown("**기술키워드**")
-                        st.write(co_info_panel.get('기술키워드','—'))
-                        st.markdown("**핵심수요태그**")
-                        st.write(co_info_panel.get('핵심수요태그','—'))
-                        if co_info_panel.get('키워드보완'):
-                            st.markdown("**보완키워드** ✏️")
-                            st.write(co_info_panel.get('키워드보완',''))
-                    with ic2:
-                        st.markdown("**제품분야**")
-                        st.write(co_info_panel.get('제품분야','—'))
-                        st.markdown("**수출실적 / 수출국가**")
-                        st.write(f"{co_info_panel.get('수출실적','—')} / {co_info_panel.get('수출국가','—')}")
-                        st.markdown("**이메일**")
-                        st.write(co_info_panel.get('이메일','—'))
+                        # 상단 핵심 지표
+                        pi1, pi2, pi3, pi4 = st.columns(4)
+                        pi1.metric("공고 현황", f"전체 {len(co_rows)}건",
+                                   f"✅{co_ap} / ❌{co_rj} / ⏳{co_pen}")
+                        pi2.metric("소재지", co_info_panel.get('소재지','—'))
+                        biz_type = co_info_panel.get('기업유형','—')
+                        pi3.metric("기업유형", biz_type[:16] + ('...' if len(str(biz_type))>16 else '') if biz_type else '—')
+                        pi4.metric("TRL / 매출", f"TRL {co_info_panel.get('TRL단계','—')} / {co_info_panel.get('매출규모','—')[:6]}" if co_info_panel.get('매출규모') else f"TRL {co_info_panel.get('TRL단계','—')}")
 
-                    # 주관식 답변 (있는 경우만 표시)
-                    has_subjective = any([
-                        co_info_panel.get('희망서비스요약',''),
-                        co_info_panel.get('평가_서비스요청',''),
-                        co_info_panel.get('평가_내부논의',''),
-                        co_info_panel.get('메모',''),
-                    ])
-                    if has_subjective:
                         st.divider()
-                        if co_info_panel.get('희망서비스요약',''):
-                            st.markdown("**📝 희망 서비스** (신청 시 작성)")
-                            st.info(co_info_panel.get('희망서비스요약',''))
-                        if co_info_panel.get('평가_서비스요청',''):
-                            st.markdown("**📝 서비스 요청** (평가 시 작성)")
-                            st.info(co_info_panel.get('평가_서비스요청',''))
-                        if co_info_panel.get('평가_내부논의',''):
-                            st.markdown("**📋 평가 내부 의견**")
-                            st.warning(co_info_panel.get('평가_내부논의',''))
-                        if co_info_panel.get('메모',''):
-                            st.markdown("**🗒 운영 메모**")
-                            st.write(co_info_panel.get('메모',''))
 
-                # ── 일괄 처리 버튼 ──────────────────────────
-                ba1, ba2, ba3, _ = st.columns([1, 1, 2, 2])
-                with ba1:
-                    if st.button("✅ 전체 승인", key="bulk_approve"):
-                        for _, r in co_rows.iterrows():
-                            st.session_state['review_state'][f"{r['기업명']}_{r.get('공고ID','')}"] = "○"
-                        st.rerun()
-                with ba2:
-                    if st.button("❌ 전체 제외", key="bulk_reject"):
-                        for _, r in co_rows.iterrows():
-                            st.session_state['review_state'][f"{r['기업명']}_{r.get('공고ID','')}"] = "✕"
-                        st.rerun()
-                with ba3:
-                    co_ai_done  = sum(1 for _, r in co_rows.iterrows()
-                                      if f"{r['기업명']}_{r.get('공고ID','')}" in st.session_state.get('ai_analysis', {}))
-                    co_ai_total = len(co_rows)
-                    if st.button(f"🤖 이 기업 AI 전체 분석 ({co_ai_done}/{co_ai_total})", key="co_bulk_ai"):
-                        prog_co_ai = st.progress(0, text="AI 분석 중...")
-                        for ai_i, (_, ai_row) in enumerate(co_rows.iterrows()):
-                            ai_key = f"{ai_row['기업명']}_{ai_row.get('공고ID','')}"
-                            if ai_key not in st.session_state.get('ai_analysis', {}):
-                                ci = {}
-                                if 'df_companies_cache' in st.session_state:
-                                    df_co3 = st.session_state['df_companies_cache']
-                                    mx = df_co3[df_co3['기업명']==ai_row['기업명']]
-                                    if not mx.empty: ci = mx.iloc[0].to_dict()
-                                ci['기업명'] = ai_row['기업명']
-                                if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = {}
-                                st.session_state['ai_analysis'][ai_key] = claude_analyze(ci, ai_row.to_dict())
-                            prog_co_ai.progress((ai_i+1)/co_ai_total, text=f"AI 분석 중... {ai_i+1}/{co_ai_total}")
-                        save_ai_analysis(_get_drive())
-                        st.success(f"✅ {selected_co} AI 분석 완료 — 드라이브 저장됨"); st.rerun()
+                        # 매칭 관련 정보
+                        ic1, ic2 = st.columns(2)
+                        with ic1:
+                            st.markdown("**관심사업분야**")
+                            st.write(co_info_panel.get('관심사업분야','—'))
+                            st.markdown("**기술키워드**")
+                            st.write(co_info_panel.get('기술키워드','—'))
+                            st.markdown("**핵심수요태그**")
+                            st.write(co_info_panel.get('핵심수요태그','—'))
+                            if co_info_panel.get('키워드보완'):
+                                st.markdown("**보완키워드** ✏️")
+                                st.write(co_info_panel.get('키워드보완',''))
+                        with ic2:
+                            st.markdown("**제품분야**")
+                            st.write(co_info_panel.get('제품분야','—'))
+                            st.markdown("**수출실적 / 수출국가**")
+                            st.write(f"{co_info_panel.get('수출실적','—')} / {co_info_panel.get('수출국가','—')}")
+                            st.markdown("**이메일**")
+                            st.write(co_info_panel.get('이메일','—'))
 
-                st.divider()
+                        # 주관식 답변 (있는 경우만 표시)
+                        has_subjective = any([
+                            co_info_panel.get('희망서비스요약',''),
+                            co_info_panel.get('평가_서비스요청',''),
+                            co_info_panel.get('평가_내부논의',''),
+                            co_info_panel.get('메모',''),
+                        ])
+                        if has_subjective:
+                            st.divider()
+                            if co_info_panel.get('희망서비스요약',''):
+                                st.markdown("**📝 희망 서비스** (신청 시 작성)")
+                                st.info(co_info_panel.get('희망서비스요약',''))
+                            if co_info_panel.get('평가_서비스요청',''):
+                                st.markdown("**📝 서비스 요청** (평가 시 작성)")
+                                st.info(co_info_panel.get('평가_서비스요청',''))
+                            if co_info_panel.get('평가_내부논의',''):
+                                st.markdown("**📋 평가 내부 의견**")
+                                st.warning(co_info_panel.get('평가_내부논의',''))
+                            if co_info_panel.get('메모',''):
+                                st.markdown("**🗒 운영 메모**")
+                                st.write(co_info_panel.get('메모',''))
 
-                # ── 공고 목록 ───────────────────────────────
-                for i, (idx, row) in enumerate(co_rows.iterrows()):
-                    key     = f"{row['기업명']}_{row.get('공고ID','')}"
-                    current = st.session_state['review_state'].get(key, "")
-                    ai_res  = st.session_state.get('ai_analysis', {}).get(key)
-
-                    try: loc_v = int(str(row.get('소재지점수','0')))
-                    except: loc_v = 0
-                    loc_txt = "🟢 지역일치" if loc_v > 0 else ("🔴 타지역" if loc_v < 0 else "🔵 전국")
-                    dl      = row.get('마감일','')
-                    dl_txt  = "⚠️ 비정형" if not dl or not dl.strip() else dl
-                    star    = row.get('관련도','')
-                    reason  = row.get('매칭근거','')
-
-                    status_txt = "✅ 승인됨" if current=="○" else ("❌ 제외됨" if current=="✕" else "⏳ 미검토")
-
-                    ai_txt = ""
-                    if ai_res and not ai_res.get('error'):
-                        rec    = ai_res.get('추천여부','')
-                        ri     = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
-                        ai_txt = f"{ri} {ai_res.get('한줄요약','')[:40]}"
-
-                    # 공고 행: 별점+AI배지 / 공고명+주관기관 / 매칭근거+AI요약 / 마감+소재지 / 승인 / 제외 / AI
-                    c_star, c_name, c_reason, c_meta, c_ok, c_ng, c_ai = st.columns([1.5, 3, 3, 2, 1.2, 1.2, 1.5])
-
-                    with c_star:
-                        st.write(star)
-                        # AI 분석 결과 배지
-                        if ai_res and not ai_res.get('error'):
-                            rec = ai_res.get('추천여부','')
-                            badge = {"추천":"🟢 추천", "검토":"🟡 검토", "비추천":"🔴 비추천"}.get(rec,"")
-                            if badge:
-                                st.caption(badge)
-                    with c_name:
-                        nm = row.get('공고명','')
-                        st.write(f"**{nm[:22]}**" + ("..." if len(nm)>22 else ""))
-                        st.caption(row.get('주관기관','')[:14])
-                    with c_reason:
-                        st.caption(reason[:40] + ("..." if len(reason)>40 else ""))
-                        if ai_txt: st.caption(ai_txt)
-                    with c_meta:
-                        st.caption(dl_txt)
-                        st.caption(loc_txt)
-                    with c_ok:
-                        lbl = "✅ 승인" if current != "○" else "↩ 취소"
-                        if st.button(lbl, key=f"o_{key}_{i}", use_container_width=True):
-                            st.session_state['review_state'][key] = "" if current=="○" else "○"; st.rerun()
-                    with c_ng:
-                        lbl = "❌ 제외" if current != "✕" else "↩ 취소"
-                        if st.button(lbl, key=f"x_{key}_{i}", use_container_width=True):
-                            st.session_state['review_state'][key] = "" if current=="✕" else "✕"; st.rerun()
-                    with c_ai:
-                        if not ai_res:
-                            if st.button("🤖 AI", key=f"ai_{key}_{i}", use_container_width=True):
-                                with st.spinner("분석 중..."):
+                    # ── 일괄 처리 버튼 ──────────────────────────
+                    ba1, ba2, ba3, _ = st.columns([1, 1, 2, 2])
+                    with ba1:
+                        if st.button("✅ 전체 승인", key="bulk_approve"):
+                            for _, r in co_rows.iterrows():
+                                st.session_state['review_state'][f"{r['기업명']}_{r.get('공고ID','')}"] = "○"
+                            st.rerun()
+                    with ba2:
+                        if st.button("❌ 전체 제외", key="bulk_reject"):
+                            for _, r in co_rows.iterrows():
+                                st.session_state['review_state'][f"{r['기업명']}_{r.get('공고ID','')}"] = "✕"
+                            st.rerun()
+                    with ba3:
+                        co_ai_done  = sum(1 for _, r in co_rows.iterrows()
+                                          if f"{r['기업명']}_{r.get('공고ID','')}" in st.session_state.get('ai_analysis', {}))
+                        co_ai_total = len(co_rows)
+                        if st.button(f"🤖 이 기업 AI 전체 분석 ({co_ai_done}/{co_ai_total})", key="co_bulk_ai"):
+                            prog_co_ai = st.progress(0, text="AI 분석 중...")
+                            for ai_i, (_, ai_row) in enumerate(co_rows.iterrows()):
+                                ai_key = f"{ai_row['기업명']}_{ai_row.get('공고ID','')}"
+                                if ai_key not in st.session_state.get('ai_analysis', {}):
                                     ci = {}
                                     if 'df_companies_cache' in st.session_state:
                                         df_co3 = st.session_state['df_companies_cache']
-                                        mx = df_co3[df_co3['기업명']==row['기업명']]
+                                        mx = df_co3[df_co3['기업명']==ai_row['기업명']]
                                         if not mx.empty: ci = mx.iloc[0].to_dict()
-                                    ci['기업명'] = row['기업명']
+                                    ci['기업명'] = ai_row['기업명']
                                     if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = {}
-                                    st.session_state['ai_analysis'][key] = claude_analyze(ci, row.to_dict())
-                                st.rerun()
-                        else:
-                            st.caption("🤖 분석완료")
-
-                    # ── 공고 상세 펼침 ──────────────────────────
-                    with st.expander(f"📋 공고 상세 보기 — {nm[:20]}"):
-                        d1, d2 = st.columns(2)
-                        with d1:
-                            st.markdown("**공고명**")
-                            st.write(row.get('공고명',''))
-                            st.markdown("**주관기관**")
-                            st.write(row.get('주관기관','—'))
-                            st.markdown("**지원대상**")
-                            st.write(row.get('지원대상','—'))
-                            if row.get('지원금액',''):
-                                st.markdown("**지원금액**")
-                                st.write(row.get('지원금액',''))
-                            if row.get('선정규모',''):
-                                st.markdown("**선정규모**")
-                                st.write(row.get('선정규모',''))
-                        with d2:
-                            st.markdown("**접수기간**")
-                            st.write(row.get('접수기간','—'))
-                            st.markdown("**마감일**")
-                            st.write(dl_txt)
-                            st.markdown("**소재지**")
-                            st.write(loc_txt)
-                            if row.get('공고링크',''):
-                                st.markdown("**공고 원문**")
-                                st.link_button("🔗 원문 보러가기", row.get('공고링크',''))
-                        st.markdown("**사업개요**")
-                        overview = row.get('사업개요','')
-                        # 앞부분 네비게이션 텍스트 제거 (HOME 정책정보 ... 패턴)
-                        if 'HOME' in overview[:30]:
-                            cut = overview.find('소관부처')
-                            if cut > 0: overview = overview[cut:]
-                        st.write(overview)
-
-                    # ── AI 분석 결과 펼침 ──────────────────────
-                    if ai_res and not ai_res.get('error'):
-                        rec       = ai_res.get('추천여부','')
-                        fit       = ai_res.get('적합도','')
-                        summary   = ai_res.get('한줄요약','')
-                        reason_ai = ai_res.get('판단근거', ai_res.get('적합이유',''))
-                        caution   = ai_res.get('주의사항','')
-                        checks    = {"업종일치": ai_res.get('업종일치','—'), "자격충족": ai_res.get('자격충족','—'),
-                                     "지역적합": ai_res.get('지역적합','—'), "수요일치": ai_res.get('수요일치','—')}
-                        icon_map  = {"O":"✅","X":"❌","△":"⚠️"}
-                        rec_icon  = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
-
-                        ai_c1, ai_c2 = st.columns([1, 9])
-                        with ai_c1:
-                            st.write(f"**{rec_icon} {rec}**")
-                            st.caption(f"적합도: {fit}")
-                        with ai_c2:
-                            st.markdown(f"**{summary}**")
-                            st.write(reason_ai)
-                            if caution and caution not in ['없음','','nan']:
-                                st.warning(f"⚠️ {caution}")
-                            check_str = "  ".join([f"{icon_map.get(v,'—')} {k}" for k, v in checks.items()])
-                            st.caption(check_str)
+                                    st.session_state['ai_analysis'][ai_key] = claude_analyze(ci, ai_row.to_dict())
+                                prog_co_ai.progress((ai_i+1)/co_ai_total, text=f"AI 분석 중... {ai_i+1}/{co_ai_total}")
+                            save_ai_analysis(_get_drive())
+                            st.success(f"✅ {selected_co} AI 분석 완료 — 드라이브 저장됨"); st.rerun()
 
                     st.divider()
 
-            # ══════════════════════════════════════════════
-            # 일괄 검토 (AI 활용) 모드
-            # ══════════════════════════════════════════════
-            else:
-                # 전체 AI 분석 — 상세 검토 탭에서만
-                with st.expander("🤖 전체 AI 분석 (상세 검토용)"):
-                    usd, krw = estimate_cost(len(filtered))
-                    st.caption(f"현재 필터 기준 {len(filtered)}건 분석 / 예상 비용 ${usd:.3f} (약 {krw:.0f}원)")
-                    confirm = st.text_input("확인코드 입력 후 실행", key="bulk_ai_confirm", placeholder="분석실행")
-                    if st.button("전체 분석 시작", key="bulk_ai_btn", type="primary"):
-                        if confirm == "분석실행":
-                            prog_ai = st.progress(0, text="AI 분석 중...")
-                            for ai_i, (_, ai_row) in enumerate(filtered.iterrows()):
-                                ai_key = f"{ai_row['기업명']}_{ai_row.get('공고ID','')}"
-                                if ai_key not in st.session_state['ai_analysis']:
-                                    co_info = {}
-                                    if 'df_companies_cache' in st.session_state:
-                                        df_co = st.session_state['df_companies_cache']
-                                        co_rows2 = df_co[df_co['기업명']==ai_row['기업명']]
-                                        if not co_rows2.empty:
-                                            co_info = co_rows2.iloc[0].to_dict()
-                                    co_info['기업명'] = ai_row['기업명']
-                                    st.session_state['ai_analysis'][ai_key] = claude_analyze(co_info, ai_row.to_dict())
-                                prog_ai.progress((ai_i+1)/len(filtered), text=f"AI 분석 중... {ai_i+1}/{len(filtered)}")
-                            save_ai_analysis(_get_drive())
-                            st.success(f"완료 — {len(filtered)}건 (드라이브 저장됨)")
-                            st.rerun()
-                        else:
-                            st.error("확인코드가 틀렸습니다 ('분석실행' 입력)")
+                    # ── 공고 목록 ───────────────────────────────
+                    for i, (idx, row) in enumerate(co_rows.iterrows()):
+                        key     = f"{row['기업명']}_{row.get('공고ID','')}"
+                        current = st.session_state['review_state'].get(key, "")
+                        ai_res  = st.session_state.get('ai_analysis', {}).get(key)
 
-                st.divider()
-                st.caption("공고 상세 내용을 확인하며 검토합니다.")
-                for i,(idx,row) in enumerate(filtered.iterrows()):
-                    key      = f"{row['기업명']}_{row.get('공고ID','')}"
-                    current  = st.session_state['review_state'].get(key,"")
-                    icon     = "🟡" if not current else ("✅" if current=="○" else "❌")
-                    deadline = row.get('마감일','')
-                    is_irregular = not deadline or deadline.strip() == ''
-                    deadline_display = f"⚠️ 비정형" if is_irregular else deadline
-                    reason = row.get('매칭근거','')
-                    loc_icon = ""
-                    if row.get('공고지역',''):
-                        _ls = str(row.get('소재지점수','0'))
-                        _lv = int(_ls) if _ls.lstrip('-').isdigit() else 0
-                        loc_icon = " ✅" if _lv > 0 else (" ⚠️" if _lv < 0 else "")
-                    with st.expander(
-                        f"{icon} **{row['기업명']}**  |  {row.get('관련도','')}  |  "
-                        f"{row.get('공고명','')[:28]}{loc_icon}  |  {reason[:22]}"
-                    ):
-                        left, right = st.columns(2)
-                        with left:
-                            st.markdown("**🏢 기업 정보**")
-                            co_info = {}
-                            if 'df_companies_cache' in st.session_state:
-                                df_co = st.session_state['df_companies_cache']
-                                co_rows = df_co[df_co['기업명']==row['기업명']]
-                                if not co_rows.empty:
-                                    co_info = co_rows.iloc[0].to_dict()
-                            co_loc      = co_info.get('소재지','—')
-                            notice_loc  = row.get('공고지역','')
-                            loc_score_v = str(row.get('소재지점수','0'))
-                            loc_score   = int(loc_score_v) if loc_score_v.lstrip('-').isdigit() else 0
-                            if notice_loc:
-                                loc_tag = "🟢 일치" if loc_score>0 else ("🔴 불일치" if loc_score<0 else "")
-                                st.markdown(f"- **소재지:** {co_loc} &nbsp; {loc_tag}")
+                        try: loc_v = int(str(row.get('소재지점수','0')))
+                        except: loc_v = 0
+                        loc_txt = "🟢 지역일치" if loc_v > 0 else ("🔴 타지역" if loc_v < 0 else "🔵 전국")
+                        dl      = row.get('마감일','')
+                        dl_txt  = "⚠️ 비정형" if not dl or not dl.strip() else dl
+                        star    = row.get('관련도','')
+                        reason  = row.get('매칭근거','')
+
+                        status_txt = "✅ 승인됨" if current=="○" else ("❌ 제외됨" if current=="✕" else "⏳ 미검토")
+
+                        ai_txt = ""
+                        if ai_res and not ai_res.get('error'):
+                            rec    = ai_res.get('추천여부','')
+                            ri     = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
+                            ai_txt = f"{ri} {ai_res.get('한줄요약','')[:40]}"
+
+                        # 공고 행: 별점+AI배지 / 공고명+주관기관 / 매칭근거+AI요약 / 마감+소재지 / 승인 / 제외 / AI
+                        c_star, c_name, c_reason, c_meta, c_ok, c_ng, c_ai = st.columns([1.5, 3, 3, 2, 1.2, 1.2, 1.5])
+
+                        with c_star:
+                            st.write(star)
+                            # AI 분석 결과 배지
+                            if ai_res and not ai_res.get('error'):
+                                rec = ai_res.get('추천여부','')
+                                badge = {"추천":"🟢 추천", "검토":"🟡 검토", "비추천":"🔴 비추천"}.get(rec,"")
+                                if badge:
+                                    st.caption(badge)
+                        with c_name:
+                            nm = row.get('공고명','')
+                            st.write(f"**{nm[:22]}**" + ("..." if len(nm)>22 else ""))
+                            st.caption(row.get('주관기관','')[:14])
+                        with c_reason:
+                            st.caption(reason[:40] + ("..." if len(reason)>40 else ""))
+                            if ai_txt: st.caption(ai_txt)
+                        with c_meta:
+                            st.caption(dl_txt)
+                            st.caption(loc_txt)
+                        with c_ok:
+                            lbl = "✅ 승인" if current != "○" else "↩ 취소"
+                            if st.button(lbl, key=f"o_{key}_{i}", use_container_width=True):
+                                st.session_state['review_state'][key] = "" if current=="○" else "○"; st.rerun()
+                        with c_ng:
+                            lbl = "❌ 제외" if current != "✕" else "↩ 취소"
+                            if st.button(lbl, key=f"x_{key}_{i}", use_container_width=True):
+                                st.session_state['review_state'][key] = "" if current=="✕" else "✕"; st.rerun()
+                        with c_ai:
+                            if not ai_res:
+                                if st.button("🤖 AI", key=f"ai_{key}_{i}", use_container_width=True):
+                                    with st.spinner("분석 중..."):
+                                        ci = {}
+                                        if 'df_companies_cache' in st.session_state:
+                                            df_co3 = st.session_state['df_companies_cache']
+                                            mx = df_co3[df_co3['기업명']==row['기업명']]
+                                            if not mx.empty: ci = mx.iloc[0].to_dict()
+                                        ci['기업명'] = row['기업명']
+                                        if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = {}
+                                        st.session_state['ai_analysis'][key] = claude_analyze(ci, row.to_dict())
+                                    st.rerun()
                             else:
-                                st.markdown(f"- **소재지:** {co_loc}")
-                            st.markdown(f"- **관심분야:** {co_info.get('관심사업분야','—')}")
-                            st.markdown(f"- **기술키워드:** {co_info.get('기술키워드','—')}")
-                            st.markdown(f"- **제품분야:** {co_info.get('제품분야','—')}")
-                            st.markdown(f"- **수출실적:** {co_info.get('수출실적','—')} / {co_info.get('수출국가','—')}")
-                            if co_info.get('TRL단계'): st.markdown(f"- **TRL:** {co_info.get('TRL단계')}")
-                            if co_info.get('핵심수요태그'): st.markdown(f"- **핵심수요:** {co_info.get('핵심수요태그')}")
-                            if co_info.get('키워드보완'): st.markdown(f"- **보완키워드:** {co_info.get('키워드보완')}")
-                        with right:
-                            st.markdown("**📋 공고 정보**")
-                            if notice_loc:
-                                region_tag = f"🟢 `{notice_loc}` (귀사 소재지 포함)" if loc_score>0 else (f"🔴 `{notice_loc}` (미포함)" if loc_score<0 else f"`{notice_loc}`")
-                                st.markdown(f"- **지역제한:** {region_tag}")
-                            else:
-                                st.markdown("- **지역제한:** 전국 공고")
-                            st.markdown(f"- **주관기관:** {row.get('주관기관','—')}")
-                            if row.get('지원금액',''): st.markdown(f"- **지원금액:** {row.get('지원금액','')}")
-                            if row.get('선정규모',''): st.markdown(f"- **선정규모:** {row.get('선정규모','')}")
-                            st.markdown(f"- **지원대상:** {row.get('지원대상','—')}")
-                            st.markdown(f"- **접수기간:** {row.get('접수기간','—')}")
-                            st.markdown(f"- **마감일:** {deadline_display}")
-                            if row.get('공고링크',''): st.markdown(f"[🔗 공고 원문 보기]({row.get('공고링크','')})")
+                                st.caption("🤖 분석완료")
+
+                        # ── 공고 상세 펼침 ──────────────────────────
+                        with st.expander(f"📋 공고 상세 보기 — {nm[:20]}"):
+                            d1, d2 = st.columns(2)
+                            with d1:
+                                st.markdown("**공고명**")
+                                st.write(row.get('공고명',''))
+                                st.markdown("**주관기관**")
+                                st.write(row.get('주관기관','—'))
+                                st.markdown("**지원대상**")
+                                st.write(row.get('지원대상','—'))
+                                if row.get('지원금액',''):
+                                    st.markdown("**지원금액**")
+                                    st.write(row.get('지원금액',''))
+                                if row.get('선정규모',''):
+                                    st.markdown("**선정규모**")
+                                    st.write(row.get('선정규모',''))
+                            with d2:
+                                st.markdown("**접수기간**")
+                                st.write(row.get('접수기간','—'))
+                                st.markdown("**마감일**")
+                                st.write(dl_txt)
+                                st.markdown("**소재지**")
+                                st.write(loc_txt)
+                                if row.get('공고링크',''):
+                                    st.markdown("**공고 원문**")
+                                    st.link_button("🔗 원문 보러가기", row.get('공고링크',''))
+                            st.markdown("**사업개요**")
+                            overview = row.get('사업개요','')
+                            # 앞부분 네비게이션 텍스트 제거 (HOME 정책정보 ... 패턴)
+                            if 'HOME' in overview[:30]:
+                                cut = overview.find('소관부처')
+                                if cut > 0: overview = overview[cut:]
+                            st.write(overview)
+
+                        # ── AI 분석 결과 펼침 ──────────────────────
+                        if ai_res and not ai_res.get('error'):
+                            rec       = ai_res.get('추천여부','')
+                            fit       = ai_res.get('적합도','')
+                            summary   = ai_res.get('한줄요약','')
+                            reason_ai = ai_res.get('판단근거', ai_res.get('적합이유',''))
+                            caution   = ai_res.get('주의사항','')
+                            checks    = {"업종일치": ai_res.get('업종일치','—'), "자격충족": ai_res.get('자격충족','—'),
+                                         "지역적합": ai_res.get('지역적합','—'), "수요일치": ai_res.get('수요일치','—')}
+                            icon_map  = {"O":"✅","X":"❌","△":"⚠️"}
+                            rec_icon  = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
+
+                            ai_c1, ai_c2 = st.columns([1, 9])
+                            with ai_c1:
+                                st.write(f"**{rec_icon} {rec}**")
+                                st.caption(f"적합도: {fit}")
+                            with ai_c2:
+                                st.markdown(f"**{summary}**")
+                                st.write(reason_ai)
+                                if caution and caution not in ['없음','','nan']:
+                                    st.warning(f"⚠️ {caution}")
+                                check_str = "  ".join([f"{icon_map.get(v,'—')} {k}" for k, v in checks.items()])
+                                st.caption(check_str)
+
                         st.divider()
-                        st.markdown("**🔍 매칭 근거**")
-                        rc1,rc2,rc3,rc4 = st.columns(4)
-                        with rc1:
-                            st.caption("지원대상")
-                            v = row.get('지원대상매칭','—')
-                            st.markdown(f"`{v}`" if v and v!='—' else "—")
-                        with rc2:
-                            st.caption("사업성격")
-                            v = row.get('사업성격매칭','—')
-                            st.markdown(f"`{v}`" if v and v!='—' else "—")
-                        with rc3:
-                            st.caption("업종 역방향")
-                            v = row.get('업종역방향매칭','—')
-                            st.markdown(f"`{v}`" if v and v!='—' else "—")
-                        with rc4:
-                            st.caption("기업키워드·수요")
-                            v = (row.get('핵심수요매칭','') or row.get('기업키워드매칭','')) or '—'
-                            st.markdown(f"`{v}`" if v and v!='—' else "—")
-                        st.divider()
-                        st.caption("사업개요")
-                        st.markdown(row.get('사업개요',''))
-                        if is_irregular:
-                            st.divider()
-                            st.caption("📅 비정형 마감일 — 공고 원문 확인 후 직접 입력")
-                            custom_dl = st.text_input("마감일 (YYYY-MM-DD)",
-                                value=st.session_state['custom_deadline'].get(key,''),
-                                key=f"dl_{key}_{i}", placeholder="예: 2026-06-30")
-                            if custom_dl:
-                                st.session_state['custom_deadline'][key] = custom_dl
-                                for r in results:
-                                    if f"{r['기업명']}_{r.get('공고ID','')}" == key:
-                                        r['마감일'] = custom_dl; break
-                        st.divider()
-                        bc1,bc2,bc3,bc4 = st.columns([1,1,1.2,2])
-                        with bc1:
-                            if st.button("○ 승인", key=f"o_{key}_{i}", type="primary"):
-                                st.session_state['review_state'][key]="○"; st.rerun()
-                        with bc2:
-                            if st.button("✕ 제외", key=f"x_{key}_{i}"):
-                                st.session_state['review_state'][key]="✕"; st.rerun()
-                        with bc3:
-                            _usd,_krw = estimate_cost(1)
-                            if st.button(f"🤖 AI 분석 (~{_krw:.0f}원)", key=f"ai_{key}_{i}"):
-                                if 'ai_analysis' not in st.session_state:
-                                    st.session_state['ai_analysis'] = {}
-                                with st.spinner("Claude 분석 중..."):
-                                    co_info = {}
-                                    if 'df_companies_cache' in st.session_state:
-                                        df_co = st.session_state['df_companies_cache']
-                                        co_rows = df_co[df_co['기업명']==row['기업명']]
-                                        if not co_rows.empty: co_info = co_rows.iloc[0].to_dict()
-                                    co_info['기업명'] = row['기업명']
-                                    result = claude_analyze(co_info, row.to_dict())
-                                    st.session_state['ai_analysis'][key] = result
+
+                # ══════════════════════════════════════════════
+                # 일괄 검토 (AI 활용) 모드
+                # ══════════════════════════════════════════════
+                else:
+                    # 전체 AI 분석 — 상세 검토 탭에서만
+                    with st.expander("🤖 전체 AI 분석 (상세 검토용)"):
+                        usd, krw = estimate_cost(len(filtered))
+                        st.caption(f"현재 필터 기준 {len(filtered)}건 분석 / 예상 비용 ${usd:.3f} (약 {krw:.0f}원)")
+                        confirm = st.text_input("확인코드 입력 후 실행", key="bulk_ai_confirm", placeholder="분석실행")
+                        if st.button("전체 분석 시작", key="bulk_ai_btn", type="primary"):
+                            if confirm == "분석실행":
+                                prog_ai = st.progress(0, text="AI 분석 중...")
+                                for ai_i, (_, ai_row) in enumerate(filtered.iterrows()):
+                                    ai_key = f"{ai_row['기업명']}_{ai_row.get('공고ID','')}"
+                                    if ai_key not in st.session_state['ai_analysis']:
+                                        co_info = {}
+                                        if 'df_companies_cache' in st.session_state:
+                                            df_co = st.session_state['df_companies_cache']
+                                            co_rows2 = df_co[df_co['기업명']==ai_row['기업명']]
+                                            if not co_rows2.empty:
+                                                co_info = co_rows2.iloc[0].to_dict()
+                                        co_info['기업명'] = ai_row['기업명']
+                                        st.session_state['ai_analysis'][ai_key] = claude_analyze(co_info, ai_row.to_dict())
+                                    prog_ai.progress((ai_i+1)/len(filtered), text=f"AI 분석 중... {ai_i+1}/{len(filtered)}")
+                                save_ai_analysis(_get_drive())
+                                st.success(f"완료 — {len(filtered)}건 (드라이브 저장됨)")
                                 st.rerun()
-                        ai_result = st.session_state.get('ai_analysis', {}).get(key)
-                        if ai_result:
-                            if 'error' in ai_result:
-                                st.error(f"분석 오류: {ai_result['error']}")
                             else:
-                                rec       = ai_result.get('추천여부','')
-                                fit       = ai_result.get('적합도','')
-                                rec_color = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
-                                fit_color = {"높음":"#10B981","보통":"#F59E0B","낮음":"#EF4444"}.get(fit,"#0F172A")
-                                icon_map  = {"O":"✅","X":"❌","△":"⚠️"}
-                                checks = {
-                                    "업종일치": ai_result.get('업종일치','—'),
-                                    "자격충족": ai_result.get('자격충족','—'),
-                                    "지역적합": ai_result.get('지역적합','—'),
-                                    "수요일치": ai_result.get('수요일치','—'),
-                                }
-                                check_html = "".join([
-                                    f"<span style='margin-right:12px;font-size:12px;'>"
-                                    f"{icon_map.get(v,'—')} {k}</span>"
-                                    for k,v in checks.items()
-                                ])
-                                caution_html = ""
-                                if ai_result.get('주의사항','') not in ['없음','','nan']:
-                                    caution_txt = ai_result.get('주의사항','')
-                                    caution_html = f"<p style='margin:8px 0 0;font-size:11px;color:#F59E0B;'>⚠️ {caution_txt}</p>"
-                                judgment = ai_result.get('판단근거', ai_result.get('적합이유',''))
-                                summary_txt = ai_result.get('한줄요약','')
-                                st.markdown(f"""
-<div style="background:rgba(74,158,255,0.08);border:1px solid rgba(74,158,255,0.2);
-            border-radius:8px;padding:14px 16px;margin-top:8px;">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-    <span style="font-size:11px;font-weight:700;color:#10B981;letter-spacing:1px;">🤖 CLAUDE 분석</span>
-    <span style="font-size:13px;font-weight:700;color:{fit_color};">{rec_color} {rec}</span>
-    <span style="font-size:12px;color:rgba(255,255,255,0.5);">적합도: {fit}</span>
-  </div>
-  <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#0F172A;">{summary_txt}</p>
-  <div style="margin-bottom:10px;">{check_html}</div>
-  <p style="margin:0 0 6px;font-size:12px;color:rgba(255,255,255,0.65);line-height:1.7;">{judgment}</p>
-  {caution_html}
-</div>
-                                """, unsafe_allow_html=True)
-            st.divider()
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                if st.button("✅ 검토 완료 저장", type="primary"):
-                    for r in results:
-                        r['담당자검토'] = st.session_state['review_state'].get(
-                            f"{r['기업명']}_{r.get('공고ID','')}", "")
-                    st.session_state['match_results'] = results
-                    st.success(f"저장 완료 — 승인 {ap}건 → '발송 관리' 메뉴로 이동")
-            with c2:
-                if st.button("📥 매칭결과 엑셀 저장"):
-                    fname = f"매칭결과_{datetime.today().strftime('%Y%m%d')}.xlsx"
-                    ai_data = st.session_state.get('ai_analysis', {})
-                    export_rows = []
-                    for r in results:
-                        r2  = dict(r)
-                        key = f"{r2.get('기업명','')}_{r2.get('공고ID','')}"
-                        ai  = ai_data.get(key, {})
-                        if ai and not ai.get('error'):
-                            r2['AI_추천여부'] = ai.get('추천여부','')
-                            r2['AI_적합도']   = ai.get('적합도','')
-                            r2['AI_한줄요약'] = ai.get('한줄요약','')
-                            r2['AI_판단근거'] = ai.get('판단근거', ai.get('적합이유',''))
-                            r2['AI_주의사항'] = ai.get('주의사항','')
-                            r2['AI_업종일치'] = ai.get('업종일치','')
-                            r2['AI_자격충족'] = ai.get('자격충족','')
-                            r2['AI_지역적합'] = ai.get('지역적합','')
-                            r2['AI_수요일치'] = ai.get('수요일치','')
-                        export_rows.append(r2)
-                    with st.spinner("드라이브 저장 중..."):
-                        save_excel(drive, pd.DataFrame(export_rows), fname,
-                                   "매칭결과", "C55A11", star_col="관련도")
-                    ai_cnt = sum(1 for r in export_rows if r.get('AI_추천여부',''))
-                    st.success(f"✅ {fname} 저장 완료 — AI 분석 {ai_cnt}건 포함")
-            with c3:
-                with st.expander("🔄 피드백 반영 (매칭 개선)"):
-                    st.caption("""제외한 공고 패턴을 분석해 다음 매칭에 자동 반영합니다.
-기업별로 자주 제외된 사업성격을 낮은 우선순위로 설정합니다.""")
-                    if st.button("피드백 적용", key="apply_feedback"):
-                        # 제외된 공고의 사업성격 패턴 집계
-                        rejected = [r for r in results
-                                    if st.session_state['review_state'].get(
-                                        f"{r['기업명']}_{r.get('공고ID','')}", "") == "✕"]
+                                st.error("확인코드가 틀렸습니다 ('분석실행' 입력)")
 
-                        # 기업별 제외 패턴
-                        co_reject_types = {}
-                        for r in rejected:
-                            co  = r.get('기업명','')
-                            typ = r.get('사업성격매칭','')
-                            if co and typ:
-                                if co not in co_reject_types:
-                                    co_reject_types[co] = []
-                                for t in typ.split('/'):
-                                    t = t.strip().split('(')[0].strip()
-                                    if t: co_reject_types[co].append(t)
+                    st.divider()
+                    st.caption("공고 상세 내용을 확인하며 검토합니다.")
+                    for i,(idx,row) in enumerate(filtered.iterrows()):
+                        key      = f"{row['기업명']}_{row.get('공고ID','')}"
+                        current  = st.session_state['review_state'].get(key,"")
+                        icon     = "🟡" if not current else ("✅" if current=="○" else "❌")
+                        deadline = row.get('마감일','')
+                        is_irregular = not deadline or deadline.strip() == ''
+                        deadline_display = f"⚠️ 비정형" if is_irregular else deadline
+                        reason = row.get('매칭근거','')
+                        loc_icon = ""
+                        if row.get('공고지역',''):
+                            _ls = str(row.get('소재지점수','0'))
+                            _lv = int(_ls) if _ls.lstrip('-').isdigit() else 0
+                            loc_icon = " ✅" if _lv > 0 else (" ⚠️" if _lv < 0 else "")
+                        with st.expander(
+                            f"{icon} **{row['기업명']}**  |  {row.get('관련도','')}  |  "
+                            f"{row.get('공고명','')[:28]}{loc_icon}  |  {reason[:22]}"
+                        ):
+                            left, right = st.columns(2)
+                            with left:
+                                st.markdown("**🏢 기업 정보**")
+                                co_info = {}
+                                if 'df_companies_cache' in st.session_state:
+                                    df_co = st.session_state['df_companies_cache']
+                                    co_rows = df_co[df_co['기업명']==row['기업명']]
+                                    if not co_rows.empty:
+                                        co_info = co_rows.iloc[0].to_dict()
+                                co_loc      = co_info.get('소재지','—')
+                                notice_loc  = row.get('공고지역','')
+                                loc_score_v = str(row.get('소재지점수','0'))
+                                loc_score   = int(loc_score_v) if loc_score_v.lstrip('-').isdigit() else 0
+                                if notice_loc:
+                                    loc_tag = "🟢 일치" if loc_score>0 else ("🔴 불일치" if loc_score<0 else "")
+                                    st.markdown(f"- **소재지:** {co_loc} &nbsp; {loc_tag}")
+                                else:
+                                    st.markdown(f"- **소재지:** {co_loc}")
+                                st.markdown(f"- **관심분야:** {co_info.get('관심사업분야','—')}")
+                                st.markdown(f"- **기술키워드:** {co_info.get('기술키워드','—')}")
+                                st.markdown(f"- **제품분야:** {co_info.get('제품분야','—')}")
+                                st.markdown(f"- **수출실적:** {co_info.get('수출실적','—')} / {co_info.get('수출국가','—')}")
+                                if co_info.get('TRL단계'): st.markdown(f"- **TRL:** {co_info.get('TRL단계')}")
+                                if co_info.get('핵심수요태그'): st.markdown(f"- **핵심수요:** {co_info.get('핵심수요태그')}")
+                                if co_info.get('키워드보완'): st.markdown(f"- **보완키워드:** {co_info.get('키워드보완')}")
+                            with right:
+                                st.markdown("**📋 공고 정보**")
+                                if notice_loc:
+                                    region_tag = f"🟢 `{notice_loc}` (귀사 소재지 포함)" if loc_score>0 else (f"🔴 `{notice_loc}` (미포함)" if loc_score<0 else f"`{notice_loc}`")
+                                    st.markdown(f"- **지역제한:** {region_tag}")
+                                else:
+                                    st.markdown("- **지역제한:** 전국 공고")
+                                st.markdown(f"- **주관기관:** {row.get('주관기관','—')}")
+                                if row.get('지원금액',''): st.markdown(f"- **지원금액:** {row.get('지원금액','')}")
+                                if row.get('선정규모',''): st.markdown(f"- **선정규모:** {row.get('선정규모','')}")
+                                st.markdown(f"- **지원대상:** {row.get('지원대상','—')}")
+                                st.markdown(f"- **접수기간:** {row.get('접수기간','—')}")
+                                st.markdown(f"- **마감일:** {deadline_display}")
+                                if row.get('공고링크',''): st.markdown(f"[🔗 공고 원문 보기]({row.get('공고링크','')})")
+                            st.divider()
+                            st.markdown("**🔍 매칭 근거**")
+                            rc1,rc2,rc3,rc4 = st.columns(4)
+                            with rc1:
+                                st.caption("지원대상")
+                                v = row.get('지원대상매칭','—')
+                                st.markdown(f"`{v}`" if v and v!='—' else "—")
+                            with rc2:
+                                st.caption("사업성격")
+                                v = row.get('사업성격매칭','—')
+                                st.markdown(f"`{v}`" if v and v!='—' else "—")
+                            with rc3:
+                                st.caption("업종 역방향")
+                                v = row.get('업종역방향매칭','—')
+                                st.markdown(f"`{v}`" if v and v!='—' else "—")
+                            with rc4:
+                                st.caption("기업키워드·수요")
+                                v = (row.get('핵심수요매칭','') or row.get('기업키워드매칭','')) or '—'
+                                st.markdown(f"`{v}`" if v and v!='—' else "—")
+                            st.divider()
+                            st.caption("사업개요")
+                            st.markdown(row.get('사업개요',''))
+                            if is_irregular:
+                                st.divider()
+                                st.caption("📅 비정형 마감일 — 공고 원문 확인 후 직접 입력")
+                                custom_dl = st.text_input("마감일 (YYYY-MM-DD)",
+                                    value=st.session_state['custom_deadline'].get(key,''),
+                                    key=f"dl_{key}_{i}", placeholder="예: 2026-06-30")
+                                if custom_dl:
+                                    st.session_state['custom_deadline'][key] = custom_dl
+                                    for r in results:
+                                        if f"{r['기업명']}_{r.get('공고ID','')}" == key:
+                                            r['마감일'] = custom_dl; break
+                            st.divider()
+                            bc1,bc2,bc3,bc4 = st.columns([1,1,1.2,2])
+                            with bc1:
+                                if st.button("○ 승인", key=f"o_{key}_{i}", type="primary"):
+                                    st.session_state['review_state'][key]="○"; st.rerun()
+                            with bc2:
+                                if st.button("✕ 제외", key=f"x_{key}_{i}"):
+                                    st.session_state['review_state'][key]="✕"; st.rerun()
+                            with bc3:
+                                _usd,_krw = estimate_cost(1)
+                                if st.button(f"🤖 AI 분석 (~{_krw:.0f}원)", key=f"ai_{key}_{i}"):
+                                    if 'ai_analysis' not in st.session_state:
+                                        st.session_state['ai_analysis'] = {}
+                                    with st.spinner("Claude 분석 중..."):
+                                        co_info = {}
+                                        if 'df_companies_cache' in st.session_state:
+                                            df_co = st.session_state['df_companies_cache']
+                                            co_rows = df_co[df_co['기업명']==row['기업명']]
+                                            if not co_rows.empty: co_info = co_rows.iloc[0].to_dict()
+                                        co_info['기업명'] = row['기업명']
+                                        result = claude_analyze(co_info, row.to_dict())
+                                        st.session_state['ai_analysis'][key] = result
+                                    st.rerun()
+                            ai_result = st.session_state.get('ai_analysis', {}).get(key)
+                            if ai_result:
+                                if 'error' in ai_result:
+                                    st.error(f"분석 오류: {ai_result['error']}")
+                                else:
+                                    rec       = ai_result.get('추천여부','')
+                                    fit       = ai_result.get('적합도','')
+                                    rec_color = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
+                                    fit_color = {"높음":"#10B981","보통":"#F59E0B","낮음":"#EF4444"}.get(fit,"#0F172A")
+                                    icon_map  = {"O":"✅","X":"❌","△":"⚠️"}
+                                    checks = {
+                                        "업종일치": ai_result.get('업종일치','—'),
+                                        "자격충족": ai_result.get('자격충족','—'),
+                                        "지역적합": ai_result.get('지역적합','—'),
+                                        "수요일치": ai_result.get('수요일치','—'),
+                                    }
+                                    check_html = "".join([
+                                        f"<span style='margin-right:12px;font-size:12px;'>"
+                                        f"{icon_map.get(v,'—')} {k}</span>"
+                                        for k,v in checks.items()
+                                    ])
+                                    caution_html = ""
+                                    if ai_result.get('주의사항','') not in ['없음','','nan']:
+                                        caution_txt = ai_result.get('주의사항','')
+                                        caution_html = f"<p style='margin:8px 0 0;font-size:11px;color:#F59E0B;'>⚠️ {caution_txt}</p>"
+                                    judgment = ai_result.get('판단근거', ai_result.get('적합이유',''))
+                                    summary_txt = ai_result.get('한줄요약','')
+                                    st.markdown(f"""
+    <div style="background:rgba(74,158,255,0.08);border:1px solid rgba(74,158,255,0.2);
+                border-radius:8px;padding:14px 16px;margin-top:8px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <span style="font-size:11px;font-weight:700;color:#10B981;letter-spacing:1px;">🤖 CLAUDE 분석</span>
+        <span style="font-size:13px;font-weight:700;color:{fit_color};">{rec_color} {rec}</span>
+        <span style="font-size:12px;color:rgba(255,255,255,0.5);">적합도: {fit}</span>
+      </div>
+      <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#0F172A;">{summary_txt}</p>
+      <div style="margin-bottom:10px;">{check_html}</div>
+      <p style="margin:0 0 6px;font-size:12px;color:rgba(255,255,255,0.65);line-height:1.7;">{judgment}</p>
+      {caution_html}
+    </div>
+                                    """, unsafe_allow_html=True)
+                st.divider()
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    if st.button("✅ 검토 완료 저장", type="primary"):
+                        for r in results:
+                            r['담당자검토'] = st.session_state['review_state'].get(
+                                f"{r['기업명']}_{r.get('공고ID','')}", "")
+                        st.session_state['match_results'] = results
+                        st.success(f"저장 완료 — 승인 {ap}건 → '발송 관리' 메뉴로 이동")
+                with c2:
+                    if st.button("📥 매칭결과 엑셀 저장"):
+                        fname = f"매칭결과_{datetime.today().strftime('%Y%m%d')}.xlsx"
+                        ai_data = st.session_state.get('ai_analysis', {})
+                        export_rows = []
+                        for r in results:
+                            r2  = dict(r)
+                            key = f"{r2.get('기업명','')}_{r2.get('공고ID','')}"
+                            ai  = ai_data.get(key, {})
+                            if ai and not ai.get('error'):
+                                r2['AI_추천여부'] = ai.get('추천여부','')
+                                r2['AI_적합도']   = ai.get('적합도','')
+                                r2['AI_한줄요약'] = ai.get('한줄요약','')
+                                r2['AI_판단근거'] = ai.get('판단근거', ai.get('적합이유',''))
+                                r2['AI_주의사항'] = ai.get('주의사항','')
+                                r2['AI_업종일치'] = ai.get('업종일치','')
+                                r2['AI_자격충족'] = ai.get('자격충족','')
+                                r2['AI_지역적합'] = ai.get('지역적합','')
+                                r2['AI_수요일치'] = ai.get('수요일치','')
+                            export_rows.append(r2)
+                        with st.spinner("드라이브 저장 중..."):
+                            save_excel(drive, pd.DataFrame(export_rows), fname,
+                                       "매칭결과", "C55A11", star_col="관련도")
+                        ai_cnt = sum(1 for r in export_rows if r.get('AI_추천여부',''))
+                        st.success(f"✅ {fname} 저장 완료 — AI 분석 {ai_cnt}건 포함")
+                with c3:
+                    with st.expander("🔄 피드백 반영 (매칭 개선)"):
+                        st.caption("""제외한 공고 패턴을 분석해 다음 매칭에 자동 반영합니다.
+    기업별로 자주 제외된 사업성격을 낮은 우선순위로 설정합니다.""")
+                        if st.button("피드백 적용", key="apply_feedback"):
+                            # 제외된 공고의 사업성격 패턴 집계
+                            rejected = [r for r in results
+                                        if st.session_state['review_state'].get(
+                                            f"{r['기업명']}_{r.get('공고ID','')}", "") == "✕"]
 
-                        # keywords.json에 제외 패턴 저장
-                        kw_data = load_json(drive, KEYWORDS_FILE) or {}
-                        feedback = kw_data.get('feedback', {})
-                        for co, types in co_reject_types.items():
-                            if co not in feedback:
-                                feedback[co] = {}
-                            for t in types:
-                                feedback[co][t] = feedback[co].get(t, 0) + 1
-                        kw_data['feedback'] = feedback
+                            # 기업별 제외 패턴
+                            co_reject_types = {}
+                            for r in rejected:
+                                co  = r.get('기업명','')
+                                typ = r.get('사업성격매칭','')
+                                if co and typ:
+                                    if co not in co_reject_types:
+                                        co_reject_types[co] = []
+                                    for t in typ.split('/'):
+                                        t = t.strip().split('(')[0].strip()
+                                        if t: co_reject_types[co].append(t)
 
-                        if save_json(drive, kw_data, KEYWORDS_FILE):
-                            summary_lines = [f"{co}: {dict(v)}" for co, v in list(co_reject_types.items())[:5]]
-                            st.success(f"피드백 반영 완료 — {len(rejected)}건 제외 패턴 저장")
-                            for line in summary_lines:
-                                st.caption(line)
-                        else:
-                            st.error("저장 실패")
+                            # keywords.json에 제외 패턴 저장
+                            kw_data = load_json(drive, KEYWORDS_FILE) or {}
+                            feedback = kw_data.get('feedback', {})
+                            for co, types in co_reject_types.items():
+                                if co not in feedback:
+                                    feedback[co] = {}
+                                for t in types:
+                                    feedback[co][t] = feedback[co].get(t, 0) + 1
+                            kw_data['feedback'] = feedback
+
+                            if save_json(drive, kw_data, KEYWORDS_FILE):
+                                summary_lines = [f"{co}: {dict(v)}" for co, v in list(co_reject_types.items())[:5]]
+                                st.success(f"피드백 반영 완료 — {len(rejected)}건 제외 패턴 저장")
+                                for line in summary_lines:
+                                    st.caption(line)
+                            else:
+                                st.error("저장 실패")
 
 
 # ══════════════════════════════════════════════════════
 # 발송 관리
 # ══════════════════════════════════════════════════════
-elif page == "발송 관리":
+elif page == "발송":
     drive = _get_drive()
     st.title("발송 관리")
     info_box("발송 관리",
@@ -4505,81 +4509,21 @@ JSON만 응답 (코드블록 없이):
             st.download_button("📥 엑셀 다운로드", buf.getvalue(), HISTORY_FILE,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-
-# ══════════════════════════════════════════════════════
-# 성과 집계
-# ══════════════════════════════════════════════════════
-elif page == "성과 집계":
+elif page == "설정":
     drive = _get_drive()
-    st.title("성과 집계")
-    info_box("성과 집계",
-        """
-발송 이력 기반 사업 성과 집계
+    st.title("설정")
+    st.caption("키워드·매칭 설정 / 드라이브 연동 / 인증 관리")
 
-**집계 항목** — 총 발송·신청·선정 건수, 신청 전환율, 기업별 현황
-**활용** — 분기 보고서 작성 시 수치 참고
-**신청여부·선정결과 입력** — '발송 이력' 메뉴에서 직접 입력
-        """)
-
-    with st.spinner("드라이브 이력 로딩 중..."):
-        df_h = load_excel(drive, HISTORY_FILE)
-
-    if df_h.empty:
-        st.info("발송 이력 없음")
-    else:
-        total    = len(df_h)
-        applied  = (df_h['신청여부']=='Y').sum() if '신청여부' in df_h.columns else 0
-        selected = (df_h['선정결과']=='선정').sum() if '선정결과' in df_h.columns else 0
-        rate     = f"{applied/total*100:.1f}%" if total else "0%"
-
-        c1,c2,c3,c4 = st.columns(4)
-        c1.metric("총 발송",    f"{total}건")
-        c2.metric("신청 건",    f"{applied}건")
-        c3.metric("선정 건",    f"{selected}건")
-        c4.metric("신청 전환율", rate)
-
-        if '기업명' in df_h.columns:
-            st.divider(); st.subheader("기업별 현황")
-            summary = df_h.groupby('기업명').agg(
-                발송건수=('공고명','count'),
-                신청건수=('신청여부',lambda x:(x=='Y').sum()),
-                선정건수=('선정결과',lambda x:(x=='선정').sum()),
-            ).reset_index()
-            st.dataframe(summary, use_container_width=True, hide_index=True)
-
-
-# ══════════════════════════════════════════════════════
-# 설정
-# ══════════════════════════════════════════════════════
-
-# ══════════════════════════════════════════════════════
-# 키워드 관리
-# ══════════════════════════════════════════════════════
-elif page == "키워드 관리":
-    drive = _get_drive()
-    st.title("키워드·매칭 설정")
-    info_box("키워드·매칭 설정",
-        """
-매칭에 사용되는 모든 키워드와 가중치를 관리합니다.
-
-- **축1 지원대상** — 공고가 누구를 위한 것인지 판단하는 키워드 (별점 결정의 핵심)
-- **축2 사업성격** — 공고가 어떤 종류의 지원인지 판단하는 키워드
-- **기업별 키워드** — 기업별 추가 키워드 (입력할수록 매칭 정확도 향상)
-- **매칭 가중치** — 각 축의 점수 비중 조정
-        """,
-        "변경 후 반드시 '저장' → 매칭 재실행")
-
+    tab_s1, tab_s2, tab_s3, tab_s4, tab_s5 = st.tabs([
+        "🎯 축1 — 지원대상", "📋 축2 — 사업성격",
+        "🏢 기업별 키워드", "⚖️ 매칭 가중치", "🔧 시스템 설정"
+    ])
     kw_data = load_json(drive, KEYWORDS_FILE) or {}
     HIGH_kw, MID_kw = load_keywords(drive)
     df_c = load_excel(drive, SELECTED_FILE)
 
-    tab_kw1, tab_kw2, tab_kw3, tab_kw4 = st.tabs([
-        "🎯 축1 — 지원대상", "📋 축2 — 사업성격",
-        "🏢 기업별 키워드", "⚖️ 매칭 가중치"
-    ])
-
     # ── 탭1: 축1 지원대상 ──────────────────────────────
-    with tab_kw1:
+    with tab_s1:
         st.subheader("축1 — 지원대상 키워드")
         st.caption("공고가 어떤 기업을 대상으로 하는지 판단합니다. 이 키워드가 공고에 있을 때 해당 카테고리로 분류됩니다.")
 
@@ -4612,7 +4556,7 @@ elif page == "키워드 관리":
                 st.error("저장 실패")
 
     # ── 탭2: 축2 사업성격 ──────────────────────────────
-    with tab_kw2:
+    with tab_s2:
         st.subheader("축2 — 사업성격 키워드")
         st.caption("공고가 어떤 종류의 지원인지 판단합니다. 축1과 교차하여 별점이 결정됩니다.")
 
@@ -4650,7 +4594,7 @@ elif page == "키워드 관리":
                 st.error("저장 실패")
 
     # ── 탭3: 기업별 키워드 ────────────────────────────
-    with tab_kw3:
+    with tab_s3:
         st.subheader("기업별 키워드 보완")
         st.caption("각 기업에 추가 키워드를 설정합니다. 기업 관리 탭과 동일한 필드이며 여기서 일괄 편집 가능합니다.")
 
@@ -4779,7 +4723,7 @@ elif page == "키워드 관리":
                 st.write(f"**{co}**: " + ", ".join([f"{k}({v}회)" for k,v in sorted(patterns.items(), key=lambda x:-x[1])]))
 
     # ── 탭4: 매칭 가중치 ──────────────────────────────
-    with tab_kw4:
+    with tab_s4:
         st.subheader("매칭 축별 가중치 조정")
         st.caption("각 축의 점수 비중을 조정합니다. 합산 점수가 별점(★) 판정에 영향을 줍니다.")
 
@@ -4839,12 +4783,68 @@ elif page == "키워드 관리":
 **세그먼트 부스트** — 기업 세그먼트(해외진출형/조달강화형 등)에 맞는 공고 유형 보너스
             """)
 
+    # ── 탭5: 시스템 설정 ──────────────────────────────
+    with tab_s5:
+        st.subheader("🔧 시스템 설정")
+
+        # 드라이브 연동 상태
+        st.markdown("**📁 드라이브 연동 현황**")
+        st.markdown(f"[📂 드라이브 폴더 열기](https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID})")
+        files_check = {
+            SELECTED_FILE: "선정기업 명단",
+            NOTICES_FILE:  "공고 DB",
+            HISTORY_FILE:  "발송 이력",
+            KEYWORDS_FILE: "키워드 설정",
+            AI_ANALYSIS_FILE: "AI 분석 결과",
+            INDCAL_FILE:   "기업별 캘린더",
+        }
+        cols = st.columns(2)
+        for i, (fname, label) in enumerate(files_check.items()):
+            fid = drive_file_id(drive, fname)
+            cols[i%2].write(f"{'✅' if fid else '❌'} {label} (`{fname}`)")
+
+        st.divider()
+
+        # 인증 상태
+        st.markdown("**🔑 구글 인증 상태**")
+        try:
+            test_resp = gapi('GET', 'https://www.googleapis.com/drive/v3/about',
+                             params={'fields': 'user'})
+            if test_resp.ok:
+                user_info = test_resp.json().get('user', {})
+                st.success(f"✅ 인증 정상 — {user_info.get('emailAddress', '확인됨')}")
+            else:
+                st.error(f"❌ 인증 실패 ({test_resp.status_code}) — 토큰 갱신 필요")
+        except Exception as e:
+            st.error(f"❌ 인증 오류: {e}")
+
+        st.divider()
+
+        # 토큰 갱신 안내
+        st.markdown("**🔄 토큰 갱신 방법**")
+        st.info("""
+토큰이 만료되면 드라이브/Gmail/캘린더 기능이 모두 중단됩니다.
+
+**갱신 순서:**
+1. 회사 PC에서 `python refresh_token.py` 실행
+2. 브라우저 구글 로그인 → 권한 허용
+3. `token_new.json` 생성 확인
+4. Streamlit Cloud → Settings → Secrets → `token` 값 교체
+5. 앱 Reboot
+        """)
+
+        st.divider()
+        st.markdown("**ℹ️ 앱 정보**")
+        st.caption(f"GitHub: onestopkipcc-web/scaleup-matching")
+        st.caption(f"배포: Streamlit Cloud")
+        st.caption(f"드라이브 폴더 ID: {DRIVE_FOLDER_ID}")
+
 
 
 # ══════════════════════════════════════════════════════
 # 캘린더 관리
 # ══════════════════════════════════════════════════════
-elif page == "캘린더 관리":
+elif page == "캘린더":
     drive = _get_drive()
     st.title("캘린더 관리")
     info_box("캘린더 관리",
@@ -5082,67 +5082,6 @@ elif page == "캘린더 관리":
 
 
 
-elif page == "설정":
-    drive = _get_drive()
-    st.title("설정")
-    info_box("설정",
-        """
-시스템 전반 설정 관리
-
-**키워드 설정** — 매칭에 사용되는 ★★★/★★ 키워드 추가·삭제 → 저장 시 즉시 반영
-**드라이브 연동** — 각 파일 존재 여부 확인
-**인증 상태** — 구글 인증 정상 여부 확인
-
-**코드 수정이 필요한 항목**
-테스트 수신 이메일(`TEST_RECIPIENTS`), 발신자 이메일, 드라이브 폴더 ID
-→ `app.py` 수정 후 깃허브 push → Streamlit Cloud 자동 재배포
-        """)
-
-    # 테스트 메일 설정
-    st.subheader("📧 테스트 수신 이메일")
-    st.caption("테스트 모드 ON 시 기업 대신 아래 이메일로 발송 — 쉼표로 구분하여 여러 개 입력 가능")
-
-    current_recipients = st.session_state.get(
-        'test_recipients_str',
-        ', '.join(_DEFAULT_TEST_RECIPIENTS)
-    )
-    new_recipients = st.text_input(
-        "테스트 수신 이메일",
-        value=current_recipients,
-        placeholder="email1@example.com, email2@example.com",
-        label_visibility="collapsed"
-    )
-    if st.button("💾 테스트 이메일 저장", key="save_test_email"):
-        st.session_state['test_recipients_str'] = new_recipients
-        parsed = [e.strip() for e in new_recipients.split(',') if e.strip()]
-        st.success(f"저장 완료 — {len(parsed)}개: {', '.join(parsed)}")
-
-    st.divider()
-    st.subheader("🔐 인증 상태")
-    if 'google' in st.secrets: st.success("✅ Streamlit Secrets 인증 설정됨")
-    elif os.path.exists('token.json'): st.success("✅ 로컬 token.json 인증 설정됨")
-    else: st.error("❌ 인증 파일 없음")
-
-    st.divider()
-    st.subheader("📁 드라이브 연동 현황")
-    st.markdown(f"[📂 드라이브 폴더 열기](https://drive.google.com/drive/folders/{DRIVE_FOLDER_ID})")
-    files_check = {
-        SELECTED_FILE:"선정기업 명단", NOTICES_FILE:"공고 DB",
-        HISTORY_FILE:"발송 이력",     CALID_FILE:"공통 캘린더 ID",
-        KEYWORDS_FILE:"키워드 설정",  CATCAL_FILE:"분야별 캘린더",
-        INDCAL_FILE:"기업별 캘린더",
-    }
-    for fname,label in files_check.items():
-        fid = drive_file_id(drive, fname)
-        st.write(f"{'✅' if fid else '❌'} {label} ({fname})")
-
-    st.divider()
-    st.info("🔑 키워드 설정은 사이드바의 **키워드 관리** 탭에서 관리합니다. (축1 지원대상 / 축2 사업성격 / 기업별 키워드 / 매칭 가중치)")
-
-
-# ══════════════════════════════════════════════════════
-# 시스템 명세
-# ══════════════════════════════════════════════════════
 elif page == "시스템 명세":
     st.title("시스템 명세")
     st.caption("원스톱 스케일업 공고 매칭 시스템 — 구조 및 운영 가이드")
