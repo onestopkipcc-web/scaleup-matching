@@ -2639,19 +2639,12 @@ elif page == "공고·매칭":
                 c3.metric("❌ 제외", f"{rj}건")
                 c4.metric("⏳ 미검토", f"{pending}건")
 
-                # ── 뷰 모드 선택 ───────────────────────────────
-                view_mode = st.radio(
-                    "보기 방식",
-                    ["🏢 기업별 검토 (테이블)", "🤖 일괄 검토 (AI 활용)"],
-                    horizontal=True, key="review_view_mode"
-                )
-
                 st.divider()
 
                 # ══════════════════════════════════════════════
-                # 기업별 검토 모드
+                # 기업별 검토 (단일 모드)
                 # ══════════════════════════════════════════════
-                if view_mode == "🏢 기업별 검토 (테이블)":
+                if True:
 
                     companies_in_result = filtered['기업명'].unique().tolist()
 
@@ -2867,14 +2860,25 @@ elif page == "공고·매칭":
 
                         # D-day 계산
                         d_day_txt = ""
+                        days_left = None
                         if dl and dl.strip():
                             try:
                                 days_left = (datetime.strptime(dl, '%Y-%m-%d') - datetime.today()).days
-                                d_day_txt = f"D-{days_left}" if days_left >= 0 else f"마감"
-                                d_color   = "#EF4444" if days_left <= 3 else "#F59E0B" if days_left <= 7 else "#10B981"
+                                if days_left < 0:
+                                    d_day_txt = f"마감 {abs(days_left)}일 전"
+                                    d_color   = "#94A3B8"
+                                elif days_left == 0:
+                                    d_day_txt = "D-0 ⚠️"
+                                    d_color   = "#EF4444"
+                                else:
+                                    d_day_txt = f"D-{days_left}"
+                                    d_color   = "#EF4444" if days_left <= 3 else "#F59E0B" if days_left <= 7 else "#10B981"
                             except: d_day_txt = dl; d_color = "#94A3B8"
                         else:
                             d_day_txt = "상시"; d_color = "#94A3B8"
+
+                        # D-0 이하 공고는 경고 표시 (스킵하지 않고 담당자가 판단)
+                        is_deadline_warn = days_left is not None and days_left <= 0
 
                         # 상태 색상
                         status_color = {"○": "#ECFDF5", "✕": "#FEF2F2"}.get(current, "#F8FAFC")
@@ -2886,6 +2890,15 @@ elif page == "공고·매칭":
                         if ai_res and not ai_res.get('error'):
                             rec = ai_res.get('추천여부','')
                             ai_badge = {"추천":"🟢 AI추천","검토":"🟡 AI검토","비추천":"🔴 AI비추천"}.get(rec,"")
+
+                        # D-0 경고 배너
+                        if is_deadline_warn:
+                            st.markdown(
+                                f"<div style='background:#FEF2F2;border:1px solid #FECACA;border-radius:6px;"
+                                f"padding:6px 12px;margin-bottom:6px;font-size:12px;color:#991B1B;'>"
+                                f"⚠️ 마감일이 지났거나 오늘까지입니다 — 발송 전 신청 가능 여부를 확인하세요.</div>",
+                                unsafe_allow_html=True
+                            )
 
                         # ── 카드 상단: 별점 + 공고명 + 상태 ──
                         top_c1, top_c2 = st.columns([8, 2])
@@ -2911,20 +2924,27 @@ elif page == "공고·매칭":
                                 unsafe_allow_html=True
                             )
 
-                        # ── 매칭근거 + AI 요약 ──
+                        # ── 매칭근거 (전체 표시) + AI 요약 ──
                         if reason:
+                            # 매칭근거를 태그별로 파싱해서 보기 좋게 표시
+                            parts = [p.strip() for p in reason.split('+') if p.strip()]
+                            tags_html = " ".join([
+                                f"<span style='display:inline-block;background:#EFF6FF;color:#1D4ED8;"
+                                f"border:1px solid #BFDBFE;border-radius:12px;padding:1px 8px;"
+                                f"font-size:11px;margin:2px 2px;'>{p}</span>"
+                                for p in parts
+                            ])
                             st.markdown(
-                                f"<div style='background:#F0FDF4;border-left:3px solid #10B981;"
-                                f"padding:6px 10px;border-radius:4px;margin:4px 0;font-size:12px;color:#065F46;'>"
-                                f"↳ {reason[:80]}{'...' if len(reason)>80 else ''}</div>",
+                                f"<div style='padding:4px 0;line-height:2;'>{tags_html}</div>",
                                 unsafe_allow_html=True
                             )
                         if ai_res and not ai_res.get('error'):
                             summary = ai_res.get('한줄요약','')
                             if summary:
                                 st.markdown(
-                                    f"<div style='font-size:12px;color:#374151;padding:3px 0;'>"
-                                    f"🤖 {summary[:80]}</div>",
+                                    f"<div style='font-size:12px;color:#374151;padding:3px 0;"
+                                    f"border-left:3px solid #10B981;padding-left:8px;margin:4px 0;'>"
+                                    f"🤖 {summary}</div>",
                                     unsafe_allow_html=True
                                 )
 
@@ -3016,192 +3036,6 @@ elif page == "공고·매칭":
 
                         st.divider()
 
-                # ══════════════════════════════════════════════
-                # 일괄 검토 (AI 활용) 모드
-                # ══════════════════════════════════════════════
-                else:
-                    # 전체 AI 분석 — 상세 검토 탭에서만
-                    with st.expander("🤖 전체 AI 분석 (상세 검토용)"):
-                        usd, krw = estimate_cost(len(filtered))
-                        st.caption(f"현재 필터 기준 {len(filtered)}건 분석 / 예상 비용 ${usd:.3f} (약 {krw:.0f}원)")
-                        confirm = st.text_input("확인코드 입력 후 실행", key="bulk_ai_confirm", placeholder="분석실행")
-                        if st.button("전체 분석 시작", key="bulk_ai_btn", type="primary"):
-                            if confirm == "분석실행":
-                                prog_ai = st.progress(0, text="AI 분석 중...")
-                                for ai_i, (_, ai_row) in enumerate(filtered.iterrows()):
-                                    ai_key = f"{ai_row['기업명']}_{ai_row.get('공고ID','')}"
-                                    if ai_key not in st.session_state['ai_analysis']:
-                                        co_info = {}
-                                        if 'df_companies_cache' in st.session_state:
-                                            df_co = st.session_state['df_companies_cache']
-                                            co_rows2 = df_co[df_co['기업명']==ai_row['기업명']]
-                                            if not co_rows2.empty:
-                                                co_info = co_rows2.iloc[0].to_dict()
-                                        co_info['기업명'] = ai_row['기업명']
-                                        st.session_state['ai_analysis'][ai_key] = claude_analyze(co_info, ai_row.to_dict())
-                                    prog_ai.progress((ai_i+1)/len(filtered), text=f"AI 분석 중... {ai_i+1}/{len(filtered)}")
-                                save_ai_analysis(_get_drive())
-                                st.success(f"완료 — {len(filtered)}건 (드라이브 저장됨)")
-                                st.rerun()
-                            else:
-                                st.error("확인코드가 틀렸습니다 ('분석실행' 입력)")
-
-                    st.divider()
-                    st.caption("공고 상세 내용을 확인하며 검토합니다.")
-                    for i,(idx,row) in enumerate(filtered.iterrows()):
-                        key      = f"{row['기업명']}_{row.get('공고ID','')}"
-                        current  = st.session_state['review_state'].get(key,"")
-                        icon     = "🟡" if not current else ("✅" if current=="○" else "❌")
-                        deadline = row.get('마감일','')
-                        is_irregular = not deadline or deadline.strip() == ''
-                        deadline_display = f"⚠️ 비정형" if is_irregular else deadline
-                        reason = row.get('매칭근거','')
-                        loc_icon = ""
-                        if row.get('공고지역',''):
-                            _ls = str(row.get('소재지점수','0'))
-                            _lv = int(_ls) if _ls.lstrip('-').isdigit() else 0
-                            loc_icon = " ✅" if _lv > 0 else (" ⚠️" if _lv < 0 else "")
-                        with st.expander(
-                            f"{icon} **{row['기업명']}**  |  {row.get('관련도','')}  |  "
-                            f"{row.get('공고명','')[:28]}{loc_icon}  |  {reason[:22]}"
-                        ):
-                            left, right = st.columns(2)
-                            with left:
-                                st.markdown("**🏢 기업 정보**")
-                                co_info = {}
-                                if 'df_companies_cache' in st.session_state:
-                                    df_co = st.session_state['df_companies_cache']
-                                    co_rows = df_co[df_co['기업명']==row['기업명']]
-                                    if not co_rows.empty:
-                                        co_info = co_rows.iloc[0].to_dict()
-                                co_loc      = co_info.get('소재지','—')
-                                notice_loc  = row.get('공고지역','')
-                                loc_score_v = str(row.get('소재지점수','0'))
-                                loc_score   = int(loc_score_v) if loc_score_v.lstrip('-').isdigit() else 0
-                                if notice_loc:
-                                    loc_tag = "🟢 일치" if loc_score>0 else ("🔴 불일치" if loc_score<0 else "")
-                                    st.markdown(f"- **소재지:** {co_loc} &nbsp; {loc_tag}")
-                                else:
-                                    st.markdown(f"- **소재지:** {co_loc}")
-                                st.markdown(f"- **관심분야:** {co_info.get('관심사업분야','—')}")
-                                st.markdown(f"- **기술키워드:** {co_info.get('기술키워드','—')}")
-                                st.markdown(f"- **제품분야:** {co_info.get('제품분야','—')}")
-                                st.markdown(f"- **수출실적:** {co_info.get('수출실적','—')} / {co_info.get('수출국가','—')}")
-                                if co_info.get('TRL단계'): st.markdown(f"- **TRL:** {co_info.get('TRL단계')}")
-                                if co_info.get('핵심수요태그'): st.markdown(f"- **핵심수요:** {co_info.get('핵심수요태그')}")
-                                if co_info.get('키워드보완'): st.markdown(f"- **보완키워드:** {co_info.get('키워드보완')}")
-                            with right:
-                                st.markdown("**📋 공고 정보**")
-                                if notice_loc:
-                                    region_tag = f"🟢 `{notice_loc}` (귀사 소재지 포함)" if loc_score>0 else (f"🔴 `{notice_loc}` (미포함)" if loc_score<0 else f"`{notice_loc}`")
-                                    st.markdown(f"- **지역제한:** {region_tag}")
-                                else:
-                                    st.markdown("- **지역제한:** 전국 공고")
-                                st.markdown(f"- **주관기관:** {row.get('주관기관','—')}")
-                                if row.get('지원금액',''): st.markdown(f"- **지원금액:** {row.get('지원금액','')}")
-                                if row.get('선정규모',''): st.markdown(f"- **선정규모:** {row.get('선정규모','')}")
-                                st.markdown(f"- **지원대상:** {row.get('지원대상','—')}")
-                                st.markdown(f"- **접수기간:** {row.get('접수기간','—')}")
-                                st.markdown(f"- **마감일:** {deadline_display}")
-                                if row.get('공고링크',''): st.markdown(f"[🔗 공고 원문 보기]({row.get('공고링크','')})")
-                            st.divider()
-                            st.markdown("**🔍 매칭 근거**")
-                            rc1,rc2,rc3,rc4 = st.columns(4)
-                            with rc1:
-                                st.caption("지원대상")
-                                v = row.get('지원대상매칭','—')
-                                st.markdown(f"`{v}`" if v and v!='—' else "—")
-                            with rc2:
-                                st.caption("사업성격")
-                                v = row.get('사업성격매칭','—')
-                                st.markdown(f"`{v}`" if v and v!='—' else "—")
-                            with rc3:
-                                st.caption("업종 역방향")
-                                v = row.get('업종역방향매칭','—')
-                                st.markdown(f"`{v}`" if v and v!='—' else "—")
-                            with rc4:
-                                st.caption("기업키워드·수요")
-                                v = (row.get('핵심수요매칭','') or row.get('기업키워드매칭','')) or '—'
-                                st.markdown(f"`{v}`" if v and v!='—' else "—")
-                            st.divider()
-                            st.caption("사업개요")
-                            st.markdown(row.get('사업개요',''))
-                            if is_irregular:
-                                st.divider()
-                                st.caption("📅 비정형 마감일 — 공고 원문 확인 후 직접 입력")
-                                custom_dl = st.text_input("마감일 (YYYY-MM-DD)",
-                                    value=st.session_state['custom_deadline'].get(key,''),
-                                    key=f"dl_{key}_{i}", placeholder="예: 2026-06-30")
-                                if custom_dl:
-                                    st.session_state['custom_deadline'][key] = custom_dl
-                                    for r in results:
-                                        if f"{r['기업명']}_{r.get('공고ID','')}" == key:
-                                            r['마감일'] = custom_dl; break
-                            st.divider()
-                            bc1,bc2,bc3,bc4 = st.columns([1,1,1.2,2])
-                            with bc1:
-                                if st.button("○ 승인", key=f"o_{key}_{i}", type="primary"):
-                                    st.session_state['review_state'][key]="○"; st.rerun()
-                            with bc2:
-                                if st.button("✕ 제외", key=f"x_{key}_{i}"):
-                                    st.session_state['review_state'][key]="✕"; st.rerun()
-                            with bc3:
-                                _usd,_krw = estimate_cost(1)
-                                if st.button(f"🤖 AI 분석 (~{_krw:.0f}원)", key=f"ai_{key}_{i}"):
-                                    if 'ai_analysis' not in st.session_state:
-                                        st.session_state['ai_analysis'] = {}
-                                    with st.spinner("Claude 분석 중..."):
-                                        co_info = {}
-                                        if 'df_companies_cache' in st.session_state:
-                                            df_co = st.session_state['df_companies_cache']
-                                            co_rows = df_co[df_co['기업명']==row['기업명']]
-                                            if not co_rows.empty: co_info = co_rows.iloc[0].to_dict()
-                                        co_info['기업명'] = row['기업명']
-                                        result = claude_analyze(co_info, row.to_dict())
-                                        st.session_state['ai_analysis'][key] = result
-                                    st.rerun()
-                            ai_result = st.session_state.get('ai_analysis', {}).get(key)
-                            if ai_result:
-                                if 'error' in ai_result:
-                                    st.error(f"분석 오류: {ai_result['error']}")
-                                else:
-                                    rec       = ai_result.get('추천여부','')
-                                    fit       = ai_result.get('적합도','')
-                                    rec_color = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
-                                    fit_color = {"높음":"#10B981","보통":"#F59E0B","낮음":"#EF4444"}.get(fit,"#0F172A")
-                                    icon_map  = {"O":"✅","X":"❌","△":"⚠️"}
-                                    checks = {
-                                        "업종일치": ai_result.get('업종일치','—'),
-                                        "자격충족": ai_result.get('자격충족','—'),
-                                        "지역적합": ai_result.get('지역적합','—'),
-                                        "수요일치": ai_result.get('수요일치','—'),
-                                    }
-                                    check_html = "".join([
-                                        f"<span style='margin-right:12px;font-size:12px;'>"
-                                        f"{icon_map.get(v,'—')} {k}</span>"
-                                        for k,v in checks.items()
-                                    ])
-                                    caution_html = ""
-                                    if ai_result.get('주의사항','') not in ['없음','','nan']:
-                                        caution_txt = ai_result.get('주의사항','')
-                                        caution_html = f"<p style='margin:8px 0 0;font-size:11px;color:#F59E0B;'>⚠️ {caution_txt}</p>"
-                                    judgment = ai_result.get('판단근거', ai_result.get('적합이유',''))
-                                    summary_txt = ai_result.get('한줄요약','')
-                                    st.markdown(f"""
-    <div style="background:rgba(74,158,255,0.08);border:1px solid rgba(74,158,255,0.2);
-                border-radius:8px;padding:14px 16px;margin-top:8px;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-        <span style="font-size:11px;font-weight:700;color:#10B981;letter-spacing:1px;">🤖 CLAUDE 분석</span>
-        <span style="font-size:13px;font-weight:700;color:{fit_color};">{rec_color} {rec}</span>
-        <span style="font-size:12px;color:rgba(255,255,255,0.5);">적합도: {fit}</span>
-      </div>
-      <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#0F172A;">{summary_txt}</p>
-      <div style="margin-bottom:10px;">{check_html}</div>
-      <p style="margin:0 0 6px;font-size:12px;color:rgba(255,255,255,0.65);line-height:1.7;">{judgment}</p>
-      {caution_html}
-    </div>
-                                    """, unsafe_allow_html=True)
-                st.divider()
                 c1, c2, c3 = st.columns(3)
                 with c1:
                     if st.button("✅ 검토 완료 저장", type="primary"):
