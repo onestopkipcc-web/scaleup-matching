@@ -1391,6 +1391,50 @@ with st.sidebar:
     if test_mode: st.warning("테스트 메일 발송")
     else:         st.success("실제 기업 발송")
 
+    # ── 진단용 결과 추출 ──────────────────────────────────
+    st.divider()
+    st.caption("🔍 진단용 결과 추출")
+    _mr = st.session_state.get('match_results', [])
+    if _mr:
+        import io as _io
+        _ai = st.session_state.get('ai_analysis', {})
+        _rv = st.session_state.get('review_state', {})
+        _df = pd.DataFrame(_mr).fillna('')
+        def _key(r):
+            return f"{r.get('기업명','')}_{r.get('공고ID','')}"
+        _ai_fields = ['추천여부','적합도','한줄요약','업종일치','자격충족',
+                      '지역적합','수요일치','판단근거','주의사항']
+        for _f in _ai_fields:
+            _df['AI_'+_f] = _df.apply(lambda r: _ai.get(_key(r), {}).get(_f, ''), axis=1)
+        _stat = {'○':'승인','✕':'제외'}
+        _df['검토상태'] = _df.apply(lambda r: _stat.get(_rv.get(_key(r), ''), '미검토'), axis=1)
+        def _agg(g):
+            s = g['관련도'].astype(str)
+            rec = g['AI_추천여부']; stt = g['검토상태']
+            return pd.Series({
+                '매칭건수': len(g),
+                '★★★': (s=='★★★').sum(), '★★': (s=='★★').sum(),
+                'AI추천': (rec=='추천').sum(), 'AI검토': (rec=='검토').sum(),
+                'AI비추천': (rec=='비추천').sum(), 'AI미분석': (rec=='').sum(),
+                '승인': (stt=='승인').sum(), '제외': (stt=='제외').sum(),
+                '미검토': (stt=='미검토').sum(),
+            })
+        _summary = _df.groupby('기업명').apply(_agg).reset_index()
+        _buf = _io.BytesIO()
+        with pd.ExcelWriter(_buf, engine='openpyxl') as _w:
+            _summary.to_excel(_w, index=False, sheet_name='기업별요약')
+            _df.to_excel(_w, index=False, sheet_name='매칭상세')
+        st.download_button(
+            "📥 진단용 결과 다운로드",
+            data=_buf.getvalue(),
+            file_name=f"매칭진단_{datetime.today().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+        st.caption(f"기업 {_df['기업명'].nunique()}곳 · 매칭 {len(_df)}건")
+    else:
+        st.caption("매칭 결과 없음 — 먼저 매칭·AI 분석을 실행하세요")
+
 # 구글 서비스 — 필요할 때 get_creds()로 직접 인증
 
 
