@@ -2857,6 +2857,19 @@ elif page == "공고·매칭":
                         else:
                             st.info("AI 추천 공고가 없습니다.")
 
+                    # ── AI 비추천 일괄 제외 (정밀도 보정) ──────────
+                    ai_bad_rows = co_rows[[
+                        ai_analysis_map.get(f"{r['기업명']}_{r.get('공고ID','')}", {}).get('추천여부') == '비추천'
+                        for _, r in co_rows.iterrows()
+                    ]]
+                    if len(ai_bad_rows) > 0:
+                        if st.button(f"🔴 AI 비추천 {len(ai_bad_rows)}건 일괄 제외",
+                                     key="bulk_ai_reject"):
+                            for _, r in ai_bad_rows.iterrows():
+                                st.session_state['review_state'][
+                                    f"{r['기업명']}_{r.get('공고ID','')}"] = "✕"
+                            st.rerun()
+
                     st.divider()
 
                     # ── 일괄 처리 버튼 ──────────────────────────
