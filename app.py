@@ -2686,6 +2686,65 @@ elif page == "공고·매칭":
 
                 st.divider()
 
+                # ── ⚡ 전 기업 일괄 처리 ────────────────────────────
+                with st.expander("⚡ 전 기업 일괄 AI 분석 + 자동 처리", expanded=False):
+                    st.caption("50개사 전체를 한 번에 분석 → AI 추천 자동 승인 → AI 비추천 자동 제외 → 검토 등급만 남깁니다.")
+
+                    bulk_c1, bulk_c2 = st.columns(2)
+                    with bulk_c1:
+                        auto_approve = st.checkbox("추천 자동 승인", value=True, key="bulk_auto_approve")
+                        auto_reject  = st.checkbox("비추천 자동 제외", value=True, key="bulk_auto_reject")
+                    with bulk_c2:
+                        already_done = sum(1 for _, r in filtered.iterrows()
+                                           if f"{r['기업명']}_{r.get('공고ID','')}"
+                                           in st.session_state.get('ai_analysis', {}))
+                        st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
+
+                    if st.button("⚡ 전 기업 일괄 실행", type="primary", key="global_bulk_ai"):
+                        _drive = _get_drive()
+                        prog_g = st.progress(0, text="전체 분석 중...")
+                        ok_g = 0; ap_g = 0; rj_g = 0
+
+                        for gi, (_, gr) in enumerate(filtered.iterrows()):
+                            gkey = f"{gr['기업명']}_{gr.get('공고ID','')}"
+
+                            # AI 분석 (미분석 건만)
+                            if gkey not in st.session_state.get('ai_analysis', {}):
+                                ci = {}
+                                if 'df_companies_cache' in st.session_state:
+                                    df_co_g = st.session_state['df_companies_cache']
+                                    mx_g = df_co_g[df_co_g['기업명']==gr['기업명']]
+                                    if not mx_g.empty: ci = mx_g.iloc[0].to_dict()
+                                ci['기업명'] = gr['기업명']
+                                if 'ai_analysis' not in st.session_state:
+                                    st.session_state['ai_analysis'] = {}
+                                st.session_state['ai_analysis'][gkey] = claude_analyze(ci, gr.to_dict())
+                                ok_g += 1
+
+                            # 자동 처리
+                            rec_g = st.session_state['ai_analysis'].get(gkey, {}).get('추천여부', '')
+                            if auto_approve and rec_g == '추천':
+                                st.session_state['review_state'][gkey] = '○'; ap_g += 1
+                            elif auto_reject and rec_g == '비추천':
+                                st.session_state['review_state'][gkey] = '✕'; rj_g += 1
+
+                            prog_g.progress((gi+1)/len(filtered),
+                                            text=f"{gi+1}/{len(filtered)} 처리 중...")
+
+                        # 드라이브 저장
+                        save_ai_analysis(_drive)
+                        st.success(f"✅ 완료 — 신규분석 {ok_g}건 / 자동승인 {ap_g}건 / 자동제외 {rj_g}건")
+                        st.rerun()
+
+                    # 검토 등급만 보기 토글
+                    show_review_only = st.checkbox(
+                        "🟡 검토 등급 공고만 보기 (추천·비추천 제외)",
+                        key="show_review_only",
+                        help="AI가 '검토'로 판단한 공고와 미분석 공고만 표시합니다."
+                    )
+
+                st.divider()
+
                 # ══════════════════════════════════════════════
                 # 기업별 검토 (단일 모드)
                 # ══════════════════════════════════════════════
@@ -2842,7 +2901,18 @@ elif page == "공고·매칭":
 
                     # AI 필터 적용
                     display_rows = co_rows.copy()
-                    if ai_only:
+                    show_review_only = st.session_state.get('show_review_only', False)
+                    if show_review_only:
+                        # 검토 등급 + 미분석만
+                        display_rows = co_rows[[
+                            ai_analysis_map.get(
+                                f"{r['기업명']}_{r.get('공고ID','')}", {}
+                            ).get('추천여부', '') in ['검토', '']
+                            for _, r in co_rows.iterrows()
+                        ]]
+                        if len(display_rows) == 0:
+                            st.success("✅ 검토가 필요한 공고가 없습니다.")
+                    elif ai_only:
                         display_rows = co_rows[[
                             ai_analysis_map.get(f"{r['기업명']}_{r.get('공고ID','')}", {}).get('추천여부') == '추천'
                             for _, r in co_rows.iterrows()
@@ -2872,38 +2942,37 @@ elif page == "공고·매칭":
 
                     st.divider()
 
-                    # ── 일괄 처리 버튼 ──────────────────────────
-                    ba1, ba2, ba3 = st.columns([1, 1, 3])
+                    # ── 일괄 처리 버튼 (기업별) ─────────────────────
+                    ba1, ba2 = st.columns([1, 3])
                     with ba1:
-                        if st.button("✅ 전체 승인", key="bulk_approve"):
-                            for _, r in co_rows.iterrows():
-                                st.session_state['review_state'][f"{r['기업명']}_{r.get('공고ID','')}"] = "○"
-                            st.rerun()
-                    with ba2:
-                        if st.button("❌ 전체 제외", key="bulk_reject"):
-                            for _, r in co_rows.iterrows():
-                                st.session_state['review_state'][f"{r['기업명']}_{r.get('공고ID','')}"] = "✕"
-                            st.rerun()
-                    with ba3:
                         co_ai_done  = sum(1 for _, r in co_rows.iterrows()
-                                          if f"{r['기업명']}_{r.get('공고ID','')}" in st.session_state.get('ai_analysis', {}))
+                                          if f"{r['기업명']}_{r.get('공고ID','')}"
+                                          in st.session_state.get('ai_analysis', {}))
                         co_ai_total = len(co_rows)
-                        if st.button(f"🤖 이 기업 AI 전체 분석 ({co_ai_done}/{co_ai_total})", key="co_bulk_ai"):
-                            prog_co_ai = st.progress(0, text="AI 분석 중...")
-                            for ai_i, (_, ai_row) in enumerate(co_rows.iterrows()):
-                                ai_key = f"{ai_row['기업명']}_{ai_row.get('공고ID','')}"
-                                if ai_key not in st.session_state.get('ai_analysis', {}):
-                                    ci = {}
-                                    if 'df_companies_cache' in st.session_state:
-                                        df_co3 = st.session_state['df_companies_cache']
-                                        mx = df_co3[df_co3['기업명']==ai_row['기업명']]
-                                        if not mx.empty: ci = mx.iloc[0].to_dict()
-                                    ci['기업명'] = ai_row['기업명']
-                                    if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = {}
-                                    st.session_state['ai_analysis'][ai_key] = claude_analyze(ci, ai_row.to_dict())
-                                prog_co_ai.progress((ai_i+1)/co_ai_total, text=f"AI 분석 중... {ai_i+1}/{co_ai_total}")
-                            save_ai_analysis(_get_drive())
-                            st.success(f"✅ {selected_co} AI 분석 완료 — 드라이브 저장됨"); st.rerun()
+                        if co_ai_done < co_ai_total:
+                            if st.button(f"🤖 AI 분석 ({co_ai_done}/{co_ai_total})",
+                                         key="co_bulk_ai", use_container_width=True):
+                                prog_co_ai = st.progress(0, text="AI 분석 중...")
+                                for ai_i, (_, ai_row) in enumerate(co_rows.iterrows()):
+                                    ai_key = f"{ai_row['기업명']}_{ai_row.get('공고ID','')}"
+                                    if ai_key not in st.session_state.get('ai_analysis', {}):
+                                        ci = {}
+                                        if 'df_companies_cache' in st.session_state:
+                                            df_co3 = st.session_state['df_companies_cache']
+                                            mx = df_co3[df_co3['기업명']==ai_row['기업명']]
+                                            if not mx.empty: ci = mx.iloc[0].to_dict()
+                                        ci['기업명'] = ai_row['기업명']
+                                        if 'ai_analysis' not in st.session_state:
+                                            st.session_state['ai_analysis'] = {}
+                                        st.session_state['ai_analysis'][ai_key] = claude_analyze(ci, ai_row.to_dict())
+                                    prog_co_ai.progress((ai_i+1)/co_ai_total,
+                                                        text=f"AI 분석 중... {ai_i+1}/{co_ai_total}")
+                                save_ai_analysis(_get_drive())
+                                st.success(f"✅ {selected_co} 분석 완료"); st.rerun()
+                        else:
+                            st.success(f"✅ 분석 완료 ({co_ai_total}건)")
+                    with ba2:
+                        st.caption("전 기업 일괄 처리는 위 ⚡ 버튼을 사용하세요.")
 
                     st.divider()
 
