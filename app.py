@@ -1560,12 +1560,12 @@ if page == "대시보드":
 
     st.divider()
 
-    # ── 월간 공고 캘린더 ─────────────────────────────────
-    st.subheader("📅 공고 마감 캘린더")
+    # ── 캘린더 탭 ─────────────────────────────────────────
+    tab_cal_ops, tab_cal_notice = st.tabs(["📋 운영 일정", "📌 공고 마감"])
 
     import calendar as cal_mod
 
-    # 월 선택
+    # 월 선택 (공통)
     cal_col1, cal_col2, _ = st.columns([1, 1, 4])
     with cal_col1:
         cal_year  = st.selectbox("연도", [2025, 2026, 2027],
@@ -1576,35 +1576,61 @@ if page == "대시보드":
                                   key="cal_month", label_visibility="collapsed",
                                   format_func=lambda x: f"{x}월")
 
-    # 해당 월 공고 필터링
-    if not df_n.empty and '마감일' in df_n.columns:
-        month_str = f"{cal_year}-{cal_month:02d}"
-        df_cal = df_n[df_n['마감일'].astype(str).str.startswith(month_str)].copy()
-
-        # 날짜별 공고 그룹핑
-        notices_by_day = {}
-        for _, row in df_cal.iterrows():
-            try:
-                day = int(str(row['마감일'])[8:10])
-                n_name = str(row.get('공고명', ''))[:18]
-                if day not in notices_by_day:
-                    notices_by_day[day] = []
-                notices_by_day[day].append(n_name)
-            except Exception:
-                pass
-    else:
-        notices_by_day = {}
-        df_cal = pd.DataFrame()
-
-    # 달력 HTML 생성
-    first_weekday, days_in_month = cal_mod.monthrange(cal_year, cal_month)
-    # 0=월요일 기준으로 변환 (일요일=6 → 0으로)
-    first_weekday = (first_weekday + 1) % 7  # 일요일 시작
-
     today = datetime.today()
     is_current_month = (today.year == cal_year and today.month == cal_month)
+    first_weekday, days_in_month = cal_mod.monthrange(cal_year, cal_month)
+    first_weekday = (first_weekday + 1) % 7  # 일요일 시작
 
-    # 요일 헤더
+    # ── 교육 프로그램 데이터 ───────────────────────────────
+    EDU_SCHEDULE = {
+        (2026, 7):  {"day": 29, "name": "AI 마케팅/콘텐츠", "time": "14:00~16:00"},
+        (2026, 8):  {"day": 12, "name": "디지털 마케팅",    "time": "14:00~16:00"},
+        (2026, 9):  {"day": 16, "name": "네이버 크리에이터 비즈니스",  "time": "14:00~16:00"},
+        (2026, 10): {"day": 21, "name": "특허·상표권·디자인권", "time": "14:00~16:00"},
+        (2026, 11): {"day": 18, "name": "해외 ODA 시장 진출", "time": "14:00~16:00"},
+        (2026, 12): {"day":  9, "name": "해외 지식재산권 보호", "time": "14:00~16:00"},
+    }
+
+    # ── 격주 매칭·발송 사이클 (수 작업 → 금 확정 → 다음월 발송) ──
+    # 7월부터 12월까지 격주 수요일 기준으로 사이클 생성
+    import datetime as _dt
+    OPS_SCHEDULE = {}  # {(year, month, day): label}
+
+    base = _dt.date(2026, 7, 1)
+    # 7월 첫 번째 수요일 찾기
+    while base.weekday() != 2:  # 2 = 수요일
+        base += _dt.timedelta(days=1)
+
+    cycle = 0
+    cur = base
+    while cur <= _dt.date(2026, 12, 31):
+        if cycle % 2 == 0:  # 격주
+            wed = cur
+            fri = wed + _dt.timedelta(days=2)
+            mon = wed + _dt.timedelta(days=5)
+            # 수: 작업
+            key_w = (wed.year, wed.month, wed.day)
+            OPS_SCHEDULE[key_w] = OPS_SCHEDULE.get(key_w, [])
+            OPS_SCHEDULE[key_w].append(("⚡", "매칭·작업", "#F59E0B"))
+            # 금: 확정
+            key_f = (fri.year, fri.month, fri.day)
+            OPS_SCHEDULE[key_f] = OPS_SCHEDULE.get(key_f, [])
+            OPS_SCHEDULE[key_f].append(("✅", "최종확정", "#10B981"))
+            # 월: 발송
+            key_m = (mon.year, mon.month, mon.day)
+            OPS_SCHEDULE[key_m] = OPS_SCHEDULE.get(key_m, [])
+            OPS_SCHEDULE[key_m].append(("📨", "발송", "#3B82F6"))
+        cycle += 1
+        cur += _dt.timedelta(weeks=1)
+
+    # 교육 일정도 OPS에 추가
+    edu = EDU_SCHEDULE.get((cal_year, cal_month))
+    if edu:
+        key_e = (cal_year, cal_month, edu["day"])
+        OPS_SCHEDULE[key_e] = OPS_SCHEDULE.get(key_e, [])
+        OPS_SCHEDULE[key_e].append(("🎓", edu["name"], "#8B5CF6"))
+
+    # ── 캘린더 HTML 생성 함수 ─────────────────────────────
     day_headers = ["일", "월", "화", "수", "목", "금", "토"]
     header_html = "".join([
         f"<th style='padding:8px;text-align:center;font-size:12px;font-weight:600;"
@@ -1612,92 +1638,142 @@ if page == "대시보드":
         for i, d in enumerate(day_headers)
     ])
 
-    # 날짜 칸 생성
-    cells = ["<td></td>"] * first_weekday
-    for day in range(1, days_in_month + 1):
-        ns = notices_by_day.get(day, [])
-        is_today = is_current_month and day == today.day
-        is_sun   = (first_weekday + day - 1) % 7 == 0
-        is_sat   = (first_weekday + day - 1) % 7 == 6
+    def make_calendar(events_by_day):
+        """events_by_day: {day: [(icon, label, color), ...]}"""
+        cells = ["<td style='background:#F8FAFC;border:1px solid #E2E8F0;'></td>"] * first_weekday
+        for day in range(1, days_in_month + 1):
+            is_today = is_current_month and day == today.day
+            is_sun   = (first_weekday + day - 1) % 7 == 0
+            is_sat   = (first_weekday + day - 1) % 7 == 6
+            day_color = "#EF4444" if is_sun else "#3B82F6" if is_sat else "#0F172A"
+            bg_color  = "#ECFDF5" if is_today else "#FFFFFF"
+            border    = "2px solid #10B981" if is_today else "1px solid #E2E8F0"
 
-        day_color = "#EF4444" if is_sun else "#3B82F6" if is_sat else "#0F172A"
-        bg_color  = "#ECFDF5" if is_today else "#FFFFFF"
-        border    = "2px solid #10B981" if is_today else "1px solid #E2E8F0"
-
-        notices_html = ""
-        for n in ns[:2]:  # 최대 2개 표시
-            notices_html += (
-                f"<div style='background:#EFF6FF;border-left:2px solid #3B82F6;"
-                f"border-radius:3px;padding:1px 4px;margin-top:2px;"
-                f"font-size:10px;color:#1E40AF;line-height:1.4;"
-                f"white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>"
-                f"📌 {n}</div>"
+            events = events_by_day.get(day, [])
+            events_html = ""
+            for icon, label, color in events[:3]:
+                events_html += (
+                    f"<div style='background:{color}18;border-left:2px solid {color};"
+                    f"border-radius:3px;padding:1px 4px;margin-top:2px;"
+                    f"font-size:10px;color:{color};line-height:1.4;"
+                    f"white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>"
+                    f"{icon} {label}</div>"
+                )
+            cells.append(
+                f"<td style='padding:6px;vertical-align:top;min-width:70px;min-height:75px;"
+                f"background:{bg_color};border:{border};border-radius:4px;'>"
+                f"<div style='font-size:13px;font-weight:700;color:{day_color};"
+                f"margin-bottom:2px;'>{day}</div>"
+                f"{events_html}</td>"
             )
-        if len(ns) > 2:
-            notices_html += (
-                f"<div style='font-size:10px;color:#94A3B8;margin-top:2px;'>"
-                f"+{len(ns)-2}건 더</div>"
+        while len(cells) % 7 != 0:
+            cells.append("<td style='background:#F8FAFC;border:1px solid #E2E8F0;'></td>")
+        rows = ""
+        for i in range(0, len(cells), 7):
+            rows += f"<tr>{''.join(cells[i:i+7])}</tr>"
+        return f"""
+        <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:separate;border-spacing:3px;
+                      font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;">
+          <thead><tr style="background:#F8FAFC;">{header_html}</tr></thead>
+          <tbody>{rows}</tbody>
+        </table></div>"""
+
+    # ── 탭1: 운영 일정 ────────────────────────────────────
+    with tab_cal_ops:
+        # 범례
+        leg_cols = st.columns(4)
+        for col, (icon, label, color) in zip(leg_cols, [
+            ("⚡", "매칭·작업 (수)", "#F59E0B"),
+            ("✅", "최종 확정 (금)", "#10B981"),
+            ("📨", "발송 (월)",     "#3B82F6"),
+            ("🎓", "교육 프로그램", "#8B5CF6"),
+        ]):
+            col.markdown(
+                f"<span style='display:inline-block;background:{color}18;"
+                f"color:{color};border:1px solid {color}44;"
+                f"border-radius:10px;padding:2px 10px;font-size:12px;font-weight:600;'>"
+                f"{icon} {label}</span>",
+                unsafe_allow_html=True
             )
 
-        cells.append(
-            f"<td style='padding:6px;vertical-align:top;min-width:80px;min-height:80px;"
-            f"background:{bg_color};border:{border};border-radius:4px;'>"
-            f"<div style='font-size:13px;font-weight:700;color:{day_color};"
-            f"margin-bottom:3px;'>{day}</div>"
-            f"{notices_html}</td>"
-        )
+        # 이번 달 운영 이벤트
+        ops_this_month = {
+            day: events
+            for (y, m, day), events in OPS_SCHEDULE.items()
+            if y == cal_year and m == cal_month
+        }
+        # 같은 날 여러 이벤트 합치기
+        merged_ops = {}
+        for (y, m, day), events in OPS_SCHEDULE.items():
+            if y == cal_year and m == cal_month:
+                if day not in merged_ops:
+                    merged_ops[day] = []
+                merged_ops[day].extend(events)
 
-    # 7칸씩 행으로 나누기
-    while len(cells) % 7 != 0:
-        cells.append("<td style='background:#F8FAFC;border:1px solid #E2E8F0;'></td>")
+        st.markdown(make_calendar(merged_ops), unsafe_allow_html=True)
 
-    rows_html = ""
-    for i in range(0, len(cells), 7):
-        row_cells = "".join(cells[i:i+7])
-        rows_html += f"<tr>{row_cells}</tr>"
+        # 이번 달 교육 상세
+        edu = EDU_SCHEDULE.get((cal_year, cal_month))
+        if edu:
+            st.markdown(
+                f"<div style='background:#F5F3FF;border:1px solid #DDD6FE;"
+                f"border-left:4px solid #8B5CF6;border-radius:8px;"
+                f"padding:12px 16px;margin-top:12px;'>"
+                f"<b style='color:#7C3AED;'>🎓 {cal_month}월 교육 프로그램</b><br>"
+                f"<span style='font-size:14px;color:#1E1B4B;font-weight:600;'>{edu['name']}</span><br>"
+                f"<span style='font-size:12px;color:#6B7280;'>"
+                f"{cal_year}년 {cal_month}월 {edu['day']}일 (수) {edu['time']}</span>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
 
-    cal_html = f"""
-    <div style="overflow-x:auto;">
-    <table style="width:100%;border-collapse:separate;border-spacing:3px;
-                  font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;">
-      <thead>
-        <tr style="background:#F8FAFC;">{header_html}</tr>
-      </thead>
-      <tbody>{rows_html}</tbody>
-    </table>
-    </div>
-    """
+    # ── 탭2: 공고 마감 ────────────────────────────────────
+    with tab_cal_notice:
+        if not df_n.empty and '마감일' in df_n.columns:
+            month_str = f"{cal_year}-{cal_month:02d}"
+            df_cal = df_n[df_n['마감일'].astype(str).str.startswith(month_str)].copy()
+            notices_by_day = {}
+            for _, row in df_cal.iterrows():
+                try:
+                    day = int(str(row['마감일'])[8:10])
+                    n_name = str(row.get('공고명', ''))[:18]
+                    if day not in notices_by_day:
+                        notices_by_day[day] = []
+                    notices_by_day[day].append(("📌", n_name, "#3B82F6"))
+                except Exception:
+                    pass
+        else:
+            notices_by_day = {}
+            df_cal = pd.DataFrame()
 
-    if notices_by_day:
-        notice_cnt = len(df_cal)
-        st.caption(f"{cal_year}년 {cal_month}월 마감 공고 총 **{notice_cnt}건** — 파란 테두리: 오늘")
-    else:
-        st.caption(f"{cal_year}년 {cal_month}월 마감 공고 없음 (공고 수집 후 표시)")
+        if notices_by_day:
+            st.caption(f"{cal_year}년 {cal_month}월 마감 공고 총 **{len(df_cal)}건** — 파란 테두리: 오늘")
+        else:
+            st.caption(f"{cal_year}년 {cal_month}월 마감 공고 없음 (공고 수집 후 표시)")
 
-    st.markdown(cal_html, unsafe_allow_html=True)
+        st.markdown(make_calendar(notices_by_day), unsafe_allow_html=True)
 
-    # 해당 월 공고 목록 (클릭 시 상세)
-    if notices_by_day:
-        with st.expander(f"📋 {cal_month}월 공고 전체 목록 ({len(df_cal)}건)"):
-            for _, row in df_cal.sort_values('마감일').iterrows():
-                c1, c2, c3 = st.columns([4, 2, 1])
-                with c1:
-                    st.write(f"**{row.get('공고명','')[:35]}**")
-                with c2:
-                    dl = str(row.get('마감일',''))
-                    try:
-                        days_left = (datetime.strptime(dl, '%Y-%m-%d') - datetime.today()).days
-                        d_label = f"D-{days_left}" if days_left >= 0 else f"마감 {abs(days_left)}일 전"
-                        color = "#EF4444" if days_left <= 3 else "#F59E0B" if days_left <= 7 else "#10B981"
-                        st.markdown(f"<span style='color:{color};font-weight:600;font-size:12px;'>{d_label}</span>",
-                                    unsafe_allow_html=True)
-                    except Exception:
-                        st.caption(dl)
-                with c3:
-                    if row.get('공고링크'):
-                        st.markdown(f"[🔗]({row.get('공고링크','')})")
-
-    st.divider()
+        if not df_cal.empty:
+            with st.expander(f"📋 {cal_month}월 공고 전체 목록 ({len(df_cal)}건)"):
+                for _, row in df_cal.sort_values('마감일').iterrows():
+                    c1, c2, c3 = st.columns([4, 2, 1])
+                    with c1:
+                        st.write(f"**{str(row.get('공고명',''))[:35]}**")
+                    with c2:
+                        dl = str(row.get('마감일',''))
+                        try:
+                            days_left = (datetime.strptime(dl, '%Y-%m-%d') - datetime.today()).days
+                            d_label = f"D-{days_left}" if days_left >= 0 else f"마감 {abs(days_left)}일 전"
+                            color   = "#EF4444" if days_left <= 3 else "#F59E0B" if days_left <= 7 else "#10B981"
+                            st.markdown(
+                                f"<span style='color:{color};font-weight:600;font-size:12px;'>"
+                                f"{d_label}</span>", unsafe_allow_html=True)
+                        except Exception:
+                            st.caption(dl)
+                    with c3:
+                        if row.get('공고링크'):
+                            st.markdown(f"[🔗]({row.get('공고링크','')})")
 
     # ── 현황 분석 탭 ────────────────────────────────────
     st.subheader("📈 현황 분석")
