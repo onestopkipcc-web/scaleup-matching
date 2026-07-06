@@ -4110,14 +4110,18 @@ elif page == "발송":
                 logs.append(f"✅ {company} — {len(notices)}건 발송 완료")
                 log.code("\n".join(logs)); prog.progress((idx+1)/len(grouped))
 
-            with st.spinner("발송 이력 드라이브 저장 중..."):
-                df_h   = load_excel(drive, HISTORY_FILE)
-                df_new = pd.DataFrame(history_records)
-                df_fin = pd.concat([df_h,df_new],ignore_index=True) if not df_h.empty else df_new
-                save_excel(drive, df_fin, HISTORY_FILE, "발송이력", "375623")
-
-            prog.progress(1.0)
-            st.success(f"발송 완료 — {len(history_records)}건 → send_history.xlsx 저장")
+            if test_mode:
+                prog.progress(1.0)
+                st.success(f"✅ 테스트 발송 완료 — {len(history_records)}건 (발송 이력 저장 안 함)")
+                st.info("테스트 모드에서는 발송 이력이 저장되지 않습니다. 실제 발송 시에만 이력이 기록됩니다.")
+            else:
+                with st.spinner("발송 이력 드라이브 저장 중..."):
+                    df_h   = load_excel(drive, HISTORY_FILE)
+                    df_new = pd.DataFrame(history_records)
+                    df_fin = pd.concat([df_h,df_new],ignore_index=True) if not df_h.empty else df_new
+                    save_excel(drive, df_fin, HISTORY_FILE, "발송이력", "375623")
+                prog.progress(1.0)
+                st.success(f"발송 완료 — {len(history_records)}건 → send_history.xlsx 저장")
             st.session_state['match_results']=[]; st.session_state['review_state']={}
 
 
@@ -5420,6 +5424,29 @@ elif page == "설정":
         st.caption(f"GitHub: onestopkipcc-web/scaleup-matching")
         st.caption(f"배포: Streamlit Cloud")
         st.caption(f"드라이브 폴더 ID: {DRIVE_FOLDER_ID}")
+
+        st.divider()
+
+        # 발송 이력 초기화
+        st.markdown("**🗑️ 발송 이력 초기화**")
+        st.warning("초기화하면 `send_history.xlsx`의 모든 이력이 삭제됩니다. 다음 매칭 시 이미 발송한 공고도 다시 추천됩니다.")
+
+        confirm_reset = st.text_input(
+            "초기화하려면 **RESET** 을 입력하세요",
+            key="reset_history_confirm",
+            placeholder="RESET"
+        )
+        if st.button("🗑️ 발송 이력 초기화 실행", key="reset_history_btn",
+                     disabled=(confirm_reset != "RESET")):
+            import pandas as _pd_reset
+            empty_df = _pd_reset.DataFrame(columns=[
+                "기업명","pblancId","공고명","발송일",
+                "매칭점수","담당자검토","검토의견","신청여부","선정결과"
+            ])
+            if save_excel(drive, empty_df, HISTORY_FILE, "발송이력", "375623"):
+                st.success("✅ 발송 이력 초기화 완료 — 다음 매칭부터 모든 공고가 다시 추천됩니다.")
+            else:
+                st.error("초기화 실패 — 드라이브 연결을 확인하세요.")
 
 
 
