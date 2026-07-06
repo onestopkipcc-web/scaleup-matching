@@ -3672,6 +3672,13 @@ elif page == "발송":
             for r in approved: grouped.setdefault(r['기업명'],[]).append(r)
 
             for idx,(company,notices) in enumerate(grouped.items()):
+                # 기업 정보 조회
+                co_row = {}
+                if not df_c_cur.empty:
+                    _mx = df_c_cur[df_c_cur['기업명'] == company]
+                    if not _mx.empty:
+                        co_row = _mx.iloc[0].to_dict()
+
                 # 공고 분류: 맞춤(기업 전용) / 공통(여러 기업 공통)
                 notices_custom = [n for n in notices if n.get('공고유형','맞춤') == '맞춤']
                 notices_common = [n for n in notices if n.get('공고유형','맞춤') == '공통']
@@ -3984,6 +3991,34 @@ elif page == "발송":
                 기술 키워드 분석을 통해 선별된 공고를 안내드립니다.
               </p>
             </div>
+
+            <!-- 기업 정보 카드 -->
+            {f"""<div style="margin-top:12px;padding:12px 16px;
+                        background:rgba(16,185,129,0.08);
+                        border:1px solid rgba(16,185,129,0.2);
+                        border-left:3px solid #10B981;border-radius:8px;">
+              <p style="margin:0 0 8px;font-size:10px;font-weight:600;color:#10B981;letter-spacing:1.5px;">
+                저희가 파악한 귀사 정보</p>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="font-size:12px;color:rgba(255,255,255,0.45);padding:2px 0;width:50%;">
+                    기술키워드 <span style="color:#fff;">{str(co_row.get("기술키워드","") or co_row.get("키워드보완","") or "—")[:25]}</span>
+                  </td>
+                  <td style="font-size:12px;color:rgba(255,255,255,0.45);padding:2px 0;width:50%;">
+                    관심분야 <span style="color:#fff;">{str(co_row.get("관심사업분야","") or "—")}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="font-size:12px;color:rgba(255,255,255,0.45);padding:2px 0;">
+                    기업유형 <span style="color:#fff;">{str(co_row.get("기업유형","") or "—")[:20]}</span>
+                  </td>
+                  <td style="font-size:12px;color:rgba(255,255,255,0.45);padding:2px 0;">
+                    소재지 <span style="color:#fff;">{str(co_row.get("소재지","") or "—")}</span>
+                  </td>
+                </tr>
+              </table>
+            </div>""" if not df_c_cur.empty and not df_c_cur[df_c_cur["기업명"]==company].empty
+            else ""}
           </td>
         </tr>
 
