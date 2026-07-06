@@ -2748,12 +2748,51 @@ elif page == "공고·매칭":
 
                 st.divider()
 
+                # ── AI 판단 기준 서브탭 ──────────────────────────
+                view_tab1, view_tab2, view_tab3 = st.tabs([
+                    "전체", "🟢 추천 + 🟡 검토만", "🟢 추천만"
+                ])
+                with view_tab1:
+                    if st.button("이 기준으로 보기", key="vt1", use_container_width=True):
+                        st.session_state['ai_view_filter'] = 'all'
+                        st.rerun()
+                    st.caption("AI 판단 무관하게 전체 공고 표시")
+                with view_tab2:
+                    if st.button("이 기준으로 보기", key="vt2", use_container_width=True, type="primary"):
+                        st.session_state['ai_view_filter'] = 'rec_review'
+                        st.rerun()
+                    st.caption("비추천 제외 — 추천·검토·미분석만 표시 (권장)")
+                with view_tab3:
+                    if st.button("이 기준으로 보기", key="vt3", use_container_width=True):
+                        st.session_state['ai_view_filter'] = 'rec_only'
+                        st.rerun()
+                    st.caption("AI 추천 공고만 표시")
+
+                ai_view_filter = st.session_state.get('ai_view_filter', 'all')
+                filter_labels  = {'all':'전체', 'rec_review':'추천+검토', 'rec_only':'추천만'}
+                st.caption(f"현재 보기: **{filter_labels[ai_view_filter]}**")
+
                 # ── 필터 ────────────────────────────────────────
                 c1, c2 = st.columns(2)
                 with c1: filter_stars = st.multiselect("관련도", ["★★★","★★"], default=["★★★","★★"])
                 with c2: filter_co    = st.selectbox("기업", ["전체"]+sorted(df_show['기업명'].unique().tolist()))
                 filtered = df_show[df_show['관련도'].isin(filter_stars)]
                 if filter_co != "전체": filtered = filtered[filtered['기업명']==filter_co]
+
+                # AI 판단 필터 적용
+                ai_map_f = st.session_state.get('ai_analysis', {})
+                if ai_view_filter == "rec_review":
+                    filtered = filtered[[
+                        ai_map_f.get(f"{r['기업명']}_{r.get('공고ID','')}", {}).get('추천여부','') in ['추천','검토','']
+                        for _, r in filtered.iterrows()
+                    ]]
+                    st.info(f"비추천 제외 후 {len(filtered)}건 표시 중")
+                elif ai_view_filter == "rec_only":
+                    filtered = filtered[[
+                        ai_map_f.get(f"{r['기업명']}_{r.get('공고ID','')}", {}).get('추천여부','') == '추천'
+                        for _, r in filtered.iterrows()
+                    ]]
+                    st.info(f"AI 추천 {len(filtered)}건만 표시 중")
 
                 ap      = sum(1 for v in st.session_state['review_state'].values() if v=="○")
                 rj      = sum(1 for v in st.session_state['review_state'].values() if v=="✕")
