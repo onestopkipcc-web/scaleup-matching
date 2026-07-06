@@ -2784,14 +2784,42 @@ elif page == "공고·매칭":
 
                 ap      = sum(1 for v in st.session_state['review_state'].values() if v=="○")
                 rj      = sum(1 for v in st.session_state['review_state'].values() if v=="✕")
-                pending = len(filtered) - ap - rj
+                pending = len(df_show) - ap - rj
 
                 # ── 상단 진행 현황 ──────────────────────────────
-                c1,c2,c3,c4 = st.columns(4)
-                c1.metric("전체", f"{len(filtered)}건")
+                c1, c2, c3, c4, c5 = st.columns([2, 2, 2, 2, 3])
+                c1.metric("전체", f"{len(df_show)}건")
                 c2.metric("✅ 승인", f"{ap}건")
                 c3.metric("❌ 제외", f"{rj}건")
                 c4.metric("⏳ 미검토", f"{pending}건")
+                with c5:
+                    if ap > 0:
+                        if st.button(
+                            f"📨 승인 {ap}건 발송 준비 →",
+                            type="primary",
+                            use_container_width=True,
+                            help="검토 완료 저장 후 발송 탭으로 이동합니다."
+                        ):
+                            # 검토 상태 드라이브 저장
+                            import json as _json
+                            drive_upload(
+                                drive, "review_state.json",
+                                _json.dumps({
+                                    'review_state': st.session_state['review_state'],
+                                    'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M')
+                                }, ensure_ascii=False).encode('utf-8'),
+                                "application/json"
+                            )
+                            st.session_state['_go_to_send'] = True
+                            st.rerun()
+                    else:
+                        st.button("📨 발송 준비", disabled=True,
+                                  use_container_width=True,
+                                  help="승인된 공고가 없습니다.")
+
+                # 발송 탭 이동 처리
+                if st.session_state.pop('_go_to_send', False):
+                    st.success(f"✅ 검토 상태 저장 완료 — 사이드바에서 '발송' 탭으로 이동하세요.")
 
                 st.divider()
 
