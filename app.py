@@ -3632,7 +3632,7 @@ elif page == "발송":
           <div style="background:#0F1D2E;padding:24px 28px 20px;">
             <p style="margin:0 0 4px;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">
               혁신제품지원센터 · 원스톱 스케일업</p>
-            <p style="margin:0;font-size:20px;font-weight:500;color:#fff;">2026년 7월 맞춤 공고 안내</p>
+            <p style="margin:0;font-size:20px;font-weight:500;color:#fff;">이번 주 맞춤 지원사업 공고</p>
             <p style="margin:4px 0 0;font-size:13px;color:rgba(255,255,255,0.5);">{preview_co} 담당자님께</p>
           </div>
           <div style="background:#0F1D2E;padding:0 28px 20px;">
@@ -4002,7 +4002,7 @@ elif page == "발송":
                     원스톱 스케일업
                   </h1>
                   <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.38);">
-                    맞춤 지원사업 공고 안내
+                    이번 주 맞춤 지원사업 공고
                   </p>
                 </td>
                 <td align="right" valign="middle" width="72">
@@ -4116,7 +4116,7 @@ elif page == "발송":
                     msg = MIMEMultipart('alternative')
                     msg['From']    = "onestop.kipcc@gmail.com"
                     msg['To']      = to
-                    msg['Subject'] = f"[원스톱 스케일업] 맞춤 지원공고 {len(notices)}건 안내 — {company}"
+                    msg['Subject'] = f"[원스톱 스케일업] {today_str} 이번 주 맞춤 지원사업 공고 — {company}"
                     msg.attach(MIMEText(html,'html','utf-8'))
                     gmail_send(base64.urlsafe_b64encode(msg.as_bytes()).decode())
 
