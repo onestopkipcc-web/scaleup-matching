@@ -3474,9 +3474,16 @@ elif page == "발송":
     review_state = st.session_state.get('review_state', {})
 
     # match_results와 review_state 동기화
+    ai_cache = st.session_state.get('ai_analysis', {})
     approved = [
         r for r in results
         if review_state.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", '') == '○'
+    ]
+    # AI 검토 등급 공고 (미검토 상태 + AI검토 판정)
+    review_grade = [
+        r for r in results
+        if review_state.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", '') == ''
+        and ai_cache.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", {}).get('추천여부','') == '검토'
     ]
     matched_group = st.session_state.get('match_target_group', '미확인')
 
@@ -3689,11 +3696,16 @@ elif page == "발송":
                     if not _mx.empty:
                         co_row = _mx.iloc[0].to_dict()
 
-                # 공고 분류: 맞춤(기업 전용) / 공통(여러 기업 공통)
                 # 별점 기준으로 분류 (공고유형 무관)
-                notices_sss = [n for n in notices if n.get('관련도','')=='★★★']
-                notices_ss  = [n for n in notices if n.get('관련도','')=='★★']
-                notices_common = []  # 이런 공고도 있어요는 별도 로직으로만
+                notices_sss    = [n for n in notices if n.get('관련도','')=='★★★']
+                notices_ss     = [n for n in notices if n.get('관련도','')=='★★']
+                notices_common = []
+
+                # AI 검토 등급 공고 (이 기업 해당분만)
+                notices_review = [
+                    r for r in review_grade
+                    if r.get('기업명','') == company
+                ]
 
                 def notice_card_simple(n, idx):
                     """공통 공고용 심플 카드 (작고 간결하게)"""
@@ -3847,6 +3859,23 @@ elif page == "발송":
                         📌 &nbsp;이런 공고도 있어요
                       </p>"""
                     for i,n in enumerate(notices_common):
+                        rows_html += notice_card_simple(n, i)
+                    rows_html += "</div>"
+
+                # ── 다른 기업들이 관심 가진 공고 (AI 검토 등급) ──
+                if notices_review:
+                    rows_html += """
+                    <div style="border-top:1px solid rgba(255,255,255,0.08);
+                                padding-top:16px;margin-top:8px;">
+                      <p style="margin:0 0 6px;font-size:10px;font-weight:700;
+                                 color:rgba(255,255,255,0.3);letter-spacing:2px;
+                                 text-transform:uppercase;">
+                        📢 &nbsp;다른 기업들이 관심 가진 공고
+                      </p>
+                      <p style="margin:0 0 10px;font-size:11px;color:rgba(255,255,255,0.25);">
+                        비슷한 업종·분야의 기업들이 추천받은 공고입니다. 참고해보세요.
+                      </p>"""
+                    for i, n in enumerate(notices_review[:3]):  # 최대 3건
                         rows_html += notice_card_simple(n, i)
                     rows_html += "</div>"
 
