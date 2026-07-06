@@ -3652,6 +3652,30 @@ elif page == "발송":
           </div>
           <div style="background:#0F1D2E;padding:0 28px 8px;">{_cards_html}</div>
           <div style="background:#0F1D2E;padding:8px 28px 20px;">{_common_html}</div>
+          <div style="background:#0F1D2E;padding:0 28px 16px;">
+            <div style="border-top:1px solid rgba(255,255,255,0.1);
+                        padding-top:16px;text-align:center;">
+              <p style="margin:0 0 12px;font-size:12px;color:rgba(255,255,255,0.4);">
+                이번 공고 안내가 도움이 됐나요?</p>
+              <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_up2.quote('[이번 주 공고 안내 피드백]\\n반응: 도움됐어요\\n\\n[추가 의견]\\n\\n[Gmail 주소]\\n')}"
+                 style="display:inline-block;margin:0 4px;padding:8px 16px;font-size:12px;
+                        font-weight:600;color:#065F46;background:#ECFDF5;
+                        border:1px solid #A7F3D0;border-radius:8px;text-decoration:none;">
+                👍 도움됐어요</a>
+              <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_up2.quote('[이번 주 공고 안내 피드백]\\n반응: 별로였어요\\n\\n[추가 의견]\\n\\n[Gmail 주소]\\n')}"
+                 style="display:inline-block;margin:0 4px;padding:8px 16px;font-size:12px;
+                        font-weight:600;color:#991B1B;background:#FEF2F2;
+                        border:1px solid #FECACA;border-radius:8px;text-decoration:none;">
+                👎 별로였어요</a>
+              <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_kw_body}"
+                 style="display:inline-block;margin:0 4px;padding:8px 16px;font-size:12px;
+                        font-weight:600;color:rgba(255,255,255,0.55);
+                        background:rgba(255,255,255,0.05);
+                        border:1px solid rgba(255,255,255,0.15);
+                        border-radius:8px;text-decoration:none;">
+                💬 의견 남기기</a>
+            </div>
+          </div>
           <div style="background:#0F1D2E;padding:0 28px 20px;">
             <div style="background:#F8FAFC;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
               <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#1F4E79;letter-spacing:1px;">
