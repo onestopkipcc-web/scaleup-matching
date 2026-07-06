@@ -2784,7 +2784,8 @@ elif page == "공고·매칭":
 
                 ap      = sum(1 for v in st.session_state['review_state'].values() if v=="○")
                 rj      = sum(1 for v in st.session_state['review_state'].values() if v=="✕")
-                pending = len(df_show) - ap - rj
+                total   = len(df_show)
+                pending = max(0, total - ap - rj)
 
                 # ── 상단 진행 현황 ──────────────────────────────
                 c1, c2, c3, c4, c5 = st.columns([2, 2, 2, 2, 3])
@@ -2849,41 +2850,45 @@ elif page == "공고·매칭":
                                 st.session_state['ai_analysis'] = {}
                             st.session_state['ai_analysis'].update(cached)
 
-                            ok_g = 0; ap_g = 0; rj_g = 0; skip_g = 0
-                            # 필터 무관하게 전체 매칭 결과 기준으로 처리
                             all_rows = df_show
                             total_g  = len(all_rows)
 
-                            for gi, (_, gr) in enumerate(all_rows.iterrows()):
-                                gkey = f"{gr['기업명']}_{gr.get('공고ID','')}"
+                            if total_g == 0:
+                                st.warning("매칭 결과가 없습니다. 먼저 매칭을 실행하세요.")
+                            else:
+                                ok_g = 0; ap_g = 0; rj_g = 0; skip_g = 0
+                                prog_g.progress(0, text=f"0/{total_g} 처리 중...")
 
-                                # 미분석 건만 Claude 분석
-                                if gkey not in st.session_state['ai_analysis']:
-                                    ci = {}
-                                    if 'df_companies_cache' in st.session_state:
-                                        df_co_g = st.session_state['df_companies_cache']
-                                        mx_g = df_co_g[df_co_g['기업명']==gr['기업명']]
-                                        if not mx_g.empty: ci = mx_g.iloc[0].to_dict()
-                                    ci['기업명'] = gr['기업명']
-                                    st.session_state['ai_analysis'][gkey] = claude_analyze(ci, gr.to_dict())
-                                    ok_g += 1
-                                else:
-                                    skip_g += 1
+                                for gi, (_, gr) in enumerate(all_rows.iterrows()):
+                                    gkey = f"{gr['기업명']}_{gr.get('공고ID','')}"
 
-                                # 자동 처리 (전체 기준)
-                                rec_g = st.session_state['ai_analysis'].get(gkey, {}).get('추천여부', '')
-                                if auto_approve and rec_g == '추천':
-                                    st.session_state['review_state'][gkey] = '○'; ap_g += 1
-                                elif auto_reject and rec_g == '비추천':
-                                    st.session_state['review_state'][gkey] = '✕'; rj_g += 1
+                                    if gkey not in st.session_state['ai_analysis']:
+                                        ci = {}
+                                        if 'df_companies_cache' in st.session_state:
+                                            df_co_g = st.session_state['df_companies_cache']
+                                            mx_g = df_co_g[df_co_g['기업명']==gr['기업명']]
+                                            if not mx_g.empty: ci = mx_g.iloc[0].to_dict()
+                                        ci['기업명'] = gr['기업명']
+                                        st.session_state['ai_analysis'][gkey] = claude_analyze(ci, gr.to_dict())
+                                        ok_g += 1
+                                    else:
+                                        skip_g += 1
 
-                                prog_g.progress((gi+1)/total_g,
-                                                text=f"{gi+1}/{total_g} 처리 중... (신규 {ok_g}건 / 캐시 {skip_g}건)")
+                                    rec_g = st.session_state['ai_analysis'].get(gkey, {}).get('추천여부', '')
+                                    if auto_approve and rec_g == '추천':
+                                        st.session_state['review_state'][gkey] = '○'; ap_g += 1
+                                    elif auto_reject and rec_g == '비추천':
+                                        st.session_state['review_state'][gkey] = '✕'; rj_g += 1
 
-                            if ok_g > 0:
-                                save_ai_analysis(_drive)
-                            st.success(f"✅ 완료 — 신규분석 {ok_g}건 / 캐시재사용 {skip_g}건 / 자동승인 {ap_g}건 / 자동제외 {rj_g}건")
-                            st.rerun()
+                                    prog_g.progress(
+                                        (gi+1)/total_g,
+                                        text=f"{gi+1}/{total_g} 처리 중... (신규 {ok_g}건 / 캐시 {skip_g}건)"
+                                    )
+
+                                if ok_g > 0:
+                                    save_ai_analysis(_drive)
+                                st.success(f"✅ 완료 — 신규분석 {ok_g}건 / 캐시재사용 {skip_g}건 / 자동승인 {ap_g}건 / 자동제외 {rj_g}건")
+                                st.rerun()
 
                     with btn_col2:
                         ai_done_count = sum(
