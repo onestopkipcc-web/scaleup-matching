@@ -2887,8 +2887,13 @@ elif page == "공고·매칭":
 
                                 if ok_g > 0:
                                     save_ai_analysis(_drive)
-                                st.success(f"✅ 완료 — 신규분석 {ok_g}건 / 캐시재사용 {skip_g}건 / 자동승인 {ap_g}건 / 자동제외 {rj_g}건")
+                                prog_g.progress(1.0, text="✅ 완료!")
+                                st.session_state['bulk_result'] = f"신규분석 {ok_g}건 / 캐시재사용 {skip_g}건 / 자동승인 {ap_g}건 / 자동제외 {rj_g}건"
                                 st.rerun()
+
+                # 완료 메시지 (rerun 후)
+                if 'bulk_result' in st.session_state:
+                    st.success(f"✅ 일괄 처리 완료 — {st.session_state.pop('bulk_result')}")
 
                     with btn_col2:
                         ai_done_count = sum(
@@ -3685,11 +3690,10 @@ elif page == "발송":
                         co_row = _mx.iloc[0].to_dict()
 
                 # 공고 분류: 맞춤(기업 전용) / 공통(여러 기업 공통)
-                notices_custom = [n for n in notices if n.get('공고유형','맞춤') == '맞춤']
-                notices_common = [n for n in notices if n.get('공고유형','맞춤') == '공통']
-                # 맞춤 내에서 별점 구분
-                notices_sss = [n for n in notices_custom if n.get('관련도','')=='★★★']
-                notices_ss  = [n for n in notices_custom if n.get('관련도','')=='★★']
+                # 별점 기준으로 분류 (공고유형 무관)
+                notices_sss = [n for n in notices if n.get('관련도','')=='★★★']
+                notices_ss  = [n for n in notices if n.get('관련도','')=='★★']
+                notices_common = []  # 이런 공고도 있어요는 별도 로직으로만
 
                 def notice_card_simple(n, idx):
                     """공통 공고용 심플 카드 (작고 간결하게)"""
