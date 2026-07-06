@@ -3545,19 +3545,16 @@ elif page == "발송":
             body = _up.quote(f"[공고 피드백]\n{label}: {name}\n\n[키워드 보완]\n")
             return f"mailto:onestop.kipcc@gmail.com?subject={subj}&body={body}"
 
-        def _prev_card(n, is_rec=False):
+        def _prev_card(n):
             dl = n.get('마감일','')
             if not dl and '~' in n.get('접수기간',''):
                 dl = n.get('접수기간','').split('~')[-1].strip()
             rsn = reason_to_sentence(n.get('매칭근거',''))
             nm  = n.get('공고명','')
-            border = "1.5px solid #10B981" if is_rec else "1px solid #E2E8F0"
-            badge  = ""
             return f"""
             <table width="100%" cellpadding="0" cellspacing="0"
-                   style="margin-bottom:8px;background:#FFFFFF;border:{border};
+                   style="margin-bottom:8px;background:#FFFFFF;border:1px solid #E2E8F0;
                           border-radius:10px;overflow:hidden;">
-              <tr><td>{badge}</td></tr>
               <tr>
                 <td style="padding:12px 16px;">
                   <a href="{n.get('공고링크','#')}" style="font-size:14px;font-weight:600;
@@ -3566,32 +3563,33 @@ elif page == "발송":
                     {n.get('주관기관','')} · 마감 {dl or '상시'}
                   </p>
                   <p style="margin:4px 0;font-size:11px;color:#10B981;">↳ {rsn}</p>
-                  <div style="margin-top:8px;display:flex;gap:6px;">
-                    <a href="{_prev_mailto('맞아요',nm,preview_co)}"
-                       style="padding:4px 10px;font-size:11px;font-weight:600;color:#065F46;
-                              background:#ECFDF5;border:1px solid #A7F3D0;border-radius:6px;
-                              text-decoration:none;">맞아요</a>
-                    <a href="{_prev_mailto('애매해요',nm,preview_co)}"
-                       style="padding:4px 10px;font-size:11px;font-weight:600;color:#92400E;
-                              background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;
-                              text-decoration:none;">애매해요</a>
-                    <a href="{_prev_mailto('안 맞아요',nm,preview_co)}"
-                       style="padding:4px 10px;font-size:11px;font-weight:600;color:#991B1B;
-                              background:#FEF2F2;border:1px solid #FECACA;border-radius:6px;
-                              text-decoration:none;">안 맞아요</a>
-                  </div>
+                </td>
+                <td width="60" align="center" valign="middle"
+                    style="padding:14px 12px;border-left:1px solid #F1F5F9;">
+                  <a href="{n.get('공고링크','#')}"
+                     style="font-size:12px;font-weight:600;color:#10B981;
+                            text-decoration:none;white-space:nowrap;">보기 →</a>
                 </td>
               </tr>
             </table>"""
 
         _cards_html = ""
-        if _rec_prev or _rest_prev:
-            _cards_html += """<p style="margin:0 0 12px;font-size:10px;font-weight:700;
-                                color:#F59E0B;letter-spacing:2px;">🔦 &nbsp;주목할 만한 공고</p>"""
-            for n in _rec_prev:  _cards_html += _prev_card(n, is_rec=True)
-            if _rec_prev and _rest_prev:
-                _cards_html += """<div style="border-top:1px dashed rgba(0,0,0,0.1);margin:12px 0;"></div>"""
-            for n in _rest_prev: _cards_html += _prev_card(n, is_rec=False)
+        if _notices_custom:
+            # ★★★ 주목할 만한 공고
+            _sss = [n for n in _notices_custom if n.get('관련도','') == '★★★']
+            _ss  = [n for n in _notices_custom if n.get('관련도','') == '★★']
+            if _sss:
+                _cards_html += """<p style="margin:0 0 12px;font-size:10px;font-weight:700;
+                                    color:#F59E0B;letter-spacing:2px;">🔦 &nbsp;주목할 만한 공고</p>"""
+                for n in _sss: _cards_html += _prev_card(n)
+            if _ss:
+                _cards_html += """<div style="border-top:1px solid rgba(255,255,255,0.08);
+                                    padding-top:14px;margin-top:8px;">
+                  <p style="margin:0 0 10px;font-size:10px;font-weight:700;
+                             color:rgba(255,255,255,0.35);letter-spacing:2px;">
+                    📌 &nbsp;이런 공고도 있어요</p>"""
+                for n in _ss: _cards_html += _prev_card(n)
+                _cards_html += "</div>"
 
         _common_html = ""
         # 검토 등급 공고 (미리보기용)
