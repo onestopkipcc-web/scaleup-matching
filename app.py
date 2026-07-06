@@ -3454,7 +3454,20 @@ elif page == "발송":
         "발신자 이름·서명 변경 → `app.py` HTML 템플릿 수정")
 
     results  = st.session_state.get('match_results', [])
-    approved = [r for r in results if r.get('담당자검토')=='○']
+
+    # review_state 없으면 드라이브에서 불러오기
+    if 'review_state' not in st.session_state or not st.session_state['review_state']:
+        saved = load_json(drive, "review_state.json")
+        if saved and 'review_state' in saved:
+            st.session_state['review_state'] = saved['review_state']
+
+    review_state = st.session_state.get('review_state', {})
+
+    # match_results와 review_state 동기화
+    approved = [
+        r for r in results
+        if review_state.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", '') == '○'
+    ]
     matched_group = st.session_state.get('match_target_group', '미확인')
 
     if not approved:
