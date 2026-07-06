@@ -3277,11 +3277,7 @@ elif page == "공고·매칭":
                                 for k, v in checks.items()
                             ])
                             if o_count >= 3:
-                                checks_html += (
-                                    f" &nbsp;<span style='font-size:11px;font-weight:700;"
-                                    f"background:#ECFDF5;color:#065F46;padding:2px 8px;"
-                                    f"border-radius:10px;'>발송 권장</span>"
-                                )
+                                checks_html += ""
                             st.markdown(
                                 f"<div style='padding:4px 0;'>{checks_html}</div>",
                                 unsafe_allow_html=True
@@ -3556,9 +3552,7 @@ elif page == "발송":
             rsn = reason_to_sentence(n.get('매칭근거',''))
             nm  = n.get('공고명','')
             border = "1.5px solid #10B981" if is_rec else "1px solid #E2E8F0"
-            badge  = """<div style="background:#F0FDF4;padding:5px 14px;border-bottom:1px solid #D1FAE5;">
-                          <span style="font-size:11px;font-weight:700;color:#065F46;">✉️ 발송 권장</span>
-                        </div>""" if is_rec else ""
+            badge  = ""
             return f"""
             <table width="100%" cellpadding="0" cellspacing="0"
                    style="margin-bottom:8px;background:#FFFFFF;border:{border};
@@ -3761,13 +3755,6 @@ elif page == "발송":
                     badge_html = ""
                     border_style = "1px solid #E2E8F0"
                     if is_recommended:
-                        badge_html = """
-                          <div style="background:#F0FDF4;padding:5px 14px;
-                                      border-bottom:1px solid #D1FAE5;">
-                            <span style="font-size:11px;font-weight:700;color:#065F46;">
-                              ✉️ 발송 권장
-                            </span>
-                          </div>"""
                         border_style = "1.5px solid #10B981"
                     subject_enc = f"[원스톱 피드백] {company}"
                     def mailto(label):
