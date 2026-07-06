@@ -3201,10 +3201,9 @@ elif page == "공고·매칭":
                                 st.markdown(
                                     f"<div style='font-size:12px;color:#374151;padding:3px 0;"
                                     f"border-left:3px solid #10B981;padding-left:8px;margin:4px 0;'>"
-                                    f"🤖 {summary}</div>",
+                                    f"{summary}</div>",
                                     unsafe_allow_html=True
                                 )
-                            # AI 체크리스트 항상 표시
                             checks = {
                                 "업종일치": ai_res.get('업종일치','—'),
                                 "자격충족": ai_res.get('자격충족','—'),
@@ -3212,20 +3211,16 @@ elif page == "공고·매칭":
                                 "수요일치": ai_res.get('수요일치','—')
                             }
                             icon_map = {"O":"✅","X":"❌","△":"⚠️"}
-
-                            # 3개 이상 O → 발송 대상 자동 추천
                             o_count = sum(1 for v in checks.values() if v == "O")
-                            auto_recommend = o_count >= 3
-
                             checks_html = " &nbsp; ".join([
                                 f"<span style='font-size:12px;'>{icon_map.get(v,'—')} {k}</span>"
                                 for k, v in checks.items()
                             ])
-                            if auto_recommend:
+                            if o_count >= 3:
                                 checks_html += (
                                     f" &nbsp;<span style='font-size:11px;font-weight:700;"
                                     f"background:#ECFDF5;color:#065F46;padding:2px 8px;"
-                                    f"border-radius:10px;'>✉️ 발송 권장</span>"
+                                    f"border-radius:10px;'>발송 권장</span>"
                                 )
                             st.markdown(
                                 f"<div style='padding:4px 0;'>{checks_html}</div>",
@@ -3502,7 +3497,6 @@ elif page == "발송":
                                      font-style:normal;line-height:1.5;">
                             ↳ {reason_sentence}
                           </p>""" if reason_sentence else ""
-                    notice_name = n.get('공고명','')
                     # 피드백 버튼 — mailto 답장 형식으로 구조화
                     subject_enc = f"[원스톱 피드백] {company}"
                     def mailto(label):
@@ -3620,6 +3614,8 @@ elif page == "발송":
                     "(위 공고 카드의 맞아요/애매해요/안 맞아요 버튼으로 보내주세요)\n\n"
                     "[키워드 보완]\n"
                     "추가로 받고 싶은 분야나 키워드를 적어주세요:\n\n"
+                    "[Gmail 주소]\n"
+                    "구글 캘린더 마감 알림을 받으시려면 Gmail 주소를 알려주세요:\n"
                 )
                 keyword_sec = f"""
                 <div style="background:#F8FAFC;border:1px solid #E2E8F0;
@@ -3630,13 +3626,13 @@ elif page == "발송":
                   </p>
                   <p style="margin:0 0 12px;font-size:13px;color:#475569;line-height:1.7;">
                     위 공고들이 귀사와 맞는지 버튼으로 알려주시면 다음 달 더 정확한 공고를 드릴 수 있습니다.<br>
-                    추가로 받고 싶은 분야나 키워드가 있으시면 아래 링크로 답장해주세요.
+                    추가 키워드나 <b>구글 캘린더 마감 알림</b>을 원하시면 아래 링크로 답장해주세요.
                   </p>
                   <a href="mailto:onestop.kipcc@gmail.com?subject={kw_subject}&body={kw_body}"
                      style="display:inline-block;padding:8px 18px;font-size:13px;font-weight:600;
                             color:#FFFFFF;background:#1F4E79;border-radius:8px;
                             text-decoration:none;">
-                    키워드 보완 답장하기 →
+                    답장하기 →
                   </a>
                 </div>"""
 
@@ -4090,6 +4086,7 @@ JSON만 응답 (코드블록 없이):
                                 prompt = f"""아래는 지원사업 안내 메일에 대한 기업 담당자의 회신입니다.
 [공고 피드백] 섹션에 '맞아요/애매해요/안 맞아요: 공고명' 형식이 있을 수 있고,
 [Q1], [Q2] 형식의 키워드 답변도 있을 수 있습니다.
+[Gmail 주소] 섹션에 구글 계정 주소가 있을 수 있습니다.
 
 회신 내용:
 {body_text[:1500]}
@@ -4097,10 +4094,11 @@ JSON만 응답 (코드블록 없이):
 위 내용에서 다음을 추출해주세요.
 - [공고 피드백] 섹션에서 공고별 피드백 추출
 - [키워드 보완] 또는 Q1/Q2 답변에서 기술키워드와 필요지원 추출
+- [Gmail 주소] 섹션에서 @gmail.com 또는 구글 계정 이메일 추출
 - 형식이 없으면 전체 내용에서 추출
 
 반드시 아래 JSON 형식으로만 응답하세요. 코드블록이나 설명 텍스트 없이 JSON만:
-{{"기술키워드": ["키워드1"], "필요지원": ["지원유형"], "수출관심국": [], "공고피드백": [{{"공고명": "...", "피드백": "맞아요"}}], "요약": "한 줄 요약"}}"""
+{{"기술키워드": ["키워드1"], "필요지원": ["지원유형"], "수출관심국": [], "공고피드백": [{{"공고명": "...", "피드백": "맞아요"}}], "gmail": "", "요약": "한 줄 요약"}}"""
                                 try:
                                     import json as _json, re as _re2
                                     res = claude_call_raw(prompt)
@@ -4144,24 +4142,35 @@ JSON만 응답 (코드블록 없이):
                                     icon = {"맞아요":"✅","애매해요":"🟡","안맞아요":"❌","안 맞아요":"❌"}.get(fb.get('피드백',''), "❓")
                                     st.write(f"{icon} {fb.get('피드백','')} — {fb.get('공고명','')[:40]}")
 
+                            gmail = ext.get('gmail','')
+                            if gmail:
+                                st.caption("**Gmail 주소**")
+                                st.write(gmail)
+
                             st.caption(f"요약: {ext.get('요약','')}")
 
-                            if matched_co and (kws or sup):
-                                if st.button(f"💾 {matched_co} 키워드 저장",
+                            if matched_co and (kws or sup or gmail):
+                                if st.button(f"💾 {matched_co} 저장",
                                              key=f"save_reply_{i}", type="primary"):
                                     df_c2 = load_excel(drive, SELECTED_FILE)
                                     mask  = df_c2['기업명'] == matched_co
                                     if mask.any():
-                                        existing = str(df_c2.loc[mask, '키워드보완'].values[0] or '')
-                                        new_kws  = ', '.join(kws + sup)
-                                        merged   = ', '.join(filter(None, [existing, new_kws]))
-                                        df_c2.loc[mask, '키워드보완'] = merged
+                                        if kws or sup:
+                                            existing = str(df_c2.loc[mask, '키워드보완'].values[0] or '')
+                                            new_kws  = ', '.join(kws + sup)
+                                            merged   = ', '.join(filter(None, [existing, new_kws]))
+                                            df_c2.loc[mask, '키워드보완'] = merged
                                         if exp:
                                             existing_exp = str(df_c2.loc[mask, '수출국가'].values[0] or '')
                                             df_c2.loc[mask, '수출국가'] = ', '.join(
                                                 filter(None, [existing_exp, ', '.join(exp)]))
+                                        if gmail and 'Gmail' in df_c2.columns:
+                                            df_c2.loc[mask, 'Gmail'] = gmail
+                                        elif gmail and 'Gmail' not in df_c2.columns:
+                                            df_c2['Gmail'] = ''
+                                            df_c2.loc[mask, 'Gmail'] = gmail
                                         if save_excel(drive, df_c2, SELECTED_FILE, "선정기업명단", "1F4E79"):
-                                            st.success(f"✅ {matched_co} 키워드 저장 완료 → 다음 매칭에 반영됩니다")
+                                            st.success(f"✅ {matched_co} 저장 완료")
                                         else:
                                             st.error("저장 실패")
                             elif not matched_co:
