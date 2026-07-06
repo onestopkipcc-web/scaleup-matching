@@ -3483,60 +3483,70 @@ elif page == "발송":
                       </tr>
                     </table>"""
 
-                def notice_card(n, idx):
-                    star = n.get('관련도','')
-                    dl_raw = n.get('마감일','')
-                    if not dl_raw and '~' in n.get('접수기간',''):
-                        dl_raw = n.get('접수기간','').split('~')[-1].strip()
-                    reason_sentence = reason_to_sentence(n.get('매칭근거',''))
+                def notice_card(n, idx, is_recommended=False):
+                    dl_raw = n.get("마감일","")
+                    if not dl_raw and "~" in n.get("접수기간",""):
+                        dl_raw = n.get("접수기간","").split("~")[-1].strip()
+                    reason_sentence = reason_to_sentence(n.get("매칭근거",""))
                     reason_html = f"""
                           <p style="margin:6px 0 0;font-size:11px;color:#10B981;
                                      font-style:normal;line-height:1.5;">
                             ↳ {reason_sentence}
                           </p>""" if reason_sentence else ""
-                    # 피드백 버튼 — mailto 답장 형식으로 구조화
+                    notice_name = n.get("공고명","")
+                    badge_html = ""
+                    border_style = "1px solid #E2E8F0"
+                    if is_recommended:
+                        badge_html = """
+                          <div style="background:#F0FDF4;padding:5px 14px;
+                                      border-bottom:1px solid #D1FAE5;">
+                            <span style="font-size:11px;font-weight:700;color:#065F46;">
+                              ✉️ 발송 권장
+                            </span>
+                          </div>"""
+                        border_style = "1.5px solid #10B981"
                     subject_enc = f"[원스톱 피드백] {company}"
                     def mailto(label):
                         body = (
-                            f"[공고 피드백]\n"
+                            "[공고 피드백]\n"
                             f"{label}: {notice_name}\n\n"
-                            f"[키워드 보완]\n"
-                            f"(추가로 받고 싶은 분야나 키워드가 있으면 적어주세요)\n"
+                            "[키워드 보완]\n"
+                            "(추가로 받고 싶은 분야나 키워드가 있으면 적어주세요)\n"
                         )
                         import urllib.parse
                         return f"mailto:onestop.kipcc@gmail.com?subject={urllib.parse.quote(subject_enc)}&body={urllib.parse.quote(body)}"
-
                     return f"""
                     <table width="100%" cellpadding="0" cellspacing="0"
-                           style="margin-bottom:10px;background:#FFFFFF;
-                                  border:1px solid #E2E8F0;
+                           style="margin-bottom:8px;background:#FFFFFF;
+                                  border:{border_style};
                                   border-radius:10px;overflow:hidden;
                                   box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                      <tr><td>{badge_html}</td></tr>
                       <tr>
-                        <td style="padding:14px 16px;">
-                          <a href="{n.get('공고링크','#')}"
+                        <td style="padding:12px 16px;">
+                          <a href="{n.get("공고링크","#")}"
                              style="font-size:14px;font-weight:600;color:#0F172A;
                                     text-decoration:none;line-height:1.5;display:block;">
                             {notice_name}
                           </a>
                           <p style="margin:4px 0 0;font-size:12px;color:#94A3B8;">
-                            {n.get('주관기관','')}
+                            {n.get("주관기관","")}
                             &nbsp;·&nbsp;
-                            마감 {dl_raw if dl_raw else '상시'}
+                            마감 {dl_raw if dl_raw else "상시"}
                           </p>
                           {reason_html}
                           <div style="margin-top:10px;display:flex;gap:6px;">
-                            <a href="{mailto('맞아요')}"
+                            <a href="{mailto("맞아요")}"
                                style="display:inline-block;padding:4px 12px;font-size:11px;
                                       font-weight:600;color:#065F46;background:#ECFDF5;
                                       border:1px solid #A7F3D0;border-radius:6px;
                                       text-decoration:none;">맞아요</a>
-                            <a href="{mailto('애매해요')}"
+                            <a href="{mailto("애매해요")}"
                                style="display:inline-block;padding:4px 12px;font-size:11px;
                                       font-weight:600;color:#92400E;background:#FFFBEB;
                                       border:1px solid #FDE68A;border-radius:6px;
                                       text-decoration:none;">애매해요</a>
-                            <a href="{mailto('안 맞아요')}"
+                            <a href="{mailto("안 맞아요")}"
                                style="display:inline-block;padding:4px 12px;font-size:11px;
                                       font-weight:600;color:#991B1B;background:#FEF2F2;
                                       border:1px solid #FECACA;border-radius:6px;
@@ -3544,9 +3554,8 @@ elif page == "발송":
                           </div>
                         </td>
                         <td width="60" align="center" valign="middle"
-                            style="padding:14px 12px;
-                                   border-left:1px solid #F1F5F9;">
-                          <a href="{n.get('공고링크','#')}"
+                            style="padding:14px 12px;border-left:1px solid #F1F5F9;">
+                          <a href="{n.get("공고링크","#")}"
                              style="display:inline-block;font-size:12px;font-weight:600;
                                     color:#10B981;text-decoration:none;white-space:nowrap;">
                             보기 →
@@ -3558,22 +3567,36 @@ elif page == "발송":
                 rows_html = ""
 
                 # ── 맞춤 공고 섹션 ──────────────────────
-                if notices_sss:
+                if notices_sss or notices_ss:
                     rows_html += """
-                    <p style="margin:0 0 10px;font-size:10px;font-weight:700;
+                    <p style="margin:0 0 12px;font-size:10px;font-weight:700;
                                color:#F59E0B;letter-spacing:2px;text-transform:uppercase;">
-                      ★★★ &nbsp;직접 연계 추천
+                      🔦 &nbsp;주목할 만한 공고
                     </p>"""
-                    for i,n in enumerate(notices_sss): rows_html += notice_card(n, i)
-                    rows_html += """<div style="height:20px;"></div>"""
 
-                if notices_ss:
-                    rows_html += """
-                    <p style="margin:0 0 10px;font-size:10px;font-weight:700;
-                               color:#10B981;letter-spacing:2px;text-transform:uppercase;">
-                      ★★ &nbsp;참고 추천
-                    </p>"""
-                    for i,n in enumerate(notices_ss): rows_html += notice_card(n, i)
+                    # 발송 권장(체크 3개 이상 O)이 상단으로
+                    all_custom = notices_sss + notices_ss
+                    ai_cache   = st.session_state.get('ai_analysis', {})
+
+                    def check_count(n):
+                        k = f"{n.get('기업명','')}_{n.get('공고ID','')}"
+                        res = ai_cache.get(k, {})
+                        return sum(1 for f in ['업종일치','자격충족','지역적합','수요일치']
+                                   if res.get(f,'') == 'O')
+
+                    recommended = [n for n in all_custom if check_count(n) >= 3]
+                    others      = [n for n in all_custom if check_count(n) < 3]
+
+                    for i, n in enumerate(recommended):
+                        rows_html += notice_card(n, i, is_recommended=True)
+
+                    if recommended and others:
+                        rows_html += """
+                        <div style="border-top:1px dashed rgba(255,255,255,0.1);
+                                    margin:14px 0;"></div>"""
+
+                    for i, n in enumerate(others):
+                        rows_html += notice_card(n, i, is_recommended=False)
 
                 # ── 공통 공고 섹션 (이런 공고도 있어요) ──
                 if notices_common:
