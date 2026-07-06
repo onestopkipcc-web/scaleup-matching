@@ -3741,38 +3741,21 @@ elif page == "발송":
                       </tr>
                     </table>"""
 
-                def notice_card(n, idx, is_recommended=False):
+                def notice_card(n, idx):
                     dl_raw = n.get("마감일","")
                     if not dl_raw and "~" in n.get("접수기간",""):
                         dl_raw = n.get("접수기간","").split("~")[-1].strip()
                     reason_sentence = reason_to_sentence(n.get("매칭근거",""))
                     reason_html = f"""
-                          <p style="margin:6px 0 0;font-size:11px;color:#10B981;
-                                     font-style:normal;line-height:1.5;">
+                          <p style="margin:6px 0 0;font-size:11px;color:#10B981;line-height:1.5;">
                             ↳ {reason_sentence}
                           </p>""" if reason_sentence else ""
                     notice_name = n.get("공고명","")
-                    badge_html = ""
-                    border_style = "1px solid #E2E8F0"
-                    if is_recommended:
-                        border_style = "1.5px solid #10B981"
-                    subject_enc = f"[원스톱 피드백] {company}"
-                    def mailto(label):
-                        body = (
-                            "[공고 피드백]\n"
-                            f"{label}: {notice_name}\n\n"
-                            "[키워드 보완]\n"
-                            "(추가로 받고 싶은 분야나 키워드가 있으면 적어주세요)\n"
-                        )
-                        import urllib.parse
-                        return f"mailto:onestop.kipcc@gmail.com?subject={urllib.parse.quote(subject_enc)}&body={urllib.parse.quote(body)}"
                     return f"""
                     <table width="100%" cellpadding="0" cellspacing="0"
                            style="margin-bottom:8px;background:#FFFFFF;
-                                  border:{border_style};
-                                  border-radius:10px;overflow:hidden;
+                                  border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;
                                   box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                      <tr><td>{badge_html}</td></tr>
                       <tr>
                         <td style="padding:12px 16px;">
                           <a href="{n.get("공고링크","#")}"
@@ -3781,28 +3764,9 @@ elif page == "발송":
                             {notice_name}
                           </a>
                           <p style="margin:4px 0 0;font-size:12px;color:#94A3B8;">
-                            {n.get("주관기관","")}
-                            &nbsp;·&nbsp;
-                            마감 {dl_raw if dl_raw else "상시"}
+                            {n.get("주관기관","")} &nbsp;·&nbsp; 마감 {dl_raw if dl_raw else "상시"}
                           </p>
                           {reason_html}
-                          <div style="margin-top:10px;display:flex;gap:6px;">
-                            <a href="{mailto("맞아요")}"
-                               style="display:inline-block;padding:4px 12px;font-size:11px;
-                                      font-weight:600;color:#065F46;background:#ECFDF5;
-                                      border:1px solid #A7F3D0;border-radius:6px;
-                                      text-decoration:none;">맞아요</a>
-                            <a href="{mailto("애매해요")}"
-                               style="display:inline-block;padding:4px 12px;font-size:11px;
-                                      font-weight:600;color:#92400E;background:#FFFBEB;
-                                      border:1px solid #FDE68A;border-radius:6px;
-                                      text-decoration:none;">애매해요</a>
-                            <a href="{mailto("안 맞아요")}"
-                               style="display:inline-block;padding:4px 12px;font-size:11px;
-                                      font-weight:600;color:#991B1B;background:#FEF2F2;
-                                      border:1px solid #FECACA;border-radius:6px;
-                                      text-decoration:none;">안 맞아요</a>
-                          </div>
                         </td>
                         <td width="60" align="center" valign="middle"
                             style="padding:14px 12px;border-left:1px solid #F1F5F9;">
@@ -3817,54 +3781,31 @@ elif page == "발송":
 
                 rows_html = ""
 
-                # ── 맞춤 공고 섹션 ──────────────────────
-                if notices_sss or notices_ss:
+                # ── 🔦 주목할 만한 공고 (★★★) ────────────
+                if notices_sss:
                     rows_html += """
                     <p style="margin:0 0 12px;font-size:10px;font-weight:700;
                                color:#F59E0B;letter-spacing:2px;text-transform:uppercase;">
                       🔦 &nbsp;주목할 만한 공고
                     </p>"""
+                    for i, n in enumerate(notices_sss):
+                        rows_html += notice_card(n, i)
 
-                    # 발송 권장(체크 3개 이상 O)이 상단으로
-                    all_custom = notices_sss + notices_ss
-                    ai_cache   = st.session_state.get('ai_analysis', {})
-
-                    def check_count(n):
-                        k = f"{n.get('기업명','')}_{n.get('공고ID','')}"
-                        res = ai_cache.get(k, {})
-                        return sum(1 for f in ['업종일치','자격충족','지역적합','수요일치']
-                                   if res.get(f,'') == 'O')
-
-                    recommended = [n for n in all_custom if check_count(n) >= 3]
-                    others      = [n for n in all_custom if check_count(n) < 3]
-
-                    for i, n in enumerate(recommended):
-                        rows_html += notice_card(n, i, is_recommended=True)
-
-                    if recommended and others:
-                        rows_html += """
-                        <div style="border-top:1px dashed rgba(255,255,255,0.1);
-                                    margin:14px 0;"></div>"""
-
-                    for i, n in enumerate(others):
-                        rows_html += notice_card(n, i, is_recommended=False)
-
-                # ── 공통 공고 섹션 (이런 공고도 있어요) ──
-                if notices_common:
-                    rows_html += """<div style="height:24px;"></div>"""
+                # ── 📌 이런 공고도 있어요 (★★) ──────────
+                if notices_ss:
                     rows_html += """
                     <div style="border-top:1px solid rgba(255,255,255,0.08);
-                                padding-top:16px;margin-top:4px;">
+                                padding-top:16px;margin-top:8px;">
                       <p style="margin:0 0 10px;font-size:10px;font-weight:700;
                                  color:rgba(255,255,255,0.35);letter-spacing:2px;
                                  text-transform:uppercase;">
                         📌 &nbsp;이런 공고도 있어요
                       </p>"""
-                    for i,n in enumerate(notices_common):
+                    for i, n in enumerate(notices_ss):
                         rows_html += notice_card_simple(n, i)
                     rows_html += "</div>"
 
-                # ── 다른 기업들이 관심 가진 공고 (AI 검토 등급) ──
+                # ── 📢 다른 기업들이 관심 가진 공고 ──────
                 if notices_review:
                     rows_html += """
                     <div style="border-top:1px solid rgba(255,255,255,0.08);
@@ -3877,9 +3818,43 @@ elif page == "발송":
                       <p style="margin:0 0 10px;font-size:11px;color:rgba(255,255,255,0.25);">
                         비슷한 업종·분야의 기업들이 추천받은 공고입니다. 참고해보세요.
                       </p>"""
-                    for i, n in enumerate(notices_review[:3]):  # 최대 3건
+                    for i, n in enumerate(notices_review[:3]):
                         rows_html += notice_card_simple(n, i)
                     rows_html += "</div>"
+
+                # ── 전체 반응 버튼 ────────────────────────
+                import urllib.parse as _up_fb
+                fb_subj = _up_fb.quote(f"[원스톱 피드백] {company}")
+                fb_good = _up_fb.quote("[이번 주 공고 안내 피드백]\n반응: 도움됐어요\n\n[추가 의견]\n\n[Gmail 주소]\n")
+                fb_bad  = _up_fb.quote("[이번 주 공고 안내 피드백]\n반응: 별로였어요\n\n[추가 의견]\n어떤 점이 아쉬우셨나요?\n\n[Gmail 주소]\n")
+                fb_msg  = _up_fb.quote("[이번 주 공고 안내 피드백]\n\n[추가 의견]\n\n[더 받고 싶은 분야/키워드]\n\n[Gmail 주소]\n")
+                rows_html += f"""
+                <div style="border-top:1px solid rgba(255,255,255,0.1);
+                            margin-top:20px;padding-top:16px;text-align:center;">
+                  <p style="margin:0 0 12px;font-size:12px;color:rgba(255,255,255,0.4);">
+                    이번 공고 안내가 도움이 됐나요?
+                  </p>
+                  <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_good}"
+                     style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
+                            font-weight:600;color:#065F46;background:#ECFDF5;
+                            border:1px solid #A7F3D0;border-radius:8px;text-decoration:none;">
+                    👍 도움됐어요
+                  </a>
+                  <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_bad}"
+                     style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
+                            font-weight:600;color:#991B1B;background:#FEF2F2;
+                            border:1px solid #FECACA;border-radius:8px;text-decoration:none;">
+                    👎 별로였어요
+                  </a>
+                  <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_msg}"
+                     style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
+                            font-weight:600;color:rgba(255,255,255,0.55);
+                            background:rgba(255,255,255,0.05);
+                            border:1px solid rgba(255,255,255,0.15);
+                            border-radius:8px;text-decoration:none;">
+                    💬 의견 남기기
+                  </a>
+                </div>"""
 
                 ind_link=""
                 if company in ind_cals and ind_cals[company].get('calendar_id'):
