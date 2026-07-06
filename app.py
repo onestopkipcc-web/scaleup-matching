@@ -681,7 +681,13 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=
     pid = notice.get('pblancId', '')
     if (row['기업명'], pid) in already_sent: return None
     dl = notice.get('마감일', '')
-    if dl and dl < datetime.today().strftime("%Y-%m-%d"): return None
+    if dl:
+        try:
+            days_left = (datetime.strptime(dl, '%Y-%m-%d') - datetime.today()).days
+            if days_left < 0: return None   # 이미 마감
+            if days_left <= 3: return None  # D-3 이내 제외 (발송 후 신청 시간 부족)
+        except Exception:
+            if dl < datetime.today().strftime("%Y-%m-%d"): return None
     if str(row.get('수출실적',''))=='아니오' and '수출' in str(notice.get('분야','')): return None
 
     text = " ".join([str(notice.get(k,'')) for k in ['공고명','사업개요','전문내용','해시태그','주관기관','지원대상']])
