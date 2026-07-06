@@ -2817,19 +2817,17 @@ elif page == "공고·매칭":
                         cached = load_json(_drive, AI_ANALYSIS_FILE) or {}
                         if 'ai_analysis' not in st.session_state:
                             st.session_state['ai_analysis'] = {}
-                        # 드라이브에 있는 건 세션으로 병합 (신규 분석 최소화)
-                        before = len(st.session_state['ai_analysis'])
                         st.session_state['ai_analysis'].update(cached)
-                        merged = len(st.session_state['ai_analysis']) - before
 
-                        ok_g = 0; ap_g = 0; rj_g = 0
-                        total_g = len(filtered)
-                        skip_g  = 0
+                        ok_g = 0; ap_g = 0; rj_g = 0; skip_g = 0
+                        # 필터 무관하게 전체 매칭 결과 기준으로 처리
+                        all_rows = df_show
+                        total_g  = len(all_rows)
 
-                        for gi, (_, gr) in enumerate(filtered.iterrows()):
+                        for gi, (_, gr) in enumerate(all_rows.iterrows()):
                             gkey = f"{gr['기업명']}_{gr.get('공고ID','')}"
 
-                            # 캐시(세션+드라이브 병합) 확인 → 없는 것만 분석
+                            # 미분석 건만 Claude 분석
                             if gkey not in st.session_state['ai_analysis']:
                                 ci = {}
                                 if 'df_companies_cache' in st.session_state:
@@ -2842,7 +2840,7 @@ elif page == "공고·매칭":
                             else:
                                 skip_g += 1
 
-                            # 자동 처리
+                            # 자동 처리 (전체 기준)
                             rec_g = st.session_state['ai_analysis'].get(gkey, {}).get('추천여부', '')
                             if auto_approve and rec_g == '추천':
                                 st.session_state['review_state'][gkey] = '○'; ap_g += 1
@@ -2852,7 +2850,6 @@ elif page == "공고·매칭":
                             prog_g.progress((gi+1)/total_g,
                                             text=f"{gi+1}/{total_g} 처리 중... (신규 {ok_g}건 / 캐시 {skip_g}건)")
 
-                        # 드라이브 저장 (신규 분석 있을 때만)
                         if ok_g > 0:
                             save_ai_analysis(_drive)
                         st.success(f"✅ 완료 — 신규분석 {ok_g}건 / 캐시재사용 {skip_g}건 / 자동승인 {ap_g}건 / 자동제외 {rj_g}건")
