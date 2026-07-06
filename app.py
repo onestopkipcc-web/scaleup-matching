@@ -2766,17 +2766,20 @@ elif page == "공고·매칭":
 
                 # AI 판단 필터 적용
                 ai_map_f = st.session_state.get('ai_analysis', {})
+
+                # AI 필터 결과를 미리 계산해서 컬럼으로 저장 (rerun 속도 개선)
+                def get_ai_rec(r):
+                    return ai_map_f.get(f"{r['기업명']}_{r.get('공고ID','')}", {}).get('추천여부','')
+
+                if '___ai_rec' not in filtered.columns:
+                    filtered = filtered.copy()
+                    filtered['___ai_rec'] = filtered.apply(get_ai_rec, axis=1)
+
                 if "추천 + 🟡 검토만" in ai_view_filter:
-                    filtered = filtered[[
-                        ai_map_f.get(f"{r['기업명']}_{r.get('공고ID','')}", {}).get('추천여부','') in ['추천','검토','']
-                        for _, r in filtered.iterrows()
-                    ]]
+                    filtered = filtered[filtered['___ai_rec'].isin(['추천','검토',''])]
                     st.info(f"비추천 제외 → {len(filtered)}건 표시 중")
                 elif "추천만" in ai_view_filter:
-                    filtered = filtered[[
-                        ai_map_f.get(f"{r['기업명']}_{r.get('공고ID','')}", {}).get('추천여부','') == '추천'
-                        for _, r in filtered.iterrows()
-                    ]]
+                    filtered = filtered[filtered['___ai_rec'] == '추천']
                     st.info(f"AI 추천 {len(filtered)}건만 표시 중")
 
                 ap      = sum(1 for v in st.session_state['review_state'].values() if v=="○")
@@ -3209,16 +3212,27 @@ elif page == "공고·매칭":
                                 "수요일치": ai_res.get('수요일치','—')
                             }
                             icon_map = {"O":"✅","X":"❌","△":"⚠️"}
+
+                            # 3개 이상 O → 발송 대상 자동 추천
+                            o_count = sum(1 for v in checks.values() if v == "O")
+                            auto_recommend = o_count >= 3
+
                             checks_html = " &nbsp; ".join([
                                 f"<span style='font-size:12px;'>{icon_map.get(v,'—')} {k}</span>"
                                 for k, v in checks.items()
                             ])
+                            if auto_recommend:
+                                checks_html += (
+                                    f" &nbsp;<span style='font-size:11px;font-weight:700;"
+                                    f"background:#ECFDF5;color:#065F46;padding:2px 8px;"
+                                    f"border-radius:10px;'>✉️ 발송 권장</span>"
+                                )
                             st.markdown(
                                 f"<div style='padding:4px 0;'>{checks_html}</div>",
                                 unsafe_allow_html=True
                             )
 
-                        # ── 핵심 정보 요약 (상세 클릭 없이 바로 표시) ──
+                        # ── 핵심 정보 요약 ──
                         info_parts = []
                         if row.get('지원대상','') and row.get('지원대상','') != '—':
                             info_parts.append(f"<b>지원대상</b> {str(row.get('지원대상',''))[:40]}")
@@ -3242,6 +3256,7 @@ elif page == "공고·매칭":
                             btn_type = "primary" if current != "○" else "secondary"
                             if st.button(lbl, key=f"o_{key}_{i}", use_container_width=True, type=btn_type):
                                 st.session_state['review_state'][key] = "" if current=="○" else "○"
+                                # rerun 대신 상태만 변경 → 전체 재렌더링 없이 버튼 상태만 반영
                                 st.rerun()
                         with b2:
                             lbl = "❌ 제외" if current != "✕" else "↩ 제외취소"
@@ -3262,7 +3277,8 @@ elif page == "공고·매칭":
                                             mx = df_co3[df_co3['기업명']==row['기업명']]
                                             if not mx.empty: ci = mx.iloc[0].to_dict()
                                         ci['기업명'] = row['기업명']
-                                        if 'ai_analysis' not in st.session_state: st.session_state['ai_analysis'] = {}
+                                        if 'ai_analysis' not in st.session_state:
+                                            st.session_state['ai_analysis'] = {}
                                         st.session_state['ai_analysis'][key] = claude_analyze(ci, row.to_dict())
                                     st.rerun()
 
