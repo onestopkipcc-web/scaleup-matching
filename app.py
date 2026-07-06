@@ -3484,22 +3484,177 @@ elif page == "발송":
 
         st.divider()
         st.subheader("발송 미리보기")
-        preview_co      = st.selectbox("기업 선택", companies)
-        preview_notices = [r for r in approved if r['기업명']==preview_co]
-        with st.expander(f"📧 {preview_co} 메일 미리보기"):
-            custom_n = [n for n in preview_notices if n.get('공고유형','맞춤')=='맞춤']
-            common_n = [n for n in preview_notices if n.get('공고유형','맞춤')=='공통']
-            if custom_n:
-                st.caption("**🎯 맞춤 공고**")
-                for i,n in enumerate(custom_n,1):
-                    st.markdown(f"**{i}. {n.get('관련도','')} [{n.get('공고명','')}]({n.get('공고링크','#')})**")
-                    st.caption(f"주관: {n.get('주관기관','')}  |  기간: {n.get('접수기간','')}")
-            if common_n:
-                st.divider()
-                st.caption("**📌 공통 공고 (이런 공고도 있어요)**")
-                for i,n in enumerate(common_n,1):
-                    st.markdown(f"{i}. [{n.get('공고명','')}]({n.get('공고링크','#')})")
-                    st.caption(f"주관: {n.get('주관기관','')}  |  기간: {n.get('접수기간','')}")
+        st.caption("실제 발송될 메일을 기업별로 확인하세요. 기업마다 공고 구성이 다릅니다.")
+
+        preview_co = st.selectbox("기업 선택", sorted(companies))
+
+        # 실제 메일 HTML 생성 (발송 로직과 동일하게)
+        _cal_id_prev   = load_text(drive, CALID_FILE)
+        _ind_cals_prev = load_json(drive, INDCAL_FILE) or {}
+        CALENDAR_LINK_PREV = f"https://calendar.google.com/calendar?cid={_cal_id_prev}" if _cal_id_prev else ""
+        _df_c_prev     = load_excel(drive, SELECTED_FILE)
+        _ai_cache_prev = st.session_state.get('ai_analysis', {})
+
+        preview_notices = [r for r in approved if r['기업명'] == preview_co]
+        _notices_custom = [n for n in preview_notices if n.get('공고유형','맞춤') == '맞춤']
+        _notices_common = [n for n in preview_notices if n.get('공고유형','맞춤') == '공통']
+
+        # 기업 정보
+        _co_info = {}
+        if not _df_c_prev.empty:
+            _mx = _df_c_prev[_df_c_prev['기업명'] == preview_co]
+            if not _mx.empty:
+                _co_info = _mx.iloc[0].to_dict()
+
+        def _check_count_prev(n):
+            k = f"{n.get('기업명','')}_{n.get('공고ID','')}"
+            res = _ai_cache_prev.get(k, {})
+            return sum(1 for f in ['업종일치','자격충족','지역적합','수요일치']
+                       if res.get(f,'') == 'O')
+
+        _rec_prev  = [n for n in _notices_custom if _check_count_prev(n) >= 3]
+        _rest_prev = [n for n in _notices_custom if _check_count_prev(n) < 3]
+
+        # 기업 정보 카드 HTML
+        _kw   = str(_co_info.get('기술키워드','') or _co_info.get('키워드보완','') or '—')[:30]
+        _area = str(_co_info.get('관심사업분야','') or '—')
+        _type = str(_co_info.get('기업유형','') or '—')
+        _loc  = str(_co_info.get('소재지','') or '—')
+
+        def _prev_mailto(label, name, co):
+            import urllib.parse as _up
+            subj = _up.quote(f"[원스톱 피드백] {co}")
+            body = _up.quote(f"[공고 피드백]\n{label}: {name}\n\n[키워드 보완]\n")
+            return f"mailto:onestop.kipcc@gmail.com?subject={subj}&body={body}"
+
+        def _prev_card(n, is_rec=False):
+            dl = n.get('마감일','')
+            if not dl and '~' in n.get('접수기간',''):
+                dl = n.get('접수기간','').split('~')[-1].strip()
+            rsn = reason_to_sentence(n.get('매칭근거',''))
+            nm  = n.get('공고명','')
+            border = "1.5px solid #10B981" if is_rec else "1px solid #E2E8F0"
+            badge  = """<div style="background:#F0FDF4;padding:5px 14px;border-bottom:1px solid #D1FAE5;">
+                          <span style="font-size:11px;font-weight:700;color:#065F46;">✉️ 발송 권장</span>
+                        </div>""" if is_rec else ""
+            return f"""
+            <table width="100%" cellpadding="0" cellspacing="0"
+                   style="margin-bottom:8px;background:#FFFFFF;border:{border};
+                          border-radius:10px;overflow:hidden;">
+              <tr><td>{badge}</td></tr>
+              <tr>
+                <td style="padding:12px 16px;">
+                  <a href="{n.get('공고링크','#')}" style="font-size:14px;font-weight:600;
+                     color:#0F172A;text-decoration:none;display:block;">{nm}</a>
+                  <p style="margin:3px 0;font-size:12px;color:#94A3B8;">
+                    {n.get('주관기관','')} · 마감 {dl or '상시'}
+                  </p>
+                  <p style="margin:4px 0;font-size:11px;color:#10B981;">↳ {rsn}</p>
+                  <div style="margin-top:8px;display:flex;gap:6px;">
+                    <a href="{_prev_mailto('맞아요',nm,preview_co)}"
+                       style="padding:4px 10px;font-size:11px;font-weight:600;color:#065F46;
+                              background:#ECFDF5;border:1px solid #A7F3D0;border-radius:6px;
+                              text-decoration:none;">맞아요</a>
+                    <a href="{_prev_mailto('애매해요',nm,preview_co)}"
+                       style="padding:4px 10px;font-size:11px;font-weight:600;color:#92400E;
+                              background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;
+                              text-decoration:none;">애매해요</a>
+                    <a href="{_prev_mailto('안 맞아요',nm,preview_co)}"
+                       style="padding:4px 10px;font-size:11px;font-weight:600;color:#991B1B;
+                              background:#FEF2F2;border:1px solid #FECACA;border-radius:6px;
+                              text-decoration:none;">안 맞아요</a>
+                  </div>
+                </td>
+              </tr>
+            </table>"""
+
+        _cards_html = ""
+        if _rec_prev or _rest_prev:
+            _cards_html += """<p style="margin:0 0 12px;font-size:10px;font-weight:700;
+                                color:#F59E0B;letter-spacing:2px;">🔦 &nbsp;주목할 만한 공고</p>"""
+            for n in _rec_prev:  _cards_html += _prev_card(n, is_rec=True)
+            if _rec_prev and _rest_prev:
+                _cards_html += """<div style="border-top:1px dashed rgba(0,0,0,0.1);margin:12px 0;"></div>"""
+            for n in _rest_prev: _cards_html += _prev_card(n, is_rec=False)
+
+        _common_html = ""
+        if _notices_common:
+            _common_html = """<div style="border-top:1px solid #E2E8F0;padding-top:14px;margin-top:8px;">
+              <p style="margin:0 0 8px;font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:2px;">
+                📌 &nbsp;이런 공고도 있어요</p>"""
+            for n in _notices_common:
+                _common_html += f"""<div style="background:#F8FAFC;border:1px solid #E2E8F0;
+                  border-radius:8px;padding:10px 14px;margin-bottom:6px;
+                  display:flex;justify-content:space-between;align-items:center;">
+                  <div>
+                    <p style="margin:0;font-size:13px;color:#374151;">{n.get('공고명','')}</p>
+                    <p style="margin:2px 0 0;font-size:11px;color:#94A3B8;">
+                      {n.get('주관기관','')} · {n.get('마감일','상시')}</p>
+                  </div>
+                  <a href="{n.get('공고링크','#')}" style="font-size:11px;color:#10B981;
+                     white-space:nowrap;padding-left:12px;text-decoration:none;">보기 →</a>
+                </div>"""
+            _common_html += "</div>"
+
+        import urllib.parse as _up2
+        _kw_subj = _up2.quote(f"[원스톱 피드백] {preview_co}")
+        _kw_body = _up2.quote("[공고 피드백]\n\n[키워드 보완]\n\n[Gmail 주소]\n")
+
+        _preview_html = f"""
+        <div style="max-width:600px;margin:0 auto;font-family:'Apple SD Gothic Neo',Arial,sans-serif;
+                    border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;">
+          <div style="background:#0F1D2E;padding:24px 28px 20px;">
+            <p style="margin:0 0 4px;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">
+              혁신제품지원센터 · 원스톱 스케일업</p>
+            <p style="margin:0;font-size:20px;font-weight:500;color:#fff;">2026년 7월 맞춤 공고 안내</p>
+            <p style="margin:4px 0 0;font-size:13px;color:rgba(255,255,255,0.5);">{preview_co} 담당자님께</p>
+          </div>
+          <div style="background:#0F1D2E;padding:0 28px 20px;">
+            <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);
+                        border-left:3px solid #10B981;border-radius:8px;padding:12px 16px;">
+              <p style="margin:0 0 8px;font-size:10px;font-weight:600;color:#10B981;letter-spacing:1.5px;">
+                저희가 파악한 귀사 정보</p>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 20px;">
+                <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);">
+                  기술키워드 <span style="color:#fff;">{_kw}</span></p>
+                <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);">
+                  관심분야 <span style="color:#fff;">{_area}</span></p>
+                <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);">
+                  기업유형 <span style="color:#fff;">{_type}</span></p>
+                <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);">
+                  소재지 <span style="color:#fff;">{_loc}</span></p>
+              </div>
+            </div>
+          </div>
+          <div style="background:#0F1D2E;padding:0 28px 8px;">{_cards_html}</div>
+          <div style="background:#0F1D2E;padding:8px 28px 20px;">{_common_html}</div>
+          <div style="background:#0F1D2E;padding:0 28px 20px;">
+            <div style="background:#F8FAFC;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
+              <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#1F4E79;letter-spacing:1px;">
+                더 잘 맞는 공고를 받고 싶다면</p>
+              <p style="margin:0 0 10px;font-size:12px;color:#475569;line-height:1.6;">
+                공고 피드백과 추가 키워드, Gmail 주소를 이 메일에 답장으로 보내주시면
+                다음 달 더 정확한 공고를 드립니다.</p>
+              <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_kw_body}"
+                 style="display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;
+                        color:#fff;background:#1F4E79;border-radius:6px;text-decoration:none;">
+                답장하기 →</a>
+            </div>
+            <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:8px;padding:14px 16px;">
+              <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#059669;letter-spacing:1px;">
+                📅 공고 마감일 캘린더 알림</p>
+              <p style="margin:0 0 10px;font-size:12px;color:#374151;line-height:1.6;">
+                D-7 · D-3 자동 알림을 받아보세요.</p>
+              {"<a href='"+CALENDAR_LINK_PREV+"' style='display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;color:#fff;background:#10B981;border-radius:6px;text-decoration:none;'>📅 캘린더 구독하기 →</a>" if CALENDAR_LINK_PREV else "<p style='margin:0;font-size:12px;color:#6B7280;'>※ 캘린더 링크는 별도 안내 예정입니다.</p>"}
+            </div>
+          </div>
+          <div style="background:#0A1628;padding:14px 28px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.3);">
+              혁신제품지원센터 원스톱 스케일업 · onestop.kipcc@gmail.com</p>
+          </div>
+        </div>"""
+
+        st.components.v1.html(_preview_html, height=900, scrolling=True)
 
         st.divider()
         if st.button("📤 발송 실행", type="primary"):
