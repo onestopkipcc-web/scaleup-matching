@@ -3518,8 +3518,6 @@ elif page == "발송":
         _ai_cache_prev = st.session_state.get('ai_analysis', {})
 
         preview_notices = [r for r in approved if r['기업명'] == preview_co]
-        _notices_custom = [n for n in preview_notices if n.get('공고유형','맞춤') == '맞춤']
-        _notices_common = [n for n in preview_notices if n.get('공고유형','맞춤') == '공통']
 
         # 기업 정보
         _co_info = {}
@@ -3534,6 +3532,8 @@ elif page == "발송":
             return sum(1 for f in ['업종일치','자격충족','지역적합','수요일치']
                        if res.get(f,'') == 'O')
 
+        # 별점 기준으로 분류 (공고유형 무관)
+        _notices_custom = [n for n in preview_notices if n.get('관련도','') in ['★★★','★★']]
         _rec_prev  = [n for n in _notices_custom if _check_count_prev(n) >= 3]
         _rest_prev = [n for n in _notices_custom if _check_count_prev(n) < 3]
 
