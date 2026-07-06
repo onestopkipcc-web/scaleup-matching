@@ -3474,6 +3474,11 @@ elif page == "발송":
     review_state = st.session_state.get('review_state', {})
 
     # match_results와 review_state 동기화
+    # ai_analysis 없으면 드라이브에서 로드
+    if 'ai_analysis' not in st.session_state or not st.session_state['ai_analysis']:
+        _cached = load_json(drive, AI_ANALYSIS_FILE) or {}
+        st.session_state['ai_analysis'] = _cached
+
     ai_cache = st.session_state.get('ai_analysis', {})
     approved = [
         r for r in results
@@ -3595,17 +3600,27 @@ elif page == "발송":
             for n in _rest_prev: _cards_html += _prev_card(n, is_rec=False)
 
         _common_html = ""
-        if _notices_common:
-            _common_html = """<div style="border-top:1px solid #E2E8F0;padding-top:14px;margin-top:8px;">
-              <p style="margin:0 0 8px;font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:2px;">
-                📌 &nbsp;이런 공고도 있어요</p>"""
-            for n in _notices_common:
-                _common_html += f"""<div style="background:#F8FAFC;border:1px solid #E2E8F0;
-                  border-radius:8px;padding:10px 14px;margin-bottom:6px;
+        # 검토 등급 공고 (미리보기용)
+        _review_prev = [
+            r for r in review_grade
+            if r.get('기업명','') == preview_co
+        ]
+        if _review_prev:
+            _common_html += """<div style="border-top:1px solid rgba(255,255,255,0.08);
+              padding-top:14px;margin-top:8px;">
+              <p style="margin:0 0 6px;font-size:10px;font-weight:700;
+                         color:rgba(255,255,255,0.3);letter-spacing:2px;">
+                📢 &nbsp;다른 기업들이 관심 가진 공고</p>
+              <p style="margin:0 0 10px;font-size:11px;color:rgba(255,255,255,0.25);">
+                비슷한 업종·분야의 기업들이 추천받은 공고입니다. 참고해보세요.</p>"""
+            for n in _review_prev[:3]:
+                _common_html += f"""<div style="background:rgba(255,255,255,0.03);
+                  border:1px solid rgba(255,255,255,0.06);border-radius:8px;
+                  padding:10px 14px;margin-bottom:6px;
                   display:flex;justify-content:space-between;align-items:center;">
                   <div>
-                    <p style="margin:0;font-size:13px;color:#374151;">{n.get('공고명','')}</p>
-                    <p style="margin:2px 0 0;font-size:11px;color:#94A3B8;">
+                    <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.6);">{n.get('공고명','')[:35]}</p>
+                    <p style="margin:2px 0 0;font-size:11px;color:rgba(255,255,255,0.25);">
                       {n.get('주관기관','')} · {n.get('마감일','상시')}</p>
                   </div>
                   <a href="{n.get('공고링크','#')}" style="font-size:11px;color:#10B981;
