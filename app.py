@@ -2784,24 +2784,36 @@ elif page == "공고·매칭":
 
                     if st.button("⚡ 전 기업 일괄 실행", type="primary", key="global_bulk_ai"):
                         _drive = _get_drive()
-                        prog_g = st.progress(0, text="전체 분석 중...")
+                        prog_g = st.progress(0, text="캐시 확인 중...")
+
+                        # 드라이브 캐시 먼저 로드 → 세션에 병합
+                        cached = load_json(_drive, AI_ANALYSIS_FILE) or {}
+                        if 'ai_analysis' not in st.session_state:
+                            st.session_state['ai_analysis'] = {}
+                        # 드라이브에 있는 건 세션으로 병합 (신규 분석 최소화)
+                        before = len(st.session_state['ai_analysis'])
+                        st.session_state['ai_analysis'].update(cached)
+                        merged = len(st.session_state['ai_analysis']) - before
+
                         ok_g = 0; ap_g = 0; rj_g = 0
+                        total_g = len(filtered)
+                        skip_g  = 0
 
                         for gi, (_, gr) in enumerate(filtered.iterrows()):
                             gkey = f"{gr['기업명']}_{gr.get('공고ID','')}"
 
-                            # AI 분석 (미분석 건만)
-                            if gkey not in st.session_state.get('ai_analysis', {}):
+                            # 캐시(세션+드라이브 병합) 확인 → 없는 것만 분석
+                            if gkey not in st.session_state['ai_analysis']:
                                 ci = {}
                                 if 'df_companies_cache' in st.session_state:
                                     df_co_g = st.session_state['df_companies_cache']
                                     mx_g = df_co_g[df_co_g['기업명']==gr['기업명']]
                                     if not mx_g.empty: ci = mx_g.iloc[0].to_dict()
                                 ci['기업명'] = gr['기업명']
-                                if 'ai_analysis' not in st.session_state:
-                                    st.session_state['ai_analysis'] = {}
                                 st.session_state['ai_analysis'][gkey] = claude_analyze(ci, gr.to_dict())
                                 ok_g += 1
+                            else:
+                                skip_g += 1
 
                             # 자동 처리
                             rec_g = st.session_state['ai_analysis'].get(gkey, {}).get('추천여부', '')
@@ -2810,12 +2822,13 @@ elif page == "공고·매칭":
                             elif auto_reject and rec_g == '비추천':
                                 st.session_state['review_state'][gkey] = '✕'; rj_g += 1
 
-                            prog_g.progress((gi+1)/len(filtered),
-                                            text=f"{gi+1}/{len(filtered)} 처리 중...")
+                            prog_g.progress((gi+1)/total_g,
+                                            text=f"{gi+1}/{total_g} 처리 중... (신규 {ok_g}건 / 캐시 {skip_g}건)")
 
-                        # 드라이브 저장
-                        save_ai_analysis(_drive)
-                        st.success(f"✅ 완료 — 신규분석 {ok_g}건 / 자동승인 {ap_g}건 / 자동제외 {rj_g}건")
+                        # 드라이브 저장 (신규 분석 있을 때만)
+                        if ok_g > 0:
+                            save_ai_analysis(_drive)
+                        st.success(f"✅ 완료 — 신규분석 {ok_g}건 / 캐시재사용 {skip_g}건 / 자동승인 {ap_g}건 / 자동제외 {rj_g}건")
                         st.rerun()
 
                     # 검토 등급만 보기 토글
@@ -3443,13 +3456,25 @@ elif page == "발송":
                     dl_raw = n.get('마감일','')
                     if not dl_raw and '~' in n.get('접수기간',''):
                         dl_raw = n.get('접수기간','').split('~')[-1].strip()
-                    # 매칭근거 → 자연어 한 줄 변환
                     reason_sentence = reason_to_sentence(n.get('매칭근거',''))
                     reason_html = f"""
                           <p style="margin:6px 0 0;font-size:11px;color:#10B981;
                                      font-style:normal;line-height:1.5;">
                             ↳ {reason_sentence}
                           </p>""" if reason_sentence else ""
+                    notice_name = n.get('공고명','')
+                    # 피드백 버튼 — mailto 답장 형식으로 구조화
+                    subject_enc = f"[원스톱 피드백] {company}"
+                    def mailto(label):
+                        body = (
+                            f"[공고 피드백]\n"
+                            f"{label}: {notice_name}\n\n"
+                            f"[키워드 보완]\n"
+                            f"(추가로 받고 싶은 분야나 키워드가 있으면 적어주세요)\n"
+                        )
+                        import urllib.parse
+                        return f"mailto:onestop.kipcc@gmail.com?subject={urllib.parse.quote(subject_enc)}&body={urllib.parse.quote(body)}"
+
                     return f"""
                     <table width="100%" cellpadding="0" cellspacing="0"
                            style="margin-bottom:10px;background:#FFFFFF;
@@ -3461,7 +3486,7 @@ elif page == "발송":
                           <a href="{n.get('공고링크','#')}"
                              style="font-size:14px;font-weight:600;color:#0F172A;
                                     text-decoration:none;line-height:1.5;display:block;">
-                            {n.get('공고명','')}
+                            {notice_name}
                           </a>
                           <p style="margin:4px 0 0;font-size:12px;color:#94A3B8;">
                             {n.get('주관기관','')}
@@ -3469,6 +3494,23 @@ elif page == "발송":
                             마감 {dl_raw if dl_raw else '상시'}
                           </p>
                           {reason_html}
+                          <div style="margin-top:10px;display:flex;gap:6px;">
+                            <a href="{mailto('맞아요')}"
+                               style="display:inline-block;padding:4px 12px;font-size:11px;
+                                      font-weight:600;color:#065F46;background:#ECFDF5;
+                                      border:1px solid #A7F3D0;border-radius:6px;
+                                      text-decoration:none;">맞아요</a>
+                            <a href="{mailto('애매해요')}"
+                               style="display:inline-block;padding:4px 12px;font-size:11px;
+                                      font-weight:600;color:#92400E;background:#FFFBEB;
+                                      border:1px solid #FDE68A;border-radius:6px;
+                                      text-decoration:none;">애매해요</a>
+                            <a href="{mailto('안 맞아요')}"
+                               style="display:inline-block;padding:4px 12px;font-size:11px;
+                                      font-weight:600;color:#991B1B;background:#FEF2F2;
+                                      border:1px solid #FECACA;border-radius:6px;
+                                      text-decoration:none;">안 맞아요</a>
+                          </div>
                         </td>
                         <td width="60" align="center" valign="middle"
                             style="padding:14px 12px;
@@ -3524,6 +3566,41 @@ elif page == "발송":
                          style="color:#2E75B6;font-size:13px">📅 {company} 전용 캘린더 구독</a></div>"""
 
                 cal_sec=f"""
+                <div style="background:#F0FDF4;border-radius:10px;
+                            padding:16px 18px;border:1px solid #A7F3D0;margin:16px 0;">
+                  <p style="margin:0 0 4px;color:#059669;font-weight:700;font-size:11px;
+                             letter-spacing:1.5px;text-transform:uppercase;">
+                    📅 공고 마감일 캘린더 알림
+                  </p>"""
+
+                import urllib.parse as _up
+                kw_subject = _up.quote(f"[원스톱 피드백] {company}")
+                kw_body    = _up.quote(
+                    "[공고 피드백]\n"
+                    "(위 공고 카드의 맞아요/애매해요/안 맞아요 버튼으로 보내주세요)\n\n"
+                    "[키워드 보완]\n"
+                    "추가로 받고 싶은 분야나 키워드를 적어주세요:\n\n"
+                )
+                keyword_sec = f"""
+                <div style="background:#F8FAFC;border:1px solid #E2E8F0;
+                            border-radius:10px;padding:16px 18px;margin:16px 0;">
+                  <p style="margin:0 0 4px;color:#1F4E79;font-weight:700;font-size:11px;
+                             letter-spacing:1.5px;text-transform:uppercase;">
+                    더 잘 맞는 공고를 받고 싶다면
+                  </p>
+                  <p style="margin:0 0 12px;font-size:13px;color:#475569;line-height:1.7;">
+                    위 공고들이 귀사와 맞는지 버튼으로 알려주시면 다음 달 더 정확한 공고를 드릴 수 있습니다.<br>
+                    추가로 받고 싶은 분야나 키워드가 있으시면 아래 링크로 답장해주세요.
+                  </p>
+                  <a href="mailto:onestop.kipcc@gmail.com?subject={kw_subject}&body={kw_body}"
+                     style="display:inline-block;padding:8px 18px;font-size:13px;font-weight:600;
+                            color:#FFFFFF;background:#1F4E79;border-radius:8px;
+                            text-decoration:none;">
+                    키워드 보완 답장하기 →
+                  </a>
+                </div>"""
+
+                cal_sec = f"""
                 <div style="background:#F0FDF4;border-radius:10px;
                             padding:16px 18px;border:1px solid #A7F3D0;margin:16px 0;">
                   <p style="margin:0 0 4px;color:#059669;font-weight:700;font-size:11px;
@@ -3641,6 +3718,7 @@ elif page == "발송":
         </tr>
 
         <!-- 캘린더 -->
+        {f'''<tr><td style="padding:0 28px 24px;background:#0F1D2E;">{keyword_sec}</td></tr>''' if keyword_sec else ''}
         {f'''<tr><td style="padding:0 28px 24px;background:#0F1D2E;">{cal_sec}</td></tr>''' if cal_sec else ''}
       </table>
     </td>
@@ -3970,18 +4048,19 @@ JSON만 응답 (코드블록 없이):
                         if body_text and st.button("🤖 키워드 자동 추출", key=f"extract_{i}"):
                             with st.spinner("Claude 분석 중..."):
                                 prompt = f"""아래는 지원사업 안내 메일에 대한 기업 담당자의 회신입니다.
-메일 본문에 [Q1], [Q2] 형식의 답변이 포함되어 있을 수 있습니다.
+[공고 피드백] 섹션에 '맞아요/애매해요/안 맞아요: 공고명' 형식이 있을 수 있고,
+[Q1], [Q2] 형식의 키워드 답변도 있을 수 있습니다.
 
 회신 내용:
 {body_text[:1500]}
 
 위 내용에서 다음을 추출해주세요.
-- [Q1] 답변(→ 답변: 이후 텍스트)에서 기업의 주요 기술/제품 키워드
-- [Q2] 답변(→ 답변: 이후 텍스트)에서 필요 지원 유형과 목표
-- Q1/Q2 형식이 없으면 전체 내용에서 추출
+- [공고 피드백] 섹션에서 공고별 피드백 추출
+- [키워드 보완] 또는 Q1/Q2 답변에서 기술키워드와 필요지원 추출
+- 형식이 없으면 전체 내용에서 추출
 
 반드시 아래 JSON 형식으로만 응답하세요. 코드블록이나 설명 텍스트 없이 JSON만:
-{{"기술키워드": ["키워드1", "키워드2"], "필요지원": ["지원유형1"], "수출관심국": [], "요약": "한 줄 요약"}}"""
+{{"기술키워드": ["키워드1"], "필요지원": ["지원유형"], "수출관심국": [], "공고피드백": [{{"공고명": "...", "피드백": "맞아요"}}], "요약": "한 줄 요약"}}"""
                                 try:
                                     import json as _json, re as _re2
                                     res = claude_call_raw(prompt)
@@ -4005,6 +4084,7 @@ JSON만 응답 (코드블록 없이):
                             kws = ext.get('기술키워드', [])
                             sup = ext.get('필요지원', [])
                             exp = ext.get('수출관심국', [])
+                            feedbacks = ext.get('공고피드백', [])
 
                             col_a, col_b, col_c = st.columns(3)
                             with col_a:
@@ -4016,6 +4096,14 @@ JSON만 응답 (코드블록 없이):
                             with col_c:
                                 st.caption("**수출 관심국**")
                                 st.write(', '.join(exp) if exp else '—')
+
+                            # 공고 피드백 표시
+                            if feedbacks:
+                                st.caption("**공고 피드백**")
+                                for fb in feedbacks:
+                                    icon = {"맞아요":"✅","애매해요":"🟡","안맞아요":"❌","안 맞아요":"❌"}.get(fb.get('피드백',''), "❓")
+                                    st.write(f"{icon} {fb.get('피드백','')} — {fb.get('공고명','')[:40]}")
+
                             st.caption(f"요약: {ext.get('요약','')}")
 
                             if matched_co and (kws or sup):
@@ -4029,7 +4117,6 @@ JSON만 응답 (코드블록 없이):
                                         merged   = ', '.join(filter(None, [existing, new_kws]))
                                         df_c2.loc[mask, '키워드보완'] = merged
                                         if exp:
-                                            # 수출국가 컬럼도 업데이트
                                             existing_exp = str(df_c2.loc[mask, '수출국가'].values[0] or '')
                                             df_c2.loc[mask, '수출국가'] = ', '.join(
                                                 filter(None, [existing_exp, ', '.join(exp)]))
