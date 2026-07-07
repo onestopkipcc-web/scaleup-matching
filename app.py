@@ -385,6 +385,38 @@ def load_ai_analysis(drive):
     return 0
 
 
+def reason_to_hashtag(reason_str):
+    """매칭근거 문자열을 해시태그 형태로 변환"""
+    if not reason_str: return ""
+    tags = []
+    parts = [p.strip() for p in reason_str.split("+")]
+    for p in parts:
+        if "조달기업 대상" in p:    tags.append("조달기업")
+        elif "수출기업 대상" in p:  tags.append("수출기업")
+        elif "중소벤처" in p:       tags.append("중소벤처")
+        elif "중소기업" in p:       tags.append("중소기업")
+        if "공공조달" in p:         tags.append("공공조달")
+        elif "해외진출" in p:       tags.append("해외진출")
+        elif "기술개발" in p:       tags.append("기술개발")
+        elif "마케팅" in p:         tags.append("마케팅홍보")
+        elif "인증특허" in p or "인증·특허" in p: tags.append("인증특허")
+        elif "금융" in p and "융자" in p: tags.append("자금지원")
+        elif "내수" in p:           tags.append("내수판로")
+        if "수요태그(" in p:
+            for t in p.split("(")[1].rstrip(")").split(","):
+                t = t.strip()
+                if t: tags.append(t)
+        if "업종일치(" in p:
+            ind = p.split("(")[1].rstrip(")").strip()
+            if ind: tags.append(ind[:8])
+        if "동일지역" in p:         tags.append("지역가점")
+    seen = []
+    for t in tags:
+        if t not in seen: seen.append(t)
+    hashtags = " ".join([f"#{t}" for t in seen[:5]])
+    return hashtags
+
+
 def reason_to_sentence(reason_str):
     """매칭근거 문자열을 메일용 자연스러운 한 줄 문장으로 변환"""
     if not reason_str: return ""
@@ -3549,8 +3581,14 @@ elif page == "발송":
             dl = n.get('마감일','')
             if not dl and '~' in n.get('접수기간',''):
                 dl = n.get('접수기간','').split('~')[-1].strip()
-            rsn = reason_to_sentence(n.get('매칭근거',''))
-            nm  = n.get('공고명','')
+            hashtags = reason_to_hashtag(n.get('매칭근거',''))
+            tag_html = ""
+            if hashtags:
+                tag_html = "<div style=\'margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;\'>"
+                for tag in hashtags.split():
+                    tag_html += f"<span style=\'font-size:11px;background:#EFF6FF;color:#1D4ED8;padding:3px 8px;border-radius:20px;\'>{tag}</span>"
+                tag_html += "</div>"
+            nm = n.get('공고명','')
             return f"""
             <table width="100%" cellpadding="0" cellspacing="0"
                    style="margin-bottom:8px;background:#FFFFFF;border:1px solid #E2E8F0;
@@ -3562,7 +3600,7 @@ elif page == "발송":
                   <p style="margin:3px 0;font-size:12px;color:#94A3B8;">
                     {n.get('주관기관','')} · 마감 {dl or '상시'}
                   </p>
-                  <p style="margin:4px 0;font-size:11px;color:#10B981;">↳ {rsn}</p>
+                  {tag_html}
                 </td>
                 <td width="60" align="center" valign="middle"
                     style="padding:14px 12px;border-left:1px solid #F1F5F9;">
@@ -3580,7 +3618,7 @@ elif page == "발송":
             _ss  = [n for n in _notices_custom if n.get('관련도','') == '★★']
             if _sss:
                 _cards_html += """<p style="margin:0 0 12px;font-size:10px;font-weight:700;
-                                    color:#F59E0B;letter-spacing:2px;">🔦 &nbsp;주목할 만한 공고</p>"""
+                                    color:#6EE7B7;letter-spacing:2px;">🔦 &nbsp;주목할 만한 공고</p>"""
                 for n in _sss: _cards_html += _prev_card(n)
             if _ss:
                 _cards_html += """<div style="border-top:1px solid rgba(255,255,255,0.08);
@@ -3699,6 +3737,8 @@ elif page == "발송":
           <div style="background:#0A1628;padding:14px 28px;text-align:center;">
             <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.3);">
               혁신제품지원센터 원스톱 스케일업 · onestop.kipcc@gmail.com</p>
+              <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.2);">
+                본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
           </div>
         </div>"""
 
@@ -3767,11 +3807,13 @@ elif page == "발송":
                     dl_raw = n.get("마감일","")
                     if not dl_raw and "~" in n.get("접수기간",""):
                         dl_raw = n.get("접수기간","").split("~")[-1].strip()
-                    reason_sentence = reason_to_sentence(n.get("매칭근거",""))
-                    reason_html = f"""
-                          <p style="margin:6px 0 0;font-size:11px;color:#10B981;line-height:1.5;">
-                            ↳ {reason_sentence}
-                          </p>""" if reason_sentence else ""
+                    hashtags = reason_to_hashtag(n.get("매칭근거",""))
+                    tag_html = ""
+                    if hashtags:
+                        tag_html = "<div style=\'margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;\'>"
+                        for tag in hashtags.split():
+                            tag_html += f"<span style=\'font-size:11px;background:#EFF6FF;color:#1D4ED8;padding:3px 8px;border-radius:20px;\'>{tag}</span>"
+                        tag_html += "</div>"
                     notice_name = n.get("공고명","")
                     return f"""
                     <table width="100%" cellpadding="0" cellspacing="0"
@@ -3788,7 +3830,7 @@ elif page == "발송":
                           <p style="margin:4px 0 0;font-size:12px;color:#94A3B8;">
                             {n.get("주관기관","")} &nbsp;·&nbsp; 마감 {dl_raw if dl_raw else "상시"}
                           </p>
-                          {reason_html}
+                          {tag_html}
                         </td>
                         <td width="60" align="center" valign="middle"
                             style="padding:14px 12px;border-left:1px solid #F1F5F9;">
@@ -3807,7 +3849,7 @@ elif page == "발송":
                 if notices_sss:
                     rows_html += """
                     <p style="margin:0 0 12px;font-size:10px;font-weight:700;
-                               color:#F59E0B;letter-spacing:2px;text-transform:uppercase;">
+                               color:#6EE7B7;letter-spacing:2px;text-transform:uppercase;">
                       🔦 &nbsp;주목할 만한 공고
                     </p>"""
                     for i, n in enumerate(notices_sss):
@@ -3819,7 +3861,7 @@ elif page == "발송":
                     <div style="border-top:1px solid rgba(255,255,255,0.08);
                                 padding-top:16px;margin-top:8px;">
                       <p style="margin:0 0 10px;font-size:10px;font-weight:700;
-                                 color:rgba(255,255,255,0.35);letter-spacing:2px;
+                                 color:#F59E0B;letter-spacing:2px;
                                  text-transform:uppercase;">
                         📌 &nbsp;이런 공고도 있어요
                       </p>"""
@@ -3833,11 +3875,11 @@ elif page == "발송":
                     <div style="border-top:1px solid rgba(255,255,255,0.08);
                                 padding-top:16px;margin-top:8px;">
                       <p style="margin:0 0 6px;font-size:10px;font-weight:700;
-                                 color:rgba(255,255,255,0.3);letter-spacing:2px;
+                                 color:#F59E0B;letter-spacing:2px;
                                  text-transform:uppercase;">
                         📢 &nbsp;다른 기업들이 관심 가진 공고
                       </p>
-                      <p style="margin:0 0 10px;font-size:11px;color:rgba(255,255,255,0.25);">
+                      <p style="margin:0 0 10px;font-size:11px;color:rgba(255,255,255,0.35);">
                         비슷한 업종·분야의 기업들이 추천받은 공고입니다. 참고해보세요.
                       </p>"""
                     for i, n in enumerate(notices_review[:3]):
@@ -4069,6 +4111,9 @@ elif page == "발송":
                  style="color:#1F4E79;text-decoration:none;font-weight:600;">
                 onestop.kipcc@gmail.com
               </a>
+            </p>
+            <p style="margin:8px 0 0;font-size:11px;color:#B0BAC4;">
+              본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.
             </p>
           </td>
           <td align="right" valign="middle">
