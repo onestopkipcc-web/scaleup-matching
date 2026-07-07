@@ -3509,7 +3509,7 @@ elif page == "발송":
         # 실제 메일 HTML 생성 (발송 로직과 동일하게)
         _cal_id_prev   = load_text(drive, CALID_FILE)
         _ind_cals_prev = load_json(drive, INDCAL_FILE) or {}
-        CALENDAR_LINK_PREV = f"https://calendar.google.com/calendar?cid={_cal_id_prev}" if _cal_id_prev else ""
+        CALENDAR_LINK_PREV = "https://calendar.google.com/calendar/u/6?cid=OTA3OGE0OTk1MGE0N2I0NmRkYjM1MTEwNDA4ODZmM2EwMTZiNzVjYTE3MTY5ZWMxMTEzZTU2OTJiNzMyNzM3NUBncm91cC5jYWxlbmRhci5nb29nbGUuY29t"
         _df_c_prev     = load_excel(drive, SELECTED_FILE)
         _ai_cache_prev = st.session_state.get('ai_analysis', {})
 
@@ -3690,10 +3690,15 @@ elif page == "발송":
             </div>
             <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:8px;padding:14px 16px;">
               <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#059669;letter-spacing:1px;">
-                📅 공고 마감일 캘린더 알림</p>
+                📅 공고 마감일 캘린더</p>
               <p style="margin:0 0 10px;font-size:12px;color:#374151;line-height:1.6;">
-                D-7 · D-3 자동 알림을 받아보세요.</p>
-              {"<a href='"+CALENDAR_LINK_PREV+"' style='display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;color:#fff;background:#10B981;border-radius:6px;text-decoration:none;'>📅 캘린더 구독하기 →</a>" if CALENDAR_LINK_PREV else "<p style='margin:0;font-size:12px;color:#6B7280;'>※ 캘린더 링크는 별도 안내 예정입니다.</p>"}
+                전체 지원사업 공고 마감일을 한눈에 확인하세요.</p>
+              {"<a href='"+CALENDAR_LINK_PREV+"' style='display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;color:#fff;background:#10B981;border-radius:6px;text-decoration:none;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK_PREV else "<p style='margin:0;font-size:12px;color:#6B7280;'>※ 캘린더 링크는 별도 안내 예정입니다.</p>"}
+              <p style="margin:10px 0 0;font-size:11px;color:#374151;line-height:1.7;">
+                💡 <b>귀사 맞춤 공고만 담긴 개인 캘린더</b>를 원하시면<br>
+                Gmail 주소를 이 메일에 답장으로 알려주세요.<br>
+                D-7 · D-3 마감 알림이 자동으로 설정됩니다.
+              </p>
             </div>
           </div>
           <div style="background:#0A1628;padding:14px 28px;text-align:center;">
@@ -3712,7 +3717,7 @@ elif page == "발송":
 
             cal_id        = load_text(drive, CALID_FILE)
             ind_cals      = load_json(drive, INDCAL_FILE)
-            CALENDAR_LINK = f"https://calendar.google.com/calendar?cid={cal_id}" if cal_id else ""
+            CALENDAR_LINK = "https://calendar.google.com/calendar/u/6?cid=OTA3OGE0OTk1MGE0N2I0NmRkYjM1MTEwNDA4ODZmM2EwMTZiNzVjYTE3MTY5ZWMxMTEzZTU2OTJiNzMyNzM3NUBncm91cC5jYWxlbmRhci5nb29nbGUuY29t"
             df_c_cur      = load_excel(drive, SELECTED_FILE)
 
             history_records = []; prog = st.progress(0); log = st.empty(); logs = []
@@ -3926,15 +3931,16 @@ elif page == "발송":
                             padding:16px 18px;border:1px solid #A7F3D0;margin:16px 0;">
                   <p style="margin:0 0 4px;color:#059669;font-weight:700;font-size:11px;
                              letter-spacing:1.5px;text-transform:uppercase;">
-                    📅 공고 마감일 캘린더 알림
+                    📅 공고 마감일 캘린더
                   </p>
                   <p style="margin:0 0 12px;font-size:12px;color:#374151;">
-                    D-7 · D-3 자동 알림을 받아보세요. 구글 계정만 있으면 1회 클릭으로 설정됩니다.
+                    전체 지원사업 공고 마감일을 한눈에 확인하세요.
                   </p>
-                  {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#10B981;color:#fff;padding:8px 18px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700;'>📅 공통 캘린더 구독하기 →</a>" if CALENDAR_LINK else "<p style='margin:0;font-size:12px;color:#6B7280;'>※ 캘린더 링크는 별도 안내 예정입니다.</p>"}
-                  {ind_link}
-                  <p style="margin:10px 0 0;font-size:11px;color:#9CA3AF;">
-                    구글 계정이 없으신 경우 담당자에게 문의 주시면 안내해드립니다.
+                  {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#10B981;color:#fff;padding:8px 18px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK else "<p style='margin:0;font-size:12px;color:#6B7280;'>※ 캘린더 링크는 별도 안내 예정입니다.</p>"}
+                  <p style="margin:12px 0 0;font-size:11px;color:#374151;line-height:1.7;">
+                    💡 <b>귀사 맞춤 공고만 담긴 개인 캘린더</b>를 원하시면<br>
+                    Gmail 주소를 이 메일에 답장으로 알려주세요.<br>
+                    D-7 · D-3 마감 알림이 자동으로 설정됩니다.
                   </p>
                 </div>"""
 
