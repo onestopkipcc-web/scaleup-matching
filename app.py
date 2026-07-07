@@ -3692,8 +3692,7 @@ elif page == "발송":
                 전체 지원사업 공고 마감일을 한눈에 확인하세요.</p>
               {"<a href='"+CALENDAR_LINK_PREV+"' style='display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;color:#fff;background:#10B981;border-radius:6px;text-decoration:none;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK_PREV else ""}
               <p style="margin:10px 0 0;font-size:11px;color:#374151;line-height:1.7;">
-                💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면<br>
-                Gmail 주소를 답장으로 알려주세요.
+                💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
               </p>
             </div>
           </div>
@@ -3924,8 +3923,7 @@ elif page == "발송":
                   </p>
                   {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#10B981;color:#fff;padding:7px 16px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK else ""}
                   <p style="margin:10px 0 0;font-size:11px;color:#374151;line-height:1.7;">
-                    💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면<br>
-                    Gmail 주소를 답장으로 알려주세요.
+                    💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
                   </p>
                 </div>"""
 
