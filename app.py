@@ -3889,37 +3889,27 @@ elif page == "발송":
                       <a href="https://calendar.google.com/calendar?cid={ind_cals[company]['calendar_id']}"
                          style="color:#2E75B6;font-size:13px">📅 {company} 전용 캘린더 구독</a></div>"""
 
-                cal_sec=f"""
-                <div style="background:#F0FDF4;border-radius:10px;
-                            padding:16px 18px;border:1px solid #A7F3D0;margin:16px 0;">
-                  <p style="margin:0 0 4px;color:#059669;font-weight:700;font-size:11px;
-                             letter-spacing:1.5px;text-transform:uppercase;">
-                    📅 공고 마감일 캘린더 알림
-                  </p>"""
-
                 import urllib.parse as _up
                 kw_subject = _up.quote(f"[원스톱 피드백] {company}")
                 kw_body    = _up.quote(
-                    "[공고 피드백]\n"
-                    "(위 공고 카드의 맞아요/애매해요/안 맞아요 버튼으로 보내주세요)\n\n"
-                    "[키워드 보완]\n"
-                    "추가로 받고 싶은 분야나 키워드를 적어주세요:\n\n"
+                    "[추가 키워드]\n"
+                    "더 받고 싶은 분야나 키워드를 적어주세요:\n\n"
                     "[Gmail 주소]\n"
-                    "구글 캘린더 마감 알림을 받으시려면 Gmail 주소를 알려주세요:\n"
+                    "맞춤 캘린더 알림을 받으시려면 Gmail 주소를 알려주세요:\n"
                 )
+
                 keyword_sec = f"""
                 <div style="background:#F8FAFC;border:1px solid #E2E8F0;
                             border-radius:10px;padding:16px 18px;margin:16px 0;">
-                  <p style="margin:0 0 4px;color:#1F4E79;font-weight:700;font-size:11px;
+                  <p style="margin:0 0 8px;color:#1F4E79;font-weight:700;font-size:11px;
                              letter-spacing:1.5px;text-transform:uppercase;">
-                    더 잘 맞는 공고를 받고 싶다면
+                    ✏️ 추가 키워드가 있으신가요?
                   </p>
-                  <p style="margin:0 0 12px;font-size:13px;color:#475569;line-height:1.7;">
-                    위 공고들이 귀사와 맞는지 버튼으로 알려주시면 다음 달 더 정확한 공고를 드릴 수 있습니다.<br>
-                    추가 키워드나 <b>구글 캘린더 마감 알림</b>을 원하시면 아래 링크로 답장해주세요.
+                  <p style="margin:0 0 12px;font-size:12px;color:#475569;line-height:1.7;">
+                    더 잘 맞는 공고를 드리기 위해 받고 싶은 분야나 키워드를 답장으로 알려주세요.
                   </p>
                   <a href="mailto:onestop.kipcc@gmail.com?subject={kw_subject}&body={kw_body}"
-                     style="display:inline-block;padding:8px 18px;font-size:13px;font-weight:600;
+                     style="display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;
                             color:#FFFFFF;background:#1F4E79;border-radius:8px;
                             text-decoration:none;">
                     답장하기 →
@@ -3933,14 +3923,13 @@ elif page == "발송":
                              letter-spacing:1.5px;text-transform:uppercase;">
                     📅 공고 마감일 캘린더
                   </p>
-                  <p style="margin:0 0 12px;font-size:12px;color:#374151;">
+                  <p style="margin:0 0 10px;font-size:12px;color:#374151;">
                     전체 지원사업 공고 마감일을 한눈에 확인하세요.
                   </p>
-                  {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#10B981;color:#fff;padding:8px 18px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK else "<p style='margin:0;font-size:12px;color:#6B7280;'>※ 캘린더 링크는 별도 안내 예정입니다.</p>"}
-                  <p style="margin:12px 0 0;font-size:11px;color:#374151;line-height:1.7;">
-                    💡 <b>귀사 맞춤 공고만 담긴 개인 캘린더</b>를 원하시면<br>
-                    Gmail 주소를 이 메일에 답장으로 알려주세요.<br>
-                    D-7 · D-3 마감 알림이 자동으로 설정됩니다.
+                  {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#10B981;color:#fff;padding:7px 16px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK else ""}
+                  <p style="margin:10px 0 0;font-size:11px;color:#374151;line-height:1.7;">
+                    💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면<br>
+                    Gmail 주소를 답장으로 알려주세요.
                   </p>
                 </div>"""
 
@@ -4042,24 +4031,18 @@ elif page == "발송":
                         border-left:3px solid #10B981;border-radius:8px;">
               <p style="margin:0 0 8px;font-size:10px;font-weight:600;color:#10B981;letter-spacing:1.5px;">
                 저희가 파악한 귀사 정보</p>
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="font-size:12px;color:rgba(255,255,255,0.45);padding:2px 0;width:50%;">
-                    기술키워드 <span style="color:#fff;">{str(co_row.get("기술키워드","") or co_row.get("키워드보완","") or "—")[:25]}</span>
-                  </td>
-                  <td style="font-size:12px;color:rgba(255,255,255,0.45);padding:2px 0;width:50%;">
-                    관심분야 <span style="color:#fff;">{str(co_row.get("관심사업분야","") or "—")}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="font-size:12px;color:rgba(255,255,255,0.45);padding:2px 0;">
-                    기업유형 <span style="color:#fff;">{str(co_row.get("기업유형","") or "—")[:20]}</span>
-                  </td>
-                  <td style="font-size:12px;color:rgba(255,255,255,0.45);padding:2px 0;">
-                    소재지 <span style="color:#fff;">{str(co_row.get("소재지","") or "—")}</span>
-                  </td>
-                </tr>
-              </table>
+              <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.45);">
+                기술키워드 <span style="color:#fff;word-break:keep-all;">{str(co_row.get("기술키워드","") or co_row.get("키워드보완","") or "—")[:30]}</span>
+              </p>
+              <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.45);">
+                관심분야 <span style="color:#fff;">{str(co_row.get("관심사업분야","") or "—")}</span>
+              </p>
+              <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.45);">
+                기업유형 <span style="color:#fff;word-break:keep-all;">{str(co_row.get("기업유형","") or "—")[:25]}</span>
+              </p>
+              <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);">
+                소재지 <span style="color:#fff;">{str(co_row.get("소재지","") or "—")}</span>
+              </p>
             </div>""" if not df_c_cur.empty and not df_c_cur[df_c_cur["기업명"]==company].empty
             else ""}
           </td>
