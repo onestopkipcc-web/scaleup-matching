@@ -3638,16 +3638,14 @@ elif page == "발송":
                         border-left:3px solid #10B981;border-radius:8px;padding:12px 16px;">
               <p style="margin:0 0 8px;font-size:10px;font-weight:600;color:#10B981;letter-spacing:1.5px;">
                 저희가 파악한 귀사 정보</p>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 20px;">
-                <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);">
-                  기술키워드 <span style="color:#fff;">{_kw}</span></p>
-                <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);">
-                  관심분야 <span style="color:#fff;">{_area}</span></p>
-                <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);">
-                  기업유형 <span style="color:#fff;">{_type}</span></p>
-                <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);">
-                  소재지 <span style="color:#fff;">{_loc}</span></p>
-              </div>
+              <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.45);">
+                기술키워드 <span style="color:#fff;word-break:keep-all;">{_kw}</span></p>
+              <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.45);">
+                관심분야 <span style="color:#fff;">{_area}</span></p>
+              <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.45);">
+                기업유형 <span style="color:#fff;word-break:keep-all;">{_type}</span></p>
+              <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);">
+                소재지 <span style="color:#fff;">{_loc}</span></p>
             </div>
           </div>
           <div style="background:#0F1D2E;padding:0 28px 8px;">{_cards_html}</div>
@@ -3679,10 +3677,9 @@ elif page == "발송":
           <div style="background:#0F1D2E;padding:0 28px 20px;">
             <div style="background:#F8FAFC;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
               <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#1F4E79;letter-spacing:1px;">
-                더 잘 맞는 공고를 받고 싶다면</p>
+                ✏️ 추가 키워드가 있으신가요?</p>
               <p style="margin:0 0 10px;font-size:12px;color:#475569;line-height:1.6;">
-                공고 피드백과 추가 키워드, Gmail 주소를 이 메일에 답장으로 보내주시면
-                다음 달 더 정확한 공고를 드립니다.</p>
+                더 잘 맞는 공고를 드리기 위해 받고 싶은 분야나 키워드를 답장으로 알려주세요.</p>
               <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_kw_body}"
                  style="display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;
                         color:#fff;background:#1F4E79;border-radius:6px;text-decoration:none;">
@@ -3693,11 +3690,10 @@ elif page == "발송":
                 📅 공고 마감일 캘린더</p>
               <p style="margin:0 0 10px;font-size:12px;color:#374151;line-height:1.6;">
                 전체 지원사업 공고 마감일을 한눈에 확인하세요.</p>
-              {"<a href='"+CALENDAR_LINK_PREV+"' style='display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;color:#fff;background:#10B981;border-radius:6px;text-decoration:none;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK_PREV else "<p style='margin:0;font-size:12px;color:#6B7280;'>※ 캘린더 링크는 별도 안내 예정입니다.</p>"}
+              {"<a href='"+CALENDAR_LINK_PREV+"' style='display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;color:#fff;background:#10B981;border-radius:6px;text-decoration:none;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK_PREV else ""}
               <p style="margin:10px 0 0;font-size:11px;color:#374151;line-height:1.7;">
-                💡 <b>귀사 맞춤 공고만 담긴 개인 캘린더</b>를 원하시면<br>
-                Gmail 주소를 이 메일에 답장으로 알려주세요.<br>
-                D-7 · D-3 마감 알림이 자동으로 설정됩니다.
+                💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면<br>
+                Gmail 주소를 답장으로 알려주세요.
               </p>
             </div>
           </div>
