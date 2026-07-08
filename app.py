@@ -3652,6 +3652,37 @@ elif page == "발송":
             r for r in review_grade
             if r.get('기업명','') == preview_co
         ]
+
+        # 0건 기업이면 전체 review_grade 공통 공고로 보완
+        _is_zero_prev = not _rec_prev and not _rest_prev
+        if not _review_prev and _is_zero_prev:
+            from collections import Counter as _Counter
+            _nc = _Counter(r.get('공고명','') for r in review_grade)
+            _top = [n for n, _ in _nc.most_common(5)]
+            _seen = set()
+            for r in review_grade:
+                if r.get('공고명','') in _top and r.get('공고명','') not in _seen:
+                    _review_prev.append(r)
+                    _seen.add(r.get('공고명',''))
+                if len(_review_prev) >= 3:
+                    break
+
+        # 0건 안내 문구
+        if _is_zero_prev:
+            _common_html += """
+            <div style="background:rgba(255,255,255,0.04);
+                        border:1px solid rgba(255,255,255,0.08);
+                        border-radius:8px;padding:14px 16px;margin-bottom:16px;">
+              <p style="margin:0 0 6px;font-size:13px;font-weight:500;
+                         color:rgba(255,255,255,0.8);">
+                이번 주 귀사에 딱 맞는 공고를 찾지 못했습니다.
+              </p>
+              <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);line-height:1.7;">
+                더 정확한 공고를 드리기 위해 추가 키워드나 관심 분야를
+                아래 답장하기 버튼으로 알려주세요.
+              </p>
+            </div>"""
+
         if _review_prev:
             _common_html += """<div style="border-top:1px solid rgba(255,255,255,0.08);
               padding-top:14px;margin-top:8px;">
