@@ -4282,7 +4282,7 @@ elif page == "발송":
                 # ── 공통 캘린더 마감일 이벤트 자동 등록 ──
                 cal_id_raw = load_text(drive, CALID_FILE)
                 # 링크에서 cid 추출 또는 직접 캘린더 ID 사용
-                _CAL_ID = "9078a49950a47b46ddb351104088​6f3a016b75ca17169ec1113e5692b7327375@group.calendar.google.com"
+                _CAL_ID = "9078a49950a47b46ddb3511040886f3a016b75ca17169ec1113e5692b7327375@group.calendar.google.com"
                 if cal_id_raw:
                     _CAL_ID = cal_id_raw.strip()
 
