@@ -5308,14 +5308,21 @@ JSON만 응답 (코드블록 없이):
             c3.metric("선정 건", (df_h['선정결과']=='선정').sum() if '선정결과' in df_h.columns else 0)
             st.divider()
 
-            edited = st.data_editor(df_h, use_container_width=True, hide_index=True,
+            # 최근 200건만 표시 (속도 최적화)
+            df_show_h = df_h.tail(200).reset_index(drop=True)
+            if len(df_h) > 200:
+                st.caption(f"※ 최근 200건만 표시 (전체 {len(df_h)}건)")
+
+            edited = st.data_editor(df_show_h, use_container_width=True, hide_index=True,
                 column_config={
                     "신청여부":st.column_config.SelectboxColumn("신청여부",options=["","Y","N"]),
                     "선정결과":st.column_config.SelectboxColumn("선정결과",options=["","선정","미선정","대기"]),
                 })
             if st.button("💾 드라이브 저장"):
                 with st.spinner("저장 중..."):
-                    save_excel(drive, edited, HISTORY_FILE, "발송이력", "375623")
+                    # 편집된 부분을 전체 df_h에 반영
+                    df_h.iloc[-len(edited):] = edited.values
+                    save_excel(drive, df_h, HISTORY_FILE, "발송이력", "375623")
                 st.success("저장 완료")
 
             st.divider()
