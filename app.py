@@ -3807,6 +3807,19 @@ elif page == "발송":
                     if r.get('기업명','') == company
                 ]
 
+                # 📢 섹션이 비어있으면 전체 review_grade에서 많이 겹치는 공고 보완
+                if not notices_review and not notices_sss and not notices_ss:
+                    from collections import Counter
+                    notice_count = Counter(r.get('공고명','') for r in review_grade)
+                    top_notices  = [n for n, _ in notice_count.most_common(5)]
+                    seen = set()
+                    for r in review_grade:
+                        if r.get('공고명','') in top_notices and r.get('공고명','') not in seen:
+                            notices_review.append(r)
+                            seen.add(r.get('공고명',''))
+                        if len(notices_review) >= 3:
+                            break
+
                 def notice_card_simple(n, idx):
                     """공통 공고용 심플 카드 (작고 간결하게)"""
                     dl_raw = n.get('마감일','')
