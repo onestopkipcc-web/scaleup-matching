@@ -522,12 +522,13 @@ def cal_list_events(cal_id, private_prop=None):
     return resp.json() if resp.ok else {'items': []}
 
 def cal_insert_event(cal_id, body):
-    resp = gapi('POST',
-        f'https://www.googleapis.com/calendar/v3/calendars/{cal_id}/events',
-        json=body)
+    import urllib.parse
+    encoded_id = urllib.parse.quote(cal_id, safe='')
+    url = f'https://www.googleapis.com/calendar/v3/calendars/{encoded_id}/events'
+    resp = gapi('POST', url, json=body)
     if not resp.ok:
-        return {'error': resp.status_code, 'msg': resp.text[:100]}
-    return resp.json() if resp.ok else {}
+        return {'error': resp.status_code, 'msg': resp.text[:100], 'url': url[:80]}
+    return resp.json()
 
 def cal_create(summary, description):
     """캘린더 생성 → cal_id 반환"""
