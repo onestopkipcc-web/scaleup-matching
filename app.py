@@ -3524,9 +3524,14 @@ elif page == "발송":
         st.warning("승인된 공고 없음 — '매칭 결과'에서 검토 완료 후 진행")
     else:
         st.info(f"📌 현재 매칭 대상 그룹: **{matched_group}** (다른 그룹 발송 시 '매칭 결과'에서 그룹 변경 후 재매칭 필요)")
-        # 전체 기업 목록 로드
+        # 전체 기업 목록 로드 (기업명 있는 행만)
         _df_c_top = load_excel(drive, SELECTED_FILE)
-        companies = _df_c_top['기업명'].tolist() if not _df_c_top.empty else list(set(r['기업명'] for r in approved))
+        if not _df_c_top.empty and '기업명' in _df_c_top.columns:
+            _names = _df_c_top['기업명'].dropna().astype(str)
+            _names = _names[_names.str.strip() != '']
+            companies = list(dict.fromkeys(_names.tolist()))
+        else:
+            companies = list(set(r['기업명'] for r in approved))
         c1,c2,c3  = st.columns(3)
         c1.metric("승인 건수", f"{len(approved)}건")
         c2.metric("대상 기업", f"{len(companies)}개사")
