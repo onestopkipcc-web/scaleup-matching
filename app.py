@@ -46,7 +46,7 @@ def check_password():
         pw = st.text_input("비밀번호", type="password",
                            placeholder="비밀번호 입력", label_visibility="collapsed")
         if st.button("로그인", use_container_width=True, type="primary"):
-            correct = st.secrets.get("password", "scaleup2026")
+            correct = st.secrets.get("password", "dbwlgns")
             if pw == correct:
                 st.session_state["authenticated"] = True
                 st.rerun()
