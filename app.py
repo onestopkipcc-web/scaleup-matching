@@ -5365,6 +5365,7 @@ elif page == "발송 이력":
                     cal_prog = st.progress(0, text="등록 중...")
                     added = 0; skipped = 0
                     items = list(to_reg.items())
+                    error_logs = []
 
                     for i, (pname, info) in enumerate(items):
                         if pname in existing_events:
@@ -5384,14 +5385,23 @@ elif page == "발송 이력":
                                         ]
                                     }
                                 }
-                                cal_insert_event(_CAL_ID, event)
-                                added += 1
-                            except Exception:
+                                result = cal_insert_event(_CAL_ID, event)
+                                if result.get('id'):
+                                    added += 1
+                                else:
+                                    error_logs.append(f"{pname[:30]}: {result}")
+                                    skipped += 1
+                            except Exception as e:
+                                error_logs.append(f"{pname[:30]}: {str(e)[:60]}")
                                 skipped += 1
-                        cal_prog.progress((i+1)/len(items),
+                        cal_prog.progress((i+1)/max(len(items),1),
                                           text=f"{i+1}/{len(items)} 처리 중...")
 
                     st.success(f"✅ 캘린더 등록 완료 — 신규 {added}건 / 중복 스킵 {skipped}건")
+                    if error_logs:
+                        with st.expander(f"⚠️ 실패 {len(error_logs)}건 상세"):
+                            for log in error_logs[:10]:
+                                st.caption(log)
                 except Exception as e:
                     st.error(f"캘린더 등록 실패: {e}")
 
