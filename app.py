@@ -3639,9 +3639,9 @@ elif page == "발송":
             _common_html += """<div style="border-top:1px solid rgba(255,255,255,0.08);
               padding-top:14px;margin-top:8px;">
               <p style="margin:0 0 6px;font-size:10px;font-weight:700;
-                         color:rgba(255,255,255,0.3);letter-spacing:2px;">
+                         color:#F59E0B;letter-spacing:2px;">
                 📢 &nbsp;다른 기업들이 관심 가진 공고</p>
-              <p style="margin:0 0 10px;font-size:11px;color:rgba(255,255,255,0.25);">
+              <p style="margin:0 0 10px;font-size:11px;color:rgba(255,255,255,0.4);">
                 비슷한 업종·분야의 기업들이 추천받은 공고입니다. 참고해보세요.</p>"""
             for n in _review_prev[:3]:
                 _common_html += f"""<div style="background:rgba(255,255,255,0.03);
