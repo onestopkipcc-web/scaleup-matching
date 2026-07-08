@@ -3524,9 +3524,11 @@ elif page == "발송":
         st.warning("승인된 공고 없음 — '매칭 결과'에서 검토 완료 후 진행")
     else:
         st.info(f"📌 현재 매칭 대상 그룹: **{matched_group}** (다른 그룹 발송 시 '매칭 결과'에서 그룹 변경 후 재매칭 필요)")
-        # 전체 기업 목록 로드 (기업명 있는 행만)
+        # 전체 기업 목록 로드 (선정 기업만)
         _df_c_top = load_excel(drive, SELECTED_FILE)
         if not _df_c_top.empty and '기업명' in _df_c_top.columns:
+            if '선정구분' in _df_c_top.columns:
+                _df_c_top = _df_c_top[_df_c_top['선정구분'] == '선정']
             _names = _df_c_top['기업명'].dropna().astype(str)
             _names = _names[_names.str.strip() != '']
             companies = list(dict.fromkeys(_names.tolist()))
@@ -3778,7 +3780,10 @@ elif page == "발송":
                 grouped.setdefault(r['기업명'],[]).append(r)
 
             # 0건 기업도 발송 대상에 추가 (review_grade 공고로 채움)
-            all_companies = df_c_cur['기업명'].tolist() if not df_c_cur.empty else []
+            if '선정구분' in df_c_cur.columns:
+                all_companies = df_c_cur[df_c_cur['선정구분']=='선정']['기업명'].dropna().tolist()
+            else:
+                all_companies = df_c_cur['기업명'].dropna().tolist()
             for co in all_companies:
                 if co not in grouped:
                     grouped[co] = []  # 승인 공고 없음 → 빈 리스트로 추가
