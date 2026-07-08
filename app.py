@@ -4287,19 +4287,13 @@ elif page == "발송":
                     _CAL_ID = cal_id_raw.strip()
 
                 try:
-                    creds   = get_credentials()
-                    cal_svc = build_service("calendar", "v3", creds)
                     cal_prog = st.progress(0, text="캘린더 이벤트 등록 중...")
                     added = 0; skipped = 0
 
                     # 이미 등록된 이벤트 조회 (중복 방지)
                     existing_events = []
                     try:
-                        evts = cal_svc.events().list(
-                            calendarId=_CAL_ID,
-                            maxResults=500,
-                            singleEvents=True
-                        ).execute()
+                        evts = cal_list_events(_CAL_ID)
                         existing_events = [e.get('summary','') for e in evts.get('items',[])]
                     except Exception:
                         pass
@@ -4338,9 +4332,7 @@ elif page == "발송":
                                         ]
                                     }
                                 }
-                                cal_svc.events().insert(
-                                    calendarId=_CAL_ID, body=event
-                                ).execute()
+                                cal_insert_event(_CAL_ID, event)
                                 added += 1
                             except Exception:
                                 skipped += 1
@@ -5336,15 +5328,11 @@ elif page == "발송 이력":
                     _CAL_ID = cal_id_raw.strip()
 
                 try:
-                    creds   = get_credentials()
-                    cal_svc = build_service("calendar", "v3", creds)
 
                     # 이미 등록된 이벤트 조회
                     existing_events = []
                     try:
-                        evts = cal_svc.events().list(
-                            calendarId=_CAL_ID, maxResults=500, singleEvents=True
-                        ).execute()
+                        evts = cal_list_events(_CAL_ID)
                         existing_events = [e.get('summary','') for e in evts.get('items',[])]
                     except Exception:
                         pass
@@ -5380,9 +5368,7 @@ elif page == "발송 이력":
                                         ]
                                     }
                                 }
-                                cal_svc.events().insert(
-                                    calendarId=_CAL_ID, body=event
-                                ).execute()
+                                cal_insert_event(_CAL_ID, event)
                                 added += 1
                             except Exception:
                                 skipped += 1
