@@ -3539,6 +3539,14 @@ elif page == "발송":
         if test_mode: st.warning("⚠️ 테스트 모드 — 본인 메일로만 발송")
         else:         st.success("✅ 실제 모드 — 기업 담당자 이메일로 발송")
 
+        # 0건 기업 표시
+        approved_cos = set(r['기업명'] for r in approved)
+        zero_cos = [co for co in companies if co not in approved_cos]
+        if zero_cos:
+            with st.expander(f"⚠️ 맞춤 공고 0건 기업 {len(zero_cos)}개사 (📢 섹션으로만 발송)"):
+                for co in zero_cos:
+                    st.write(f"• {co}")
+
         st.divider()
         st.subheader("발송 미리보기")
         st.caption("실제 발송될 메일을 기업별로 확인하세요. 기업마다 공고 구성이 다릅니다.")
