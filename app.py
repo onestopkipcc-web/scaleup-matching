@@ -517,6 +517,8 @@ def cal_insert_event(cal_id, body):
     resp = gapi('POST',
         f'https://www.googleapis.com/calendar/v3/calendars/{cal_id}/events',
         json=body)
+    if not resp.ok:
+        return {'error': resp.status_code, 'msg': resp.text[:100]}
     return resp.json() if resp.ok else {}
 
 def cal_create(summary, description):
