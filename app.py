@@ -4259,6 +4259,7 @@ elif page == "발송":
                 for n in notices:
                     history_records.append({"기업명":company,"pblancId":n.get('공고ID',''),
                         "공고명":n.get('공고명',''),"발송일":datetime.today().strftime("%Y-%m-%d"),
+                        "마감일":n.get('마감일',''),"공고링크":n.get('공고링크',''),
                         "매칭점수":n.get('점수',''),"담당자검토":"○",
                         "검토의견":n.get('검토의견',''),"신청여부":"","선정결과":""})
 
@@ -4277,6 +4278,79 @@ elif page == "발송":
                     save_excel(drive, df_fin, HISTORY_FILE, "발송이력", "375623")
                 prog.progress(1.0)
                 st.success(f"발송 완료 — {len(history_records)}건 → send_history.xlsx 저장")
+
+                # ── 공통 캘린더 마감일 이벤트 자동 등록 ──
+                cal_id_raw = load_text(drive, CALID_FILE)
+                # 링크에서 cid 추출 또는 직접 캘린더 ID 사용
+                _CAL_ID = "9078a49950a47b46ddb351104088​6f3a016b75ca17169ec1113e5692b7327375@group.calendar.google.com"
+                if cal_id_raw:
+                    _CAL_ID = cal_id_raw.strip()
+
+                try:
+                    creds   = get_credentials()
+                    cal_svc = build_service("calendar", "v3", creds)
+                    cal_prog = st.progress(0, text="캘린더 이벤트 등록 중...")
+                    added = 0; skipped = 0
+
+                    # 이미 등록된 이벤트 조회 (중복 방지)
+                    existing_events = []
+                    try:
+                        evts = cal_svc.events().list(
+                            calendarId=_CAL_ID,
+                            maxResults=500,
+                            singleEvents=True
+                        ).execute()
+                        existing_events = [e.get('summary','') for e in evts.get('items',[])]
+                    except Exception:
+                        pass
+
+                    # 마감일 있는 공고만 등록
+                    seen_notices = set()
+                    to_register  = []
+                    for r in history_records:
+                        pname = r.get('공고명','')
+                        dl    = r.get('마감일','')
+                        if not dl or not pname or pname in seen_notices:
+                            continue
+                        seen_notices.add(pname)
+                        to_register.append({'공고명': pname, '마감일': dl,
+                                            '공고링크': r.get('공고링크','')})
+
+                    for i, n in enumerate(to_register):
+                        pname = n['공고명']
+                        dl    = n['마감일']
+                        link  = n.get('공고링크','')
+
+                        if pname in existing_events:
+                            skipped += 1
+                        else:
+                            try:
+                                event = {
+                                    'summary': pname,
+                                    'description': link,
+                                    'start': {'date': dl},
+                                    'end':   {'date': dl},
+                                    'reminders': {
+                                        'useDefault': False,
+                                        'overrides': [
+                                            {'method': 'popup', 'minutes': 60*24*7},
+                                            {'method': 'popup', 'minutes': 60*24*3},
+                                        ]
+                                    }
+                                }
+                                cal_svc.events().insert(
+                                    calendarId=_CAL_ID, body=event
+                                ).execute()
+                                added += 1
+                            except Exception:
+                                skipped += 1
+
+                        cal_prog.progress((i+1)/len(to_register),
+                                          text=f"캘린더 등록 중... {i+1}/{len(to_register)}")
+
+                    st.success(f"📅 캘린더 이벤트 등록 완료 — 신규 {added}건 / 중복 스킵 {skipped}건")
+                except Exception as e:
+                    st.warning(f"캘린더 등록 실패 (발송은 완료됨): {e}")
             st.session_state['match_results']=[]; st.session_state['review_state']={}
 
 
