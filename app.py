@@ -4291,11 +4291,7 @@ elif page == "발송":
                 st.success(f"발송 완료 — {len(history_records)}건 → send_history.xlsx 저장")
 
                 # ── 공통 캘린더 마감일 이벤트 자동 등록 ──
-                cal_id_raw = load_text(drive, CALID_FILE)
-                # 링크에서 cid 추출 또는 직접 캘린더 ID 사용
-                _CAL_ID = "9078a49950a47b46ddb3511040886f3a016b75ca17169ec1113e5692b7327375@group.calendar.google.com"
-                if cal_id_raw:
-                    _CAL_ID = cal_id_raw.strip()
+                _CAL_ID = "9078a49950a47b46ddb3511040886f3a016b75ca17169ec1113e5692b7327375@group.calendar.google.com"  # 직접 하드코딩
 
                 try:
                     cal_prog = st.progress(0, text="캘린더 이벤트 등록 중...")
@@ -5334,9 +5330,7 @@ elif page == "발송 이력":
 
             if st.button("📅 캘린더 일괄 등록 실행", type="primary"):
                 _CAL_ID = "9078a49950a47b46ddb3511040886f3a016b75ca17169ec1113e5692b7327375@group.calendar.google.com"
-                cal_id_raw = load_text(drive, CALID_FILE)
-                if cal_id_raw:
-                    _CAL_ID = cal_id_raw.strip()
+                # CALID_FILE 값 무시 (잘못된 ID 저장됨)
 
                 try:
 
