@@ -5337,14 +5337,30 @@ elif page == "발송 이력":
                     except Exception:
                         pass
 
+                    # notices_db에서 공고명→마감일 매핑 로드
+                    df_n_cal = load_excel(drive, NOTICES_FILE)
+                    name_to_dl   = {}
+                    name_to_link = {}
+                    if not df_n_cal.empty:
+                        for _, nr in df_n_cal.iterrows():
+                            nm = str(nr.get("공고명","") or "")
+                            dl = str(nr.get("마감일","") or "")
+                            lk = str(nr.get("공고링크","") or "")
+                            if nm and dl and dl not in ["","nan","None"]:
+                                name_to_dl[nm]   = dl[:10]
+                                name_to_link[nm] = lk
+
                     # 마감일 있는 공고만 중복 제거해서 등록
                     to_reg = {}
                     for _, row in df_h.iterrows():
-                        pname = str(row.get('공고명','') or '')
-                        dl    = str(row.get('마감일','') or '')
-                        link  = str(row.get('공고링크','') or '')
-                        if pname and dl and dl not in ['', 'nan', 'None', '상시']:
-                            to_reg[pname] = {'마감일': dl[:10], '공고링크': link}
+                        pname = str(row.get("공고명","") or "")
+                        dl    = str(row.get("마감일","") or "")
+                        link  = str(row.get("공고링크","") or "")
+                        if (not dl or dl in ["nan","None",""]) and pname in name_to_dl:
+                            dl   = name_to_dl[pname]
+                            link = name_to_link.get(pname, link)
+                        if pname and dl and dl not in ["", "nan", "None", "상시"]:
+                            to_reg[pname] = {"마감일": dl[:10], "공고링크": link}
 
                     cal_prog = st.progress(0, text="등록 중...")
                     added = 0; skipped = 0
