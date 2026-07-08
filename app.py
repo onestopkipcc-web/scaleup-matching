@@ -3756,8 +3756,17 @@ elif page == "발송":
             df_c_cur      = load_excel(drive, SELECTED_FILE)
 
             history_records = []; prog = st.progress(0); log = st.empty(); logs = []
+
+            # 승인 공고 기준으로 grouped 구성
             grouped = {}
-            for r in approved: grouped.setdefault(r['기업명'],[]).append(r)
+            for r in approved:
+                grouped.setdefault(r['기업명'],[]).append(r)
+
+            # 0건 기업도 발송 대상에 추가 (review_grade 공고로 채움)
+            all_companies = df_c_cur['기업명'].tolist() if not df_c_cur.empty else []
+            for co in all_companies:
+                if co not in grouped:
+                    grouped[co] = []  # 승인 공고 없음 → 빈 리스트로 추가
 
             for idx,(company,notices) in enumerate(grouped.items()):
                 # 기업 정보 조회
@@ -3844,6 +3853,23 @@ elif page == "발송":
                     </table>"""
 
                 rows_html = ""
+
+                # ── 0건 기업 안내 문구 ───────────────────────
+                is_zero = not notices_sss and not notices_ss
+                if is_zero:
+                    rows_html += """
+                    <div style="background:rgba(255,255,255,0.04);
+                                border:1px solid rgba(255,255,255,0.08);
+                                border-radius:8px;padding:14px 16px;margin-bottom:16px;">
+                      <p style="margin:0 0 6px;font-size:13px;font-weight:500;
+                                 color:rgba(255,255,255,0.8);">
+                        이번 주 귀사에 딱 맞는 공고를 찾지 못했습니다.
+                      </p>
+                      <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);line-height:1.7;">
+                        더 정확한 공고를 드리기 위해 추가 키워드나 관심 분야를
+                        아래 답장하기 버튼으로 알려주세요.
+                      </p>
+                    </div>"""
 
                 # ── 🔦 주목할 만한 공고 (★★★) ────────────
                 if notices_sss:
