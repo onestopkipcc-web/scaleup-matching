@@ -5281,7 +5281,7 @@ JSON만 응답 (코드블록 없이):
                     st.error(f"실패 {fail_count}건 — 로그를 확인하세요.")
 
 
-
+elif page == "발송 이력":
         drive = _get_drive()
         st.title("발송 이력")
         info_box("발송 이력",
