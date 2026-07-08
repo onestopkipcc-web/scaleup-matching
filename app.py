@@ -488,9 +488,17 @@ def get_creds():
 
 def gapi(method, url, **kwargs):
     """인증된 구글 API 요청 (requests 직접 호출)"""
+    from google.auth.transport.requests import Request as GRequest
     creds = get_creds()
     if not creds:
         raise Exception("인증 실패")
+    # 토큰 만료 시 강제 갱신
+    if creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(GRequest())
+            st.session_state['g_creds'] = creds
+        except Exception:
+            pass
     headers = kwargs.pop('headers', {})
     headers['Authorization'] = f'Bearer {creds.token}'
     return requests.request(method, url, headers=headers, **kwargs)
