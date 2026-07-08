@@ -5319,6 +5319,74 @@ JSON만 응답 (코드블록 없이):
                 st.success("저장 완료")
 
             st.divider()
+            st.markdown("**📅 공통 캘린더 일괄 등록**")
+            st.caption("send_history의 마감일 있는 공고를 공통 캘린더에 일괄 등록합니다. 이미 등록된 공고는 스킵됩니다.")
+
+            if st.button("📅 캘린더 일괄 등록 실행", type="primary"):
+                _CAL_ID = "9078a49950a47b46ddb3511040886f3a016b75ca17169ec1113e5692b7327375@group.calendar.google.com"
+                cal_id_raw = load_text(drive, CALID_FILE)
+                if cal_id_raw:
+                    _CAL_ID = cal_id_raw.strip()
+
+                try:
+                    creds   = get_credentials()
+                    cal_svc = build_service("calendar", "v3", creds)
+
+                    # 이미 등록된 이벤트 조회
+                    existing_events = []
+                    try:
+                        evts = cal_svc.events().list(
+                            calendarId=_CAL_ID, maxResults=500, singleEvents=True
+                        ).execute()
+                        existing_events = [e.get('summary','') for e in evts.get('items',[])]
+                    except Exception:
+                        pass
+
+                    # 마감일 있는 공고만 중복 제거해서 등록
+                    to_reg = {}
+                    for _, row in df_h.iterrows():
+                        pname = str(row.get('공고명','') or '')
+                        dl    = str(row.get('마감일','') or '')
+                        link  = str(row.get('공고링크','') or '')
+                        if pname and dl and dl not in ['', 'nan', 'None', '상시']:
+                            to_reg[pname] = {'마감일': dl[:10], '공고링크': link}
+
+                    cal_prog = st.progress(0, text="등록 중...")
+                    added = 0; skipped = 0
+                    items = list(to_reg.items())
+
+                    for i, (pname, info) in enumerate(items):
+                        if pname in existing_events:
+                            skipped += 1
+                        else:
+                            try:
+                                event = {
+                                    'summary': pname,
+                                    'description': info['공고링크'],
+                                    'start': {'date': info['마감일']},
+                                    'end':   {'date': info['마감일']},
+                                    'reminders': {
+                                        'useDefault': False,
+                                        'overrides': [
+                                            {'method': 'popup', 'minutes': 60*24*7},
+                                            {'method': 'popup', 'minutes': 60*24*3},
+                                        ]
+                                    }
+                                }
+                                cal_svc.events().insert(
+                                    calendarId=_CAL_ID, body=event
+                                ).execute()
+                                added += 1
+                            except Exception:
+                                skipped += 1
+                        cal_prog.progress((i+1)/len(items),
+                                          text=f"{i+1}/{len(items)} 처리 중...")
+
+                    st.success(f"✅ 캘린더 등록 완료 — 신규 {added}건 / 중복 스킵 {skipped}건")
+                except Exception as e:
+                    st.error(f"캘린더 등록 실패: {e}")
+
+            st.divider()
             buf = io.BytesIO()
             with pd.ExcelWriter(buf, engine='openpyxl') as w: df_h.to_excel(w, index=False)
             st.download_button("📥 엑셀 다운로드", buf.getvalue(), HISTORY_FILE,
