@@ -6,6 +6,7 @@ import pandas as pd
 import requests
 import re, os, json, io, subprocess
 from datetime import datetime, timedelta
+from google.auth.transport.requests import Request as GRequest
 
 def install_playwright():
     try:
@@ -485,7 +486,6 @@ def get_creds():
 
 def gapi(method, url, **kwargs):
     """인증된 구글 API 요청 (requests 직접 호출)"""
-    from google.auth.transport.requests import Request as GRequest
     creds = get_creds()
     if not creds:
         raise Exception("인증 실패")
