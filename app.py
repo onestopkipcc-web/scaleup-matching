@@ -4720,7 +4720,7 @@ JSON만 응답 (코드블록 없이):
             if has_status:
                 target_group = st.radio(
                     "발송 그룹",
-                    ["선정 50개사", "예비 20개사", "전체 70개사", "직접 선택"],
+                    ["선정 50개사", "예비 20개사", "전체 70개사", "직접 선택", "이메일 직접 입력"],
                     horizontal=False, key="notice_mail_group"
                 )
             else:
@@ -4728,6 +4728,7 @@ JSON만 응답 (코드블록 없이):
 
         # 대상 기업 필터링
         df_active = df_c[df_c['수신거부'] != 'Y'].copy()
+        direct_input_email = None
         if has_status:
             if target_group == "선정 50개사":
                 df_target = df_active[df_active['선정구분'] == '선정']
@@ -4738,6 +4739,13 @@ JSON만 응답 (코드블록 없이):
                     "기업 직접 선택", df_active['기업명'].tolist(), key="notice_mail_select"
                 )
                 df_target = df_active[df_active['기업명'].isin(selected_names)]
+            elif target_group == "이메일 직접 입력":
+                direct_input_email = st.text_input(
+                    "수신 이메일 주소",
+                    placeholder="example@company.com",
+                    key="notice_direct_email_input"
+                )
+                df_target = df_active.head(0)  # 빈 데이터프레임
             else:
                 df_target = df_active
         else:
@@ -5174,13 +5182,20 @@ onestop.kipcc@gmail.com""",
             st.divider()
             st.subheader("④ 발송 실행")
 
+            # 직접 작성 모드 - 단건 발송용 이메일 입력 (이전 코드 제거)
+            direct_email = None
+
             c1, c2 = st.columns(2)
             with c1:
-                st.info(f"**발송 대상:** {target_group if has_status else '전체'} ({len(df_target)}개사)")
+                if target_group == "이메일 직접 입력" and direct_input_email:
+                    st.info(f"**발송 대상:** {direct_input_email} (단건)")
+                else:
+                    st.info(f"**발송 대상:** {target_group if has_status else '전체'} ({len(df_target)}개사)")
             with c2:
-                no_email = df_target[df_target['이메일'].str.strip() == '']
-                if not no_email.empty:
-                    st.warning(f"이메일 없는 기업 {len(no_email)}개사는 발송 제외됩니다.")
+                if target_group != "이메일 직접 입력" and not df_target.empty:
+                    no_email = df_target[df_target['이메일'].str.strip() == '']
+                    if not no_email.empty:
+                        st.warning(f"이메일 없는 기업 {len(no_email)}개사는 발송 제외됩니다.")
 
             # ── 첨부파일 + 기업 키워드 옵션 ──────────────
             opt1, opt2 = st.columns(2)
@@ -5218,7 +5233,18 @@ onestop.kipcc@gmail.com""",
                     attach_data = attach_file.read()
                     attach_name = attach_file.name
 
-                df_send = df_target[df_target['이메일'].str.strip() != '']
+                df_send = df_target[df_target['이메일'].str.strip() != ''] if not df_target.empty else df_target
+
+                # 이메일 직접 입력 모드 단건 발송
+                if target_group == "이메일 직접 입력" and direct_input_email and direct_input_email.strip():
+                    import pandas as _pd_direct
+                    df_send = _pd_direct.DataFrame([{
+                        '기업명': '테스트',
+                        '이메일': direct_input_email.strip(),
+                        '담당자': '',
+                        '선정구분': '선정'
+                    }])
+
                 prog = st.progress(0); log_area = st.empty(); logs = []
                 ok_count = fail_count = 0
 
