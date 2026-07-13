@@ -4783,8 +4783,7 @@ JSON만 응답 (코드블록 없이):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 주  제: AI 마케팅 / 콘텐츠 제작 활용
-        생성형 AI로 SNS 마케팅, 홍보 콘텐츠 제작,
-        미리캔버스·캡컷 실습 등 실무 중심으로 진행됩니다.
+        온라인(SNS) 홍보 · AI 마케팅/홍보 · CANVA · 캡컷 · 미리캔버스 활용 실습
 강  사: 송윤경 강사 (소상공인연합회)
 일  시: 2026년 7월 29일(수) 14:00 ~ 16:00 (질의응답 포함)
 방  식: 온라인 (Zoom)
@@ -4795,10 +4794,12 @@ JSON만 응답 (코드블록 없이):
 ✅ 신청 방법 | 마감: 7월 17일(목)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-이 메일에 아래 내용을 작성하여 답장해 주세요.
+이 메일에 아래 내용을 작성하여, 본 메일에 답장해 주세요.
 
+기업명:
 담당자명:
 연락처:
+※ 1인 이상 참여 시 참여 인원 정보를 모두 작성해 주세요.
 
 ─────────────────────────────────
 📢 이런 행사도 있어요
@@ -4819,6 +4820,8 @@ CES 혁신상 수상 노하우 공유 밋업
 10월 | 특허·상표권·디자인권 보호
 11월 | 해외 ODA 시장 진출 및 KOICA 무상원조 참여방안
 12월 | 해외 지식재산권 보호 지원사업 및 활용사례
+
+※ 상기 일정은 내부 사정에 따라 변동될 수 있습니다.
 
 감사합니다.
 혁신제품지원센터 원스톱 스케일업 운영팀
@@ -4998,7 +5001,7 @@ onestop.kipcc@gmail.com""",
         st.divider()
         st.subheader("③ 발송 미리보기")
 
-        if df_target.empty:
+        if df_target.empty and not direct_input_email:
             st.warning("발송 대상 기업이 없습니다.")
         elif not mail_subject or not mail_body:
             st.info("제목과 본문을 작성하면 미리보기가 표시됩니다.")
@@ -5045,7 +5048,7 @@ onestop.kipcc@gmail.com""",
         <span style="font-size:11px;color:#6B7280;margin-left:6px;">온라인 (Zoom)</span>
       </div>
       <p style="margin:0 0 6px;font-size:16px;font-weight:700;color:#0F172A;">AI 마케팅 / 콘텐츠 제작 활용</p>
-      <p style="margin:0 0 12px;font-size:12px;color:#6B7280;">생성형 AI로 SNS 마케팅, 홍보 콘텐츠 제작, 미리캔버스·캡컷 실습</p>
+      <p style="margin:0 0 12px;font-size:12px;color:#6B7280;">온라인(SNS) 홍보 · AI 마케팅/홍보 · CANVA · 캡컷 · 미리캔버스 활용 실습</p>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td style="padding:8px 14px;background:#fff;border-radius:8px;width:50%;">
@@ -5066,12 +5069,14 @@ onestop.kipcc@gmail.com""",
   </div>
   <div style="background:#1F4E79;padding:20px 28px;">
     <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);letter-spacing:2px;">✅ 신청 방법</p>
-    <p style="margin:0 0 14px;font-size:14px;font-weight:600;color:#fff;">이 메일에 아래 내용을 작성하여 답장해 주세요</p>
+    <p style="margin:0 0 14px;font-size:14px;font-weight:600;color:#fff;">아래 내용을 작성하여, 본 메일에 답장해 주세요</p>
     <div style="background:rgba(255,255,255,0.08);border-radius:8px;padding:14px 16px;font-size:13px;color:rgba(255,255,255,0.9);line-height:2.4;">
+      기업명 : <span style="color:rgba(255,255,255,0.4);">____________</span><br>
       담당자명 : <span style="color:rgba(255,255,255,0.4);">____________</span><br>
       연락처 : <span style="color:rgba(255,255,255,0.4);">____________</span>
     </div>
-    <div style="margin-top:14px;background:#F59E0B;border-radius:8px;padding:10px 16px;text-align:center;">
+    <p style="margin:10px 0 0;font-size:11px;color:rgba(255,255,255,0.5);">※ 1인 이상 참여 시 참여 인원 정보를 모두 작성해 주세요.</p>
+    <div style="margin-top:12px;background:#F59E0B;border-radius:8px;padding:10px 16px;text-align:center;">
       <p style="margin:0;font-size:13px;font-weight:700;color:#0F172A;">📅 신청 마감: 7월 17일(목)까지</p>
     </div>
   </div>
@@ -5094,6 +5099,7 @@ onestop.kipcc@gmail.com""",
         <tr style="background:#F8FAFC;"><td style="padding:7px 10px;font-size:12px;color:#94A3B8;white-space:nowrap;">11월</td><td style="padding:7px 10px;font-size:12px;color:#374151;">해외 ODA 시장 진출 및 KOICA 무상원조 참여방안</td></tr>
         <tr><td style="padding:7px 10px;font-size:12px;color:#94A3B8;white-space:nowrap;">12월</td><td style="padding:7px 10px;font-size:12px;color:#374151;">해외 지식재산권 보호 지원사업 및 활용사례</td></tr>
       </table>
+      <p style="margin:8px 0 0;font-size:11px;color:#94A3B8;">※ 상기 일정은 내부 사정에 따라 변동될 수 있습니다.</p>
     </div>
   </div>
   <div style="background:#0A1628;border-radius:0 0 14px 14px;padding:14px 28px;text-align:center;">
@@ -5318,7 +5324,7 @@ onestop.kipcc@gmail.com""",
         <span style="font-size:11px;color:#6B7280;margin-left:6px;">온라인 (Zoom)</span>
       </div>
       <p style="margin:0 0 6px;font-size:16px;font-weight:700;color:#0F172A;">AI 마케팅 / 콘텐츠 제작 활용</p>
-      <p style="margin:0 0 12px;font-size:12px;color:#6B7280;">생성형 AI로 SNS 마케팅, 홍보 콘텐츠 제작, 미리캔버스·캡컷 실습</p>
+      <p style="margin:0 0 12px;font-size:12px;color:#6B7280;">온라인(SNS) 홍보 · AI 마케팅/홍보 · CANVA · 캡컷 · 미리캔버스 활용 실습</p>
       <table width="100%" cellpadding="0" cellspacing="4">
         <tr>
           <td style="padding:8px 14px;background:#fff;border-radius:8px;width:50%;">
@@ -5338,12 +5344,14 @@ onestop.kipcc@gmail.com""",
   </div>
   <div style="background:#1F4E79;padding:20px 28px;">
     <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);letter-spacing:2px;">✅ 신청 방법</p>
-    <p style="margin:0 0 14px;font-size:14px;font-weight:600;color:#fff;">이 메일에 아래 내용을 작성하여 답장해 주세요</p>
+    <p style="margin:0 0 14px;font-size:14px;font-weight:600;color:#fff;">아래 내용을 작성하여, 본 메일에 답장해 주세요</p>
     <div style="background:rgba(255,255,255,0.08);border-radius:8px;padding:14px 16px;font-size:13px;color:rgba(255,255,255,0.9);line-height:2.4;">
+      기업명 : &nbsp;<br>
       담당자명 : &nbsp;<br>
       연락처 : &nbsp;
     </div>
-    <div style="margin-top:14px;background:#F59E0B;border-radius:8px;padding:10px 16px;text-align:center;">
+    <p style="margin:10px 0 0;font-size:11px;color:rgba(255,255,255,0.5);">※ 1인 이상 참여 시 참여 인원 정보를 모두 작성해 주세요.</p>
+    <div style="margin-top:12px;background:#F59E0B;border-radius:8px;padding:10px 16px;text-align:center;">
       <p style="margin:0;font-size:13px;font-weight:700;color:#0F172A;">📅 신청 마감: 7월 17일(목)까지</p>
     </div>
   </div>
@@ -5366,6 +5374,7 @@ onestop.kipcc@gmail.com""",
         <tr style="background:#F8FAFC;"><td style="padding:7px 10px;font-size:12px;color:#94A3B8;white-space:nowrap;">11월</td><td style="padding:7px 10px;font-size:12px;color:#374151;">해외 ODA 시장 진출 및 KOICA 무상원조 참여방안</td></tr>
         <tr><td style="padding:7px 10px;font-size:12px;color:#94A3B8;white-space:nowrap;">12월</td><td style="padding:7px 10px;font-size:12px;color:#374151;">해외 지식재산권 보호 지원사업 및 활용사례</td></tr>
       </table>
+      <p style="margin:8px 0 0;font-size:11px;color:#94A3B8;">※ 상기 일정은 내부 사정에 따라 변동될 수 있습니다.</p>
     </div>
   </div>
   <div style="background:#0A1628;border-radius:0 0 14px 14px;padding:14px 28px;text-align:center;">
