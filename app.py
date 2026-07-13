@@ -5004,7 +5004,7 @@ onestop.kipcc@gmail.com""",
 
         if df_target.empty and not direct_input_email:
             st.warning("발송 대상 기업이 없습니다.")
-        elif not mail_subject or not mail_body:
+        elif (not mail_subject or not mail_body) and template_choice != "7월 교육 프로그램 신청 안내":
             st.info("제목과 본문을 작성하면 미리보기가 표시됩니다.")
         else:
             sample_company = df_target.iloc[0]['기업명'] if not df_target.empty else "샘플기업"
