@@ -7,16 +7,13 @@ import requests
 import re, os, json, io, subprocess
 from datetime import datetime, timedelta
 
-# Playwright 브라우저 자동 설치 (Streamlit Cloud 대응)
-@st.cache_resource
 def install_playwright():
     try:
-        subprocess.run(["playwright", "install", "chromium"], 
+        subprocess.run(["playwright", "install", "chromium"],
                       capture_output=True, timeout=120)
     except Exception:
         pass
 
-# install_playwright()  # 앱 시작 시 설치 제거 → 크롤링 버튼 클릭 시 설치
 
 st.set_page_config(
     page_title="원스톱 스케일업_UJH",
