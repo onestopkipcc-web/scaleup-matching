@@ -5034,9 +5034,19 @@ onestop.kipcc@gmail.com""",
 <body style="margin:0;padding:0;background:#F2F4F7;font-family:'Apple SD Gothic Neo',Arial,sans-serif;">
 <div style="max-width:580px;margin:32px auto;">
   <div style="background:#0F1D2E;border-radius:14px 14px 0 0;padding:24px 28px 20px;border:1px solid #1E3A5F;">
-    <p style="margin:0 0 2px;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:2px;">원스톱 스케일업 · 혁신제품지원센터</p>
-    <p style="margin:0;font-size:20px;font-weight:700;color:#fff;">7월 교육 프로그램 신청 안내</p>
-    <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 7월 14일(화) ~ 17일(금)</p>
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td valign="top">
+        <p style="margin:0 0 2px;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:2px;">원스톱 스케일업 · 혁신제품지원센터</p>
+        <p style="margin:0;font-size:20px;font-weight:700;color:#fff;">7월 교육 프로그램 신청 안내</p>
+        <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 7월 14일(화) ~ 17일(금)</p>
+      </td>
+      <td width="64" align="right" valign="top">
+        <div style="background:#F59E0B;border-radius:10px;padding:8px 10px;text-align:center;min-width:48px;">
+          <p style="margin:0;font-size:16px;font-weight:800;color:#0F172A;line-height:1;">D-4</p>
+          <p style="margin:2px 0 0;font-size:9px;font-weight:700;color:#0F172A;letter-spacing:1px;">신청마감</p>
+        </div>
+      </td>
+    </tr></table>
   </div>
   <div style="background:#fff;padding:20px 28px 16px;border-left:1px solid #E2E8F0;border-right:1px solid #E2E8F0;">
     <p style="margin:0;font-size:13px;color:#374151;line-height:1.8;">
@@ -5329,9 +5339,19 @@ onestop.kipcc@gmail.com""",
 <body style="margin:0;padding:0;background:#F2F4F7;font-family:'Apple SD Gothic Neo',Arial,sans-serif;">
 <div style="max-width:580px;margin:32px auto;">
   <div style="background:#0F1D2E;border-radius:14px 14px 0 0;padding:24px 28px 20px;border:1px solid #1E3A5F;">
-    <p style="margin:0 0 2px;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:2px;">원스톱 스케일업 · 혁신제품지원센터</p>
-    <p style="margin:0;font-size:20px;font-weight:700;color:#fff;">7월 교육 프로그램 신청 안내</p>
-    <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 7월 14일(화) ~ 17일(금)</p>
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td valign="top">
+        <p style="margin:0 0 2px;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:2px;">원스톱 스케일업 · 혁신제품지원센터</p>
+        <p style="margin:0;font-size:20px;font-weight:700;color:#fff;">7월 교육 프로그램 신청 안내</p>
+        <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 7월 14일(화) ~ 17일(금)</p>
+      </td>
+      <td width="64" align="right" valign="top">
+        <div style="background:#F59E0B;border-radius:10px;padding:8px 10px;text-align:center;min-width:48px;">
+          <p style="margin:0;font-size:16px;font-weight:800;color:#0F172A;line-height:1;">D-4</p>
+          <p style="margin:2px 0 0;font-size:9px;font-weight:700;color:#0F172A;letter-spacing:1px;">신청마감</p>
+        </div>
+      </td>
+    </tr></table>
   </div>
   <div style="background:#fff;padding:20px 28px 16px;border-left:1px solid #E2E8F0;border-right:1px solid #E2E8F0;">
     <p style="margin:0;font-size:13px;color:#374151;line-height:1.8;">
