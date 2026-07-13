@@ -4776,6 +4776,7 @@ JSON만 응답 (코드블록 없이):
                 "subject": "[원스톱 스케일업] 7월 교육 프로그램 참여 신청 안내 (7/14~17)",
                 "body": """안녕하세요, 원스톱 스케일업 운영팀입니다.
 선정 기업 여러분께 제공되는 7월 교육 프로그램을 안내드립니다.
+부담 없이 참여하실 수 있으며, 실무에 바로 적용할 수 있는 내용으로 준비했습니다.
 많은 관심과 참여 부탁드립니다.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -5031,12 +5032,13 @@ onestop.kipcc@gmail.com""",
   <div style="background:#0F1D2E;border-radius:14px 14px 0 0;padding:24px 28px 20px;">
     <p style="margin:0 0 2px;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:2px;">원스톱 스케일업 · 혁신제품지원센터</p>
     <p style="margin:0;font-size:20px;font-weight:700;color:#fff;">7월 교육 프로그램 신청 안내</p>
-    <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 7월 14일(월) ~ 17일(목)</p>
+    <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 7월 14일(화) ~ 17일(금)</p>
   </div>
   <div style="background:#fff;padding:20px 28px 16px;">
     <p style="margin:0;font-size:13px;color:#374151;line-height:1.8;">
       안녕하세요, 원스톱 스케일업 운영팀입니다.<br>
       선정 기업 여러분께 제공되는 <b>7월 교육 프로그램</b>을 안내드립니다.<br>
+      부담 없이 참여하실 수 있으며, 실무에 바로 적용할 수 있는 내용으로 준비했습니다.<br>
       많은 관심과 참여 부탁드립니다.
     </p>
   </div>
@@ -5077,7 +5079,7 @@ onestop.kipcc@gmail.com""",
     </div>
     <p style="margin:10px 0 0;font-size:11px;color:rgba(255,255,255,0.5);">※ 1인 이상 참여 시 참여 인원 정보를 모두 작성해 주세요.</p>
     <div style="margin-top:12px;background:#F59E0B;border-radius:8px;padding:10px 16px;text-align:center;">
-      <p style="margin:0;font-size:13px;font-weight:700;color:#0F172A;">📅 신청 마감: 7월 17일(목)까지</p>
+      <p style="margin:0;font-size:13px;font-weight:700;color:#0F172A;">📅 신청 마감: 7월 17일(금)까지</p>
     </div>
   </div>
   <div style="background:#fff;padding:16px 28px;">
@@ -5307,12 +5309,13 @@ onestop.kipcc@gmail.com""",
   <div style="background:#0F1D2E;border-radius:14px 14px 0 0;padding:24px 28px 20px;">
     <p style="margin:0 0 2px;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:2px;">원스톱 스케일업 · 혁신제품지원센터</p>
     <p style="margin:0;font-size:20px;font-weight:700;color:#fff;">7월 교육 프로그램 신청 안내</p>
-    <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 7월 14일(월) ~ 17일(목)</p>
+    <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 7월 14일(화) ~ 17일(금)</p>
   </div>
   <div style="background:#fff;padding:20px 28px 16px;">
     <p style="margin:0;font-size:13px;color:#374151;line-height:1.8;">
       안녕하세요, 원스톱 스케일업 운영팀입니다.<br>
       선정 기업 여러분께 제공되는 <b>7월 교육 프로그램</b>을 안내드립니다.<br>
+      부담 없이 참여하실 수 있으며, 실무에 바로 적용할 수 있는 내용으로 준비했습니다.<br>
       많은 관심과 참여 부탁드립니다.
     </p>
   </div>
@@ -5352,7 +5355,7 @@ onestop.kipcc@gmail.com""",
     </div>
     <p style="margin:10px 0 0;font-size:11px;color:rgba(255,255,255,0.5);">※ 1인 이상 참여 시 참여 인원 정보를 모두 작성해 주세요.</p>
     <div style="margin-top:12px;background:#F59E0B;border-radius:8px;padding:10px 16px;text-align:center;">
-      <p style="margin:0;font-size:13px;font-weight:700;color:#0F172A;">📅 신청 마감: 7월 17일(목)까지</p>
+      <p style="margin:0;font-size:13px;font-weight:700;color:#0F172A;">📅 신청 마감: 7월 17일(금)까지</p>
     </div>
   </div>
   <div style="background:#fff;padding:16px 28px;">
