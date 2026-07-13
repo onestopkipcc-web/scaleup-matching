@@ -16,7 +16,7 @@ def install_playwright():
     except Exception:
         pass
 
-install_playwright()
+# install_playwright()  # 앱 시작 시 설치 제거 → 크롤링 버튼 클릭 시 설치
 
 st.set_page_config(
     page_title="원스톱 스케일업_UJH",
@@ -2365,6 +2365,8 @@ elif page == "공고·매칭":
 
                 # bizinfo 상세페이지는 SPA(JS 렌더링) 구조라 requests로는 빈 body만 받아온다
                 # (실측: html 8~9만자, body 자식태그 0개 — 진단 확정됨) → Playwright로 브라우저를 띄워 렌더링 후 텍스트 추출
+                with st.spinner("Chromium 설치 중..."):
+                    install_playwright()
                 from playwright.sync_api import sync_playwright
 
                 with sync_playwright() as pw:
