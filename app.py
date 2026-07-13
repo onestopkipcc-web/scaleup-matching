@@ -5266,7 +5266,89 @@ onestop.kipcc@gmail.com""",
 """
 
                     # HTML 본문 생성
-                    body_html_co = mail_body.replace('\n', '<br>')
+                    if template_choice == "7월 교육 프로그램 신청 안내":
+                        html_body = f"""<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F2F4F7;font-family:'Apple SD Gothic Neo',Arial,sans-serif;">
+<div style="max-width:580px;margin:32px auto;">
+  <div style="background:#0F1D2E;border-radius:14px 14px 0 0;padding:24px 28px 20px;">
+    <p style="margin:0 0 2px;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:2px;">원스톱 스케일업 · 혁신제품지원센터</p>
+    <p style="margin:0;font-size:20px;font-weight:700;color:#fff;">7월 교육 프로그램 신청 안내</p>
+    <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 7월 14일(월) ~ 17일(목)</p>
+  </div>
+  <div style="background:#fff;padding:20px 28px 16px;">
+    <p style="margin:0;font-size:13px;color:#374151;line-height:1.8;">
+      안녕하세요, 원스톱 스케일업 운영팀입니다.<br>
+      선정 기업 여러분께 제공되는 <b>7월 교육 프로그램</b>을 안내드립니다.<br>
+      많은 관심과 참여 부탁드립니다.
+    </p>
+  </div>
+  <div style="background:#fff;padding:0 28px 20px;">
+    <div style="background:#F0FDF4;border:1.5px solid #10B981;border-radius:10px;padding:18px 20px;">
+      <div style="margin-bottom:12px;">
+        <span style="background:#10B981;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">7월 정기 교육</span>
+        <span style="background:#ECFDF5;color:#059669;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-left:6px;">선정기업 무료 제공</span>
+        <span style="font-size:11px;color:#6B7280;margin-left:6px;">온라인 (Zoom)</span>
+      </div>
+      <p style="margin:0 0 6px;font-size:16px;font-weight:700;color:#0F172A;">AI 마케팅 / 콘텐츠 제작 활용</p>
+      <p style="margin:0 0 12px;font-size:12px;color:#6B7280;">생성형 AI로 SNS 마케팅, 홍보 콘텐츠 제작, 미리캔버스·캡컷 실습</p>
+      <table width="100%" cellpadding="0" cellspacing="4">
+        <tr>
+          <td style="padding:8px 14px;background:#fff;border-radius:8px;width:50%;">
+            <p style="margin:0 0 2px;font-size:10px;color:#94A3B8;font-weight:600;">강사</p>
+            <p style="margin:0;font-size:13px;color:#0F172A;font-weight:600;">송윤경 강사</p>
+            <p style="margin:0;font-size:11px;color:#6B7280;">소상공인연합회</p>
+          </td>
+          <td style="padding:8px 14px;background:#fff;border-radius:8px;width:50%;">
+            <p style="margin:0 0 2px;font-size:10px;color:#94A3B8;font-weight:600;">일시</p>
+            <p style="margin:0;font-size:13px;color:#0F172A;font-weight:600;">7월 29일(수)</p>
+            <p style="margin:0;font-size:11px;color:#6B7280;">14:00 ~ 16:00</p>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:10px 0 0;font-size:11px;color:#059669;">※ 줌 링크·교육자료는 다음 주 초 별도 안내드릴 예정입니다.</p>
+    </div>
+  </div>
+  <div style="background:#1F4E79;padding:20px 28px;">
+    <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);letter-spacing:2px;">✅ 신청 방법</p>
+    <p style="margin:0 0 14px;font-size:14px;font-weight:600;color:#fff;">이 메일에 아래 내용을 작성하여 답장해 주세요</p>
+    <div style="background:rgba(255,255,255,0.08);border-radius:8px;padding:14px 16px;font-size:13px;color:rgba(255,255,255,0.9);line-height:2.4;">
+      담당자명 : &nbsp;<br>
+      연락처 : &nbsp;
+    </div>
+    <div style="margin-top:14px;background:#F59E0B;border-radius:8px;padding:10px 16px;text-align:center;">
+      <p style="margin:0;font-size:13px;font-weight:700;color:#0F172A;">📅 신청 마감: 7월 17일(목)까지</p>
+    </div>
+  </div>
+  <div style="background:#fff;padding:16px 28px;">
+    <div style="border:1px solid #E2E8F0;border-radius:8px;padding:14px 16px;">
+      <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:1.5px;">📢 이런 행사도 있어요</p>
+      <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#0F172A;">CES 혁신상 수상 노하우 공유 밋업</p>
+      <p style="margin:0 0 6px;font-size:12px;color:#6B7280;">7월 28일(화) · 오프라인 · 시간·장소 추후 안내</p>
+      <p style="margin:0;font-size:12px;color:#475569;line-height:1.6;">CES 혁신상 수상 경험 공유 및 2027 CES 도전 준비 Q&A<br>관심 있으신 기업은 별도 안내 시 참고해 주세요.</p>
+    </div>
+  </div>
+  <div style="background:#fff;padding:0 28px 20px;">
+    <div style="background:#F8FAFC;border-radius:8px;padding:14px 16px;">
+      <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#64748B;letter-spacing:1.5px;">📅 하반기 월별 교육 일정</p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+        <tr style="background:#ECFDF5;"><td style="padding:7px 10px;font-size:12px;font-weight:700;color:#059669;white-space:nowrap;width:45px;">07월</td><td style="padding:7px 10px;font-size:12px;color:#0F172A;font-weight:600;">AI 마케팅 / 콘텐츠 제작 활용 ← 현재</td></tr>
+        <tr><td style="padding:7px 10px;font-size:12px;color:#94A3B8;white-space:nowrap;">08월</td><td style="padding:7px 10px;font-size:12px;color:#374151;">디지털 마케팅</td></tr>
+        <tr style="background:#F8FAFC;"><td style="padding:7px 10px;font-size:12px;color:#94A3B8;white-space:nowrap;">09월</td><td style="padding:7px 10px;font-size:12px;color:#374151;">네이버 크리에이터 &amp; 비즈니스 플랫폼 활용</td></tr>
+        <tr><td style="padding:7px 10px;font-size:12px;color:#94A3B8;white-space:nowrap;">10월</td><td style="padding:7px 10px;font-size:12px;color:#374151;">특허·상표권·디자인권 보호</td></tr>
+        <tr style="background:#F8FAFC;"><td style="padding:7px 10px;font-size:12px;color:#94A3B8;white-space:nowrap;">11월</td><td style="padding:7px 10px;font-size:12px;color:#374151;">해외 ODA 시장 진출 및 KOICA 무상원조 참여방안</td></tr>
+        <tr><td style="padding:7px 10px;font-size:12px;color:#94A3B8;white-space:nowrap;">12월</td><td style="padding:7px 10px;font-size:12px;color:#374151;">해외 지식재산권 보호 지원사업 및 활용사례</td></tr>
+      </table>
+    </div>
+  </div>
+  <div style="background:#0A1628;border-radius:0 0 14px 14px;padding:14px 28px;text-align:center;">
+    <p style="margin:0 0 2px;font-size:12px;color:rgba(255,255,255,0.4);">혁신제품지원센터 원스톱 스케일업 · onestop.kipcc@gmail.com</p>
+    <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.2);">본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
+  </div>
+</div>
+</body></html>"""
+                    else:
+                        body_html_co = mail_body.replace('\n', '<br>')
 
                     # 기업 키워드 카드를 "▣ 한 가지 부탁드립니다" 앞에 삽입
                     if kw_section_html and '▣ 한 가지 부탁드립니다' in body_html_co:
@@ -5287,7 +5369,8 @@ onestop.kipcc@gmail.com""",
                           <a href="{form_link}" style="font-size:13px;color:#10B981;">{form_link}</a>
                         </div>"""
 
-                    html_body = f"""<!DOCTYPE html>
+                    if template_choice != "7월 교육 프로그램 신청 안내":
+                        html_body = f"""<!DOCTYPE html>
     <html lang="ko"><head><meta charset="UTF-8"></head>
     <body style="margin:0;padding:0;background:#F2F4F7;
                  font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
