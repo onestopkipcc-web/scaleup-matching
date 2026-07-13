@@ -5266,6 +5266,7 @@ onestop.kipcc@gmail.com""",
 """
 
                     # HTML 본문 생성
+                    body_html_co = ""
                     if template_choice == "7월 교육 프로그램 신청 안내":
                         html_body = f"""<!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"></head>
