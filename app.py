@@ -3794,7 +3794,7 @@ elif page == "발송":
           </div>
           <div style="background:#0A1628;padding:14px 28px;text-align:center;">
             <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.3);">
-              혁신제품지원센터 원스톱 스케일업 · onestop.kipcc@gmail.com</p>
+              혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:rgba(255,255,255,0.7);text-decoration:none;">onestop.kipcc@gmail.com</a></p>
               <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.2);">
                 본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
           </div>
@@ -5124,11 +5124,12 @@ onestop.kipcc@gmail.com""",
     </div>
   </div>
   <div style="background:#0A1628;border-radius:0 0 14px 14px;padding:14px 28px;text-align:center;border:1px solid #1E3A5F;">
-    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · onestop.kipcc@gmail.com</p>
+    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:rgba(255,255,255,0.7);text-decoration:none;">onestop.kipcc@gmail.com</a></p>
     <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.5);">본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
   </div>
 </div>
 </body></html>"""
+            else:
                 sample_html = f"""<!DOCTYPE html>
     <html lang="ko">
     <head><meta charset="UTF-8"></head>
@@ -5418,7 +5419,7 @@ onestop.kipcc@gmail.com""",
     </div>
   </div>
   <div style="background:#0A1628;border-radius:0 0 14px 14px;padding:14px 28px;text-align:center;border:1px solid #1E3A5F;">
-    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · onestop.kipcc@gmail.com</p>
+    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:rgba(255,255,255,0.7);text-decoration:none;">onestop.kipcc@gmail.com</a></p>
     <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.5);">본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
   </div>
 </div>
