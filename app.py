@@ -1608,344 +1608,152 @@ if page == "대시보드":
 
     st.divider()
 
-    # ── 캘린더 탭 ─────────────────────────────────────────
-    tab_cal_ops, tab_cal_notice = st.tabs(["📋 운영 일정", "📌 공고 마감"])
+    st.divider()
 
-    import calendar as cal_mod
+    # ── 운영 활동 타임라인 ───────────────────────────────────
+    st.subheader("📋 운영 활동 타임라인")
 
-    # 월 선택 (공통)
-    cal_col1, cal_col2, _ = st.columns([1, 1, 4])
-    with cal_col1:
-        cal_year  = st.selectbox("연도", [2025, 2026, 2027],
-                                  index=1, key="cal_year", label_visibility="collapsed")
-    with cal_col2:
-        cal_month = st.selectbox("월", list(range(1, 13)),
-                                  index=datetime.today().month - 1,
-                                  key="cal_month", label_visibility="collapsed",
-                                  format_func=lambda x: f"{x}월")
+    TIMELINE_FILE = "timeline_log.json"
 
-    today = datetime.today()
-    is_current_month = (today.year == cal_year and today.month == cal_month)
-    first_weekday, days_in_month = cal_mod.monthrange(cal_year, cal_month)
-    first_weekday = (first_weekday + 1) % 7  # 일요일 시작
+    # 타임라인 데이터 로드
+    def load_timeline(drive):
+        try:
+            data = load_json(drive, TIMELINE_FILE)
+            return data if data else []
+        except:
+            return []
 
-    # ── 교육 프로그램 데이터 ───────────────────────────────
-    EDU_SCHEDULE = {
-        (2026, 7):  {"day": 29, "name": "AI 마케팅/콘텐츠", "time": "14:00~16:00"},
-        (2026, 8):  {"day": 12, "name": "디지털 마케팅",    "time": "14:00~16:00"},
-        (2026, 9):  {"day": 16, "name": "네이버 크리에이터 비즈니스",  "time": "14:00~16:00"},
-        (2026, 10): {"day": 21, "name": "특허·상표권·디자인권", "time": "14:00~16:00"},
-        (2026, 11): {"day": 18, "name": "해외 ODA 시장 진출", "time": "14:00~16:00"},
-        (2026, 12): {"day":  9, "name": "해외 지식재산권 보호", "time": "14:00~16:00"},
+    def save_timeline(drive, data):
+        save_json(drive, data, TIMELINE_FILE)
+
+    if 'timeline_data' not in st.session_state:
+        st.session_state['timeline_data'] = load_timeline(drive)
+
+    tl_data = st.session_state['timeline_data']
+
+    # 필터
+    TYPE_LABELS = {
+        "all": "전체",
+        "mail": "📧 메일 발송",
+        "match": "🎯 공고 매칭",
+        "edu": "📚 교육",
+        "meetup": "🤝 밋업",
+        "system": "⚙️ 시스템",
+        "eval": "📊 평가·선정",
+    }
+    TYPE_COLORS = {
+        "mail": "#3B82F6", "match": "#F43F5E", "edu": "#10B981",
+        "meetup": "#F59E0B", "system": "#8B5CF6", "eval": "#F59E0B",
+    }
+    TYPE_BADGE = {
+        "mail": "background:#EFF6FF;color:#1D4ED8",
+        "match": "background:#FFF1F2;color:#BE123C",
+        "edu": "background:#F0FDF4;color:#059669",
+        "meetup": "background:#FFF7ED;color:#C2410C",
+        "system": "background:#F5F3FF;color:#6D28D9",
+        "eval": "background:#FFFBEB;color:#92400E",
     }
 
-    # ── 격주 매칭·발송 사이클 (수 작업 → 금 확정 → 다음월 발송) ──
-    # 7월부터 12월까지 격주 수요일 기준으로 사이클 생성
-    import datetime as _dt
-    OPS_SCHEDULE = {}  # {(year, month, day): label}
+    filter_cols = st.columns(len(TYPE_LABELS))
+    tl_filter = st.session_state.get('tl_filter', 'all')
+    for i, (k, v) in enumerate(TYPE_LABELS.items()):
+        with filter_cols[i]:
+            if st.button(v, key=f"tl_f_{k}",
+                         type="primary" if tl_filter == k else "secondary",
+                         use_container_width=True):
+                st.session_state['tl_filter'] = k
+                st.rerun()
 
-    base = _dt.date(2026, 7, 1)
-    # 7월 첫 번째 수요일 찾기
-    while base.weekday() != 2:  # 2 = 수요일
-        base += _dt.timedelta(days=1)
+    tl_filter = st.session_state.get('tl_filter', 'all')
+    filtered = [t for t in sorted(tl_data, key=lambda x: x.get('date',''), reverse=True)
+                if tl_filter == 'all' or t.get('type') == tl_filter]
 
-    cycle = 0
-    cur = base
-    while cur <= _dt.date(2026, 12, 31):
-        if cycle % 2 == 0:  # 격주
-            wed = cur
-            fri = wed + _dt.timedelta(days=2)
-            mon = wed + _dt.timedelta(days=5)
-            # 수: 작업
-            key_w = (wed.year, wed.month, wed.day)
-            OPS_SCHEDULE[key_w] = OPS_SCHEDULE.get(key_w, [])
-            OPS_SCHEDULE[key_w].append(("⚡", "매칭·작업", "#F59E0B"))
-            # 금: 확정
-            key_f = (fri.year, fri.month, fri.day)
-            OPS_SCHEDULE[key_f] = OPS_SCHEDULE.get(key_f, [])
-            OPS_SCHEDULE[key_f].append(("✅", "최종확정", "#10B981"))
-            # 월: 발송
-            key_m = (mon.year, mon.month, mon.day)
-            OPS_SCHEDULE[key_m] = OPS_SCHEDULE.get(key_m, [])
-            OPS_SCHEDULE[key_m].append(("📨", "발송", "#3B82F6"))
-        cycle += 1
-        cur += _dt.timedelta(weeks=1)
+    if not filtered:
+        st.info("활동 기록이 없습니다. 아래에서 추가해주세요.")
+    else:
+        # 월별 그룹
+        from itertools import groupby
+        def month_key(item):
+            d = item.get('date','')
+            return d[:7] if d else '0000-00'
 
-    # 교육 일정도 OPS에 추가
-    edu = EDU_SCHEDULE.get((cal_year, cal_month))
-    if edu:
-        key_e = (cal_year, cal_month, edu["day"])
-        OPS_SCHEDULE[key_e] = OPS_SCHEDULE.get(key_e, [])
-        OPS_SCHEDULE[key_e].append(("🎓", edu["name"], "#8B5CF6"))
+        for month, items in groupby(filtered, key=month_key):
+            try:
+                import datetime as _dt2
+                yr, mo = int(month[:4]), int(month[5:7])
+                mo_label = f"{yr}년 {mo}월"
+            except:
+                mo_label = month
 
-    # ── 캘린더 HTML 생성 함수 ─────────────────────────────
-    day_headers = ["일", "월", "화", "수", "목", "금", "토"]
-    header_html = "".join([
-        f"<th style='padding:8px;text-align:center;font-size:12px;font-weight:600;"
-        f"color:{'#EF4444' if i==0 else '#3B82F6' if i==6 else '#475569'};'>{d}</th>"
-        for i, d in enumerate(day_headers)
-    ])
+            st.markdown(f"<p style='font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:1.5px;margin:12px 0 8px;'>{mo_label}</p>", unsafe_allow_html=True)
 
-    def make_calendar(events_by_day):
-        """events_by_day: {day: [(icon, label, color), ...]}"""
-        cells = ["<td style='background:#F8FAFC;border:1px solid #E2E8F0;'></td>"] * first_weekday
-        for day in range(1, days_in_month + 1):
-            is_today = is_current_month and day == today.day
-            is_sun   = (first_weekday + day - 1) % 7 == 0
-            is_sat   = (first_weekday + day - 1) % 7 == 6
-            day_color = "#EF4444" if is_sun else "#3B82F6" if is_sat else "#0F172A"
-            bg_color  = "#ECFDF5" if is_today else "#FFFFFF"
-            border    = "2px solid #10B981" if is_today else "1px solid #E2E8F0"
-
-            events = events_by_day.get(day, [])
-            events_html = ""
-            for icon, label, color in events[:3]:
-                events_html += (
-                    f"<div style='background:{color}18;border-left:2px solid {color};"
-                    f"border-radius:3px;padding:1px 4px;margin-top:2px;"
-                    f"font-size:10px;color:{color};line-height:1.4;"
-                    f"white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>"
-                    f"{icon} {label}</div>"
-                )
-            cells.append(
-                f"<td style='padding:6px;vertical-align:top;min-width:70px;min-height:75px;"
-                f"background:{bg_color};border:{border};border-radius:4px;'>"
-                f"<div style='font-size:13px;font-weight:700;color:{day_color};"
-                f"margin-bottom:2px;'>{day}</div>"
-                f"{events_html}</td>"
-            )
-        while len(cells) % 7 != 0:
-            cells.append("<td style='background:#F8FAFC;border:1px solid #E2E8F0;'></td>")
-        rows = ""
-        for i in range(0, len(cells), 7):
-            rows += f"<tr>{''.join(cells[i:i+7])}</tr>"
-        return f"""
-        <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:separate;border-spacing:3px;
-                      font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;">
-          <thead><tr style="background:#F8FAFC;">{header_html}</tr></thead>
-          <tbody>{rows}</tbody>
-        </table></div>"""
-
-    # ── 탭1: 운영 일정 ────────────────────────────────────
-    with tab_cal_ops:
-        # 범례
-        leg_cols = st.columns(4)
-        for col, (icon, label, color) in zip(leg_cols, [
-            ("⚡", "매칭·작업 (수)", "#F59E0B"),
-            ("✅", "최종 확정 (금)", "#10B981"),
-            ("📨", "발송 (월)",     "#3B82F6"),
-            ("🎓", "교육 프로그램", "#8B5CF6"),
-        ]):
-            col.markdown(
-                f"<span style='display:inline-block;background:{color}18;"
-                f"color:{color};border:1px solid {color}44;"
-                f"border-radius:10px;padding:2px 10px;font-size:12px;font-weight:600;'>"
-                f"{icon} {label}</span>",
-                unsafe_allow_html=True
-            )
-
-        # 이번 달 운영 이벤트
-        ops_this_month = {
-            day: events
-            for (y, m, day), events in OPS_SCHEDULE.items()
-            if y == cal_year and m == cal_month
-        }
-        # 같은 날 여러 이벤트 합치기
-        merged_ops = {}
-        for (y, m, day), events in OPS_SCHEDULE.items():
-            if y == cal_year and m == cal_month:
-                if day not in merged_ops:
-                    merged_ops[day] = []
-                merged_ops[day].extend(events)
-
-        st.markdown(make_calendar(merged_ops), unsafe_allow_html=True)
-
-        # 이번 달 교육 상세
-        edu = EDU_SCHEDULE.get((cal_year, cal_month))
-        if edu:
-            st.markdown(
-                f"<div style='background:#F5F3FF;border:1px solid #DDD6FE;"
-                f"border-left:4px solid #8B5CF6;border-radius:8px;"
-                f"padding:12px 16px;margin-top:12px;'>"
-                f"<b style='color:#7C3AED;'>🎓 {cal_month}월 교육 프로그램</b><br>"
-                f"<span style='font-size:14px;color:#1E1B4B;font-weight:600;'>{edu['name']}</span><br>"
-                f"<span style='font-size:12px;color:#6B7280;'>"
-                f"{cal_year}년 {cal_month}월 {edu['day']}일 (수) {edu['time']}</span>"
-                f"</div>",
-                unsafe_allow_html=True
-            )
-
-    # ── 탭2: 공고 마감 ────────────────────────────────────
-    with tab_cal_notice:
-        if not df_n.empty and '마감일' in df_n.columns:
-            month_str = f"{cal_year}-{cal_month:02d}"
-            df_cal = df_n[df_n['마감일'].astype(str).str.startswith(month_str)].copy()
-            notices_by_day = {}
-            for _, row in df_cal.iterrows():
+            for item in items:
+                t = item.get('type','system')
+                color = TYPE_COLORS.get(t, '#94A3B8')
+                badge_style = TYPE_BADGE.get(t, 'background:#F1F5F9;color:#475569')
+                badge_label = TYPE_LABELS.get(t, t)
+                date_str = item.get('date','')
                 try:
-                    day = int(str(row['마감일'])[8:10])
-                    n_name = str(row.get('공고명', ''))[:18]
-                    if day not in notices_by_day:
-                        notices_by_day[day] = []
-                    notices_by_day[day].append(("📌", n_name, "#3B82F6"))
-                except Exception:
-                    pass
-        else:
-            notices_by_day = {}
-            df_cal = pd.DataFrame()
+                    d = datetime.strptime(date_str, '%Y-%m-%d')
+                    day = d.strftime('%d')
+                    dow = ['월','화','수','목','금','토','일'][d.weekday()]
+                except:
+                    day, dow = '??', ''
 
-        if notices_by_day:
-            st.caption(f"{cal_year}년 {cal_month}월 마감 공고 총 **{len(df_cal)}건** — 파란 테두리: 오늘")
-        else:
-            st.caption(f"{cal_year}년 {cal_month}월 마감 공고 없음 (공고 수집 후 표시)")
+                meta_parts = []
+                if item.get('count'): meta_parts.append(f"📤 {item['count']}")
+                if item.get('note'): meta_parts.append(f"📝 {item['note']}")
+                meta_html = '&nbsp;·&nbsp;'.join(meta_parts)
 
-        st.markdown(make_calendar(notices_by_day), unsafe_allow_html=True)
+                st.markdown(f"""
+<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;">
+  <div style="width:36px;text-align:right;flex-shrink:0;padding-top:8px;">
+    <div style="font-size:13px;font-weight:700;color:#374151;">{day}</div>
+    <div style="font-size:10px;color:#94A3B8;">{dow}</div>
+  </div>
+  <div style="width:10px;height:10px;border-radius:50%;background:{color};flex-shrink:0;margin-top:11px;border:2px solid #fff;box-shadow:0 0 0 2px {color}44;"></div>
+  <div style="background:#fff;border-radius:10px;padding:10px 14px;flex:1;border:1px solid #F1F5F9;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+      <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;{badge_style}">{badge_label}</span>
+      <span style="font-size:13px;font-weight:600;color:#0F172A;">{item.get('title','')}</span>
+    </div>
+    <div style="font-size:11px;color:#64748B;">{item.get('desc','')}</div>
+    {"<div style='font-size:10px;color:#94A3B8;margin-top:4px;'>" + meta_html + "</div>" if meta_html else ""}
+  </div>
+</div>""", unsafe_allow_html=True)
 
-        if not df_cal.empty:
-            with st.expander(f"📋 {cal_month}월 공고 전체 목록 ({len(df_cal)}건)"):
-                for _, row in df_cal.sort_values('마감일').iterrows():
-                    c1, c2, c3 = st.columns([4, 2, 1])
-                    with c1:
-                        st.write(f"**{str(row.get('공고명',''))[:35]}**")
-                    with c2:
-                        dl = str(row.get('마감일',''))
-                        try:
-                            days_left = (datetime.strptime(dl, '%Y-%m-%d') - datetime.today()).days
-                            d_label = f"D-{days_left}" if days_left >= 0 else f"마감 {abs(days_left)}일 전"
-                            color   = "#EF4444" if days_left <= 3 else "#F59E0B" if days_left <= 7 else "#10B981"
-                            st.markdown(
-                                f"<span style='color:{color};font-weight:600;font-size:12px;'>"
-                                f"{d_label}</span>", unsafe_allow_html=True)
-                        except Exception:
-                            st.caption(dl)
-                    with c3:
-                        if row.get('공고링크'):
-                            st.markdown(f"[🔗]({row.get('공고링크','')})")
+    st.divider()
 
-    # ── 현황 분석 탭 ────────────────────────────────────
-    st.subheader("📈 현황 분석")
-    tab_c1, tab_c2, tab_c3, tab_c4 = st.tabs(["분야별 공고", "기업 관심분야", "매칭 현황", "발송 추이"])
+    # 활동 추가
+    with st.expander("➕ 활동 기록 추가"):
+        a1, a2, a3 = st.columns([1.5, 2, 1.5])
+        with a1:
+            new_date = st.date_input("날짜", key="tl_new_date")
+            new_type = st.selectbox("유형", list(TYPE_LABELS.keys())[1:],
+                                    format_func=lambda x: TYPE_LABELS[x], key="tl_new_type")
+        with a2:
+            new_title = st.text_input("제목", key="tl_new_title")
+            new_desc  = st.text_input("설명 (선택)", key="tl_new_desc")
+        with a3:
+            new_count = st.text_input("수량 (선택, 예: 50개사)", key="tl_new_count")
+            new_note  = st.text_input("비고 (선택)", key="tl_new_note")
 
-    with tab_c1:
-        if df_n.empty:
-            st.info("공고 수집 후 확인 가능")
-        elif '분야' in df_n.columns:
-            import plotly.express as px
-            realm_count = df_n['분야'].value_counts().reset_index()
-            realm_count.columns = ['분야', '공고 수']
-            realm_count = realm_count[realm_count['분야'] != ''].head(10)
-            fig = px.bar(realm_count, x='분야', y='공고 수',
-                         color_discrete_sequence=['#10B981'],
-                         template='simple_white', height=300)
-            fig.update_layout(margin=dict(l=0,r=0,t=10,b=0),
-                              font_family="'Apple SD Gothic Neo','Malgun Gothic',sans-serif",
-                              plot_bgcolor='white', paper_bgcolor='white')
-            st.plotly_chart(fig, use_container_width=True)
-            st.caption(f"총 {len(df_n):,}건 / {len(realm_count)}개 분야")
-        else:
-            st.info("분야 컬럼 없음")
+        if st.button("✅ 추가", type="primary", key="tl_add_btn"):
+            if new_title:
+                new_item = {
+                    'date': str(new_date),
+                    'type': new_type,
+                    'title': new_title,
+                    'desc': new_desc,
+                    'count': new_count,
+                    'note': new_note,
+                }
+                tl_data.append(new_item)
+                save_timeline(drive, tl_data)
+                st.session_state['timeline_data'] = tl_data
+                st.success(f"'{new_title}' 추가됐습니다.")
+                st.rerun()
 
-    with tab_c2:
-        if df_c.empty:
-            st.info("선정기업 명단 업로드 후 확인 가능")
-        else:
-            import plotly.express as px
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if '관심사업분야' in df_c.columns:
-                    all_interests = []
-                    for val in df_c['관심사업분야']:
-                        for item in str(val).split(','):
-                            item = item.strip()
-                            if item and item != 'nan':
-                                all_interests.append(item)
-                    interest_count = pd.Series(all_interests).value_counts().reset_index()
-                    interest_count.columns = ['관심분야', '기업 수']
-                    st.caption("관심사업분야 분포")
-                    fig = px.bar(interest_count, x='관심분야', y='기업 수',
-                                 color_discrete_sequence=['#10B981'],
-                                 template='simple_white', height=250)
-                    fig.update_layout(margin=dict(l=0,r=0,t=10,b=0), plot_bgcolor='white', paper_bgcolor='white')
-                    st.plotly_chart(fig, use_container_width=True)
-            with col_b:
-                if '소재지' in df_c.columns:
-                    region_count = df_c['소재지'].value_counts().reset_index()
-                    region_count.columns = ['소재지', '기업 수']
-                    st.caption("소재지 분포")
-                    fig = px.bar(region_count, x='소재지', y='기업 수',
-                                 color_discrete_sequence=['#3B82F6'],
-                                 template='simple_white', height=250)
-                    fig.update_layout(margin=dict(l=0,r=0,t=10,b=0), plot_bgcolor='white', paper_bgcolor='white')
-                    st.plotly_chart(fig, use_container_width=True)
-
-    with tab_c3:
-        if not results:
-            st.info("매칭 실행 후 확인 가능")
-        else:
-            import plotly.express as px
-            df_r = pd.DataFrame(results)
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if '관련도' in df_r.columns:
-                    star_count = df_r['관련도'].value_counts().reset_index()
-                    star_count.columns = ['관련도', '건수']
-                    st.caption("별점 분포")
-                    fig = px.bar(star_count, x='관련도', y='건수',
-                                 color_discrete_sequence=['#F59E0B'],
-                                 template='simple_white', height=200)
-                    fig.update_layout(margin=dict(l=0,r=0,t=10,b=0), plot_bgcolor='white', paper_bgcolor='white')
-                    st.plotly_chart(fig, use_container_width=True)
-            with col_b:
-                if '공고명' in df_r.columns:
-                    top_notices = df_r.groupby('공고명').size().sort_values(ascending=False).head(10).reset_index()
-                    top_notices.columns = ['공고명', '추천 기업 수']
-                    top_notices['공고명'] = top_notices['공고명'].str[:18] + '...'
-                    st.caption("공고별 추천 기업 수 (상위 10)")
-                    fig = px.bar(top_notices, x='추천 기업 수', y='공고명',
-                                 orientation='h',
-                                 color_discrete_sequence=['#EF4444'],
-                                 template='simple_white', height=260)
-                    fig.update_layout(margin=dict(l=0,r=0,t=10,b=0), yaxis={'categoryorder':'total ascending'},
-                                      plot_bgcolor='white', paper_bgcolor='white')
-                    st.plotly_chart(fig, use_container_width=True)
-            if '공고유형' in df_r.columns:
-                st.divider()
-                type_count = df_r['공고유형'].value_counts()
-                c1, c2, c3 = st.columns(3)
-                c1.metric("맞춤 공고", f"{type_count.get('맞춤', 0)}건")
-                c2.metric("공통 공고", f"{type_count.get('공통', 0)}건")
-                c3.metric("기업당 평균", f"{len(df_r)/df_r['기업명'].nunique():.1f}건")
-
-    with tab_c4:
-        if df_h.empty:
-            st.info("발송 이력이 쌓이면 확인 가능")
-        else:
-            if '발송일' in df_h.columns:
-                import plotly.express as px
-                df_h2 = df_h.copy()
-                df_h2['발송일'] = pd.to_datetime(df_h2['발송일'], errors='coerce')
-                df_h2['월'] = df_h2['발송일'].dt.to_period('M').astype(str)
-                monthly = df_h2.groupby('월').size().reset_index(name='발송 건수')
-                fig = px.line(monthly, x='월', y='발송 건수', markers=True,
-                              color_discrete_sequence=['#10B981'],
-                              template='simple_white', height=220)
-                fig.update_layout(margin=dict(l=0,r=0,t=10,b=0), plot_bgcolor='white', paper_bgcolor='white')
-                st.plotly_chart(fig, use_container_width=True)
-            col_a, col_b, col_c = st.columns(3)
-            col_a.metric("총 발송", f"{len(df_h)}건")
-            if '신청여부' in df_h.columns:
-                applied = (df_h['신청여부']=='Y').sum()
-                col_b.metric("신청 건", f"{applied}건",
-                             f"{applied/len(df_h)*100:.1f}%" if len(df_h) else "")
-            if '선정결과' in df_h.columns:
-                selected = (df_h['선정결과']=='선정').sum()
-                col_c.metric("선정 건", f"{selected}건")
-
-
-# ══════════════════════════════════════════════════════
-# 기업 관리
-# ══════════════════════════════════════════════════════
 elif page == "기업 관리":
     drive = _get_drive()
     st.title("기업 관리")
