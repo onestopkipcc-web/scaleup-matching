@@ -1508,6 +1508,23 @@ header    { visibility:hidden; }
   background: #FF0080 !important;
   color: #000000 !important;
 
+/* ── radio 버튼 ── */
+[data-testid="stRadio"] label {
+  color: var(--text-1) !important;
+  font-size: 13px !important;
+}
+[data-testid="stRadio"] [data-testid="stMarkdownContainer"] p {
+  color: var(--text-1) !important;
+}
+[data-testid="stRadio"] input:checked + div {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+[data-testid="stRadio"] div[data-checked="true"] {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
 /* ── 타임라인 필터 버튼 명시적 색상 ── */
 .tl-filter-active {
   background: #FF0080 !important;
@@ -4776,16 +4793,23 @@ JSON만 응답 (코드블록 없이):
         st.subheader("② 메일 내용 작성")
 
         # 템플릿 선택
-        template_choice = st.selectbox("템플릿 선택 (직접 수정 가능)", [
-            "직접 작성",
-            "첫 안내 메일 (선정 축하 + 회신 요청)",
-            "선정 기업 축하 및 프로그램 안내",
-            "7월 교육 프로그램 신청 안내",
-            "CES 혁신상 밋업 신청 안내",
-            "교육 프로그램 수요조사",
-            "성과집계 조사 요청",
-            "서류 제출 안내",
-        ], key="notice_mail_template")
+        st.caption("템플릿 선택 (직접 수정 가능)")
+        template_choice = st.radio(
+            "템플릿 선택",
+            [
+                "직접 작성",
+                "첫 안내 메일 (선정 축하 + 회신 요청)",
+                "선정 기업 축하 및 프로그램 안내",
+                "7월 교육 프로그램 신청 안내",
+                "CES 혁신상 밋업 신청 안내",
+                "교육 프로그램 수요조사",
+                "성과집계 조사 요청",
+                "서류 제출 안내",
+            ],
+            key="notice_mail_template",
+            horizontal=True,
+            label_visibility="collapsed",
+        )
 
         TEMPLATES = {
             "7월 교육 프로그램 신청 안내": {
