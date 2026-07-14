@@ -5916,13 +5916,12 @@ elif page == "교육 신청 집계":
     # 기존 신청 데이터 로드
     def load_edu_reg(drive):
         try:
-            txt = load_text(drive, EDU_REG_FILE)
-            return json.loads(txt) if txt else []
+            return load_json(drive, EDU_REG_FILE) or []
         except:
             return []
 
     def save_edu_reg(drive, data):
-        save_text(drive, json.dumps(data, ensure_ascii=False, indent=2), EDU_REG_FILE)
+        save_json(drive, data, EDU_REG_FILE)
 
     edu_data = load_edu_reg(drive)
 
@@ -5942,19 +5941,26 @@ elif page == "교육 신청 집계":
 
     # Gmail 자동 파싱
     st.subheader("📥 Gmail 회신 자동 파싱")
-    col1, col2 = st.columns([2,1])
-    with col1:
-        search_days = st.number_input("최근 N일 회신 검색", min_value=1, max_value=30, value=7)
-    with col2:
-        st.write("")
-        st.write("")
-        parse_btn = st.button("🔍 Gmail 회신 파싱 실행", type="primary")
+    
+    col_s1, col_s2 = st.columns([3, 1])
+    with col_s1:
+        mail_subject_input = st.text_input(
+            "발송한 메일 제목 입력",
+            placeholder="예: [원스톱 스케일업] 7월 교육 프로그램 참여 신청 안내 (7/14~17)",
+            key="edu_subject_input"
+        )
+    with col_s2:
+        search_days = st.number_input("최근 N일", min_value=1, max_value=30, value=7, key="edu_search_days")
 
-    if parse_btn:
+    st.caption("💡 발송한 메일 제목을 입력하면 해당 메일의 회신만 정확히 수집합니다.")
+    parse_btn = st.button("🔍 Gmail 회신 파싱 실행", type="primary", disabled=not mail_subject_input)
+
+    if parse_btn and mail_subject_input:
         with st.spinner("Gmail 회신 검색 중..."):
             try:
                 after_date = (datetime.today() - timedelta(days=int(search_days))).strftime('%Y/%m/%d')
-                query = f'in:inbox subject:"원스톱 스케일업" after:{after_date}'
+                # 발송한 메일 제목으로 정확한 회신만 수집
+                query = f'in:inbox subject:"{mail_subject_input}" after:{after_date}'
                 resp = gapi('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/messages',
                             params={'q': query, 'maxResults': 100})
 
