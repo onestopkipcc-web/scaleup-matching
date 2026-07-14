@@ -1672,10 +1672,16 @@ if page == "대시보드":
         with c2:
             st.caption(s['detail'])
         with c3:
-            badge_color = "#10B981" if s['ok'] else ("#F59E0B" if icon=="🟡" else "#E2E8F0")
+            if s['ok']:
+                badge_bg, badge_color = "#0A2E1F", "#4DFFAA"
+            elif icon == "🟡":
+                badge_bg, badge_color = "#2D1E00", "#FFD080"
+            else:
+                badge_bg, badge_color = "#1A1A1A", "#888888"
             st.markdown(
-                f"<span style='background:{badge_color};color:#000;padding:2px 10px;"
-                f"border-radius:10px;font-size:11px;font-weight:700;'>{s['status']}</span>",
+                f"<span style='background:{badge_bg};color:{badge_color};padding:3px 10px;"
+                f"border-radius:6px;font-size:11px;font-weight:700;"
+                f"border:1px solid {badge_color}44;'>{s['status']}</span>",
                 unsafe_allow_html=True
             )
 
@@ -1873,7 +1879,17 @@ if page == "대시보드":
             st.success("초기화 완료")
             st.rerun()
 
-    st.markdown("<p style='text-align:right;font-size:9px;color:#1A1A1A;letter-spacing:2px;font-weight:700;margin-top:24px;' title='🖤💗'>BLACKPINK IN MY AREA</p>", unsafe_allow_html=True)
+    st.markdown("""
+<div style='text-align:right;margin-top:32px;'>
+  <span style='font-size:9px;letter-spacing:2px;font-weight:700;
+               color:#0A0A0A;background:#0A0A0A;
+               padding:2px 6px;border-radius:4px;
+               cursor:default;transition:color 0.4s;user-select:none;'
+        onmouseover="this.style.color='#FF0080';this.style.background='transparent';"
+        onmouseout="this.style.color='#0A0A0A';this.style.background='#0A0A0A';">
+    BLACKPINK IN MY AREA
+  </span>
+</div>""", unsafe_allow_html=True)
 
     with st.expander("➕ 활동 기록 추가"):
         a1, a2, a3 = st.columns([1.5, 2, 1.5])
