@@ -5308,7 +5308,7 @@ onestop.kipcc@gmail.com""",
   </div>
   <div style="background:#0A0A0A;border-radius:0 0 14px 14px;padding:16px 28px;text-align:center;border:1px solid #D4AF37;">
     <p style="margin:0 0 6px;font-size:10px;color:#D4AF37;letter-spacing:3px;font-weight:700;">WITH AVING NEWS</p>
-    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · onestop.kipcc@gmail.com</p>
+    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:rgba(255,255,255,0.7);text-decoration:none;">onestop.kipcc@gmail.com</a></p>
     <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.45);">본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
   </div>
 </div>
@@ -5731,7 +5731,7 @@ onestop.kipcc@gmail.com""",
   </div>
   <div style="background:#0A0A0A;border-radius:0 0 14px 14px;padding:16px 28px;text-align:center;border:1px solid #D4AF37;">
     <p style="margin:0 0 6px;font-size:10px;color:#D4AF37;letter-spacing:3px;font-weight:700;">WITH AVING NEWS</p>
-    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · onestop.kipcc@gmail.com</p>
+    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:rgba(255,255,255,0.7);text-decoration:none;">onestop.kipcc@gmail.com</a></p>
     <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.45);">본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
   </div>
 </div>
