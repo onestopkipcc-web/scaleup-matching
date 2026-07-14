@@ -1502,8 +1502,9 @@ header    { visibility:hidden; }
   background: #FF0080 !important;
   color: #000000 !important;
 }
-/* 선택된 항목 */
-[aria-selected="true"] {
+/* 선택된 항목 (드롭다운 옵션에만 적용) */
+[data-baseweb="menu"] [aria-selected="true"],
+[data-baseweb="popover"] [aria-selected="true"] {
   background: #FF0080 !important;
   color: #000000 !important;
 }
@@ -1527,12 +1528,24 @@ li[role="option"][aria-selected="true"] {
 
 /* ── radio 버튼 ── */
 [data-testid="stRadio"] label {
-  color: var(--text-1) !important;
+  color: var(--text-2) !important;
   font-size: 13px !important;
+  background: transparent !important;
+  transition: color 0.15s !important;
 }
 [data-testid="stRadio"] [data-testid="stMarkdownContainer"] p {
-  color: var(--text-1) !important;
+  color: inherit !important;
 }
+/* 선택된 라벨: 배경 없이 밝은 핑크 글자 */
+[data-testid="stRadio"] label:has(input:checked) {
+  color: var(--accent) !important;
+  font-weight: 600 !important;
+}
+[data-testid="stRadio"] label:has(input:checked) [data-testid="stMarkdownContainer"] p {
+  color: var(--accent) !important;
+}
+[data-testid="stRadio"] label:hover { color: var(--text-1) !important; }
+/* 라디오 dot */
 [data-testid="stRadio"] input:checked + div {
   background: var(--accent) !important;
   border-color: var(--accent) !important;
