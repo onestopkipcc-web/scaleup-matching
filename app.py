@@ -5210,7 +5210,7 @@ onestop.kipcc@gmail.com""",
 </div>
 </body></html>"""
             elif template_choice == "CES 혁신상 밋업 신청 안내":
-                _ces_img = "https://drive.google.com/uc?export=view&id=1kwTjAWDqFz4-Y9Tfa80TNU8Ejp5Y-4gv"
+                _ces_img = "https://raw.githubusercontent.com/onestopkipcc-web/scaleup-matching/main/CES.jpg"
                 sample_html = f"""<!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#FAFAF8;font-family:'Apple SD Gothic Neo',Arial,sans-serif;">
@@ -5639,7 +5639,7 @@ onestop.kipcc@gmail.com""",
 </body></html>"""
                         body_html_co = mail_body.replace('\n', '<br>')
                     elif template_choice == "CES 혁신상 밋업 신청 안내":
-                        _ces_img = "https://drive.google.com/uc?export=view&id=1kwTjAWDqFz4-Y9Tfa80TNU8Ejp5Y-4gv"
+                        _ces_img = "https://raw.githubusercontent.com/onestopkipcc-web/scaleup-matching/main/CES.jpg"
                         html_body = f"""<!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#FAFAF8;font-family:'Apple SD Gothic Neo',Arial,sans-serif;">
