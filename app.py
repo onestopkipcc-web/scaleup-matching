@@ -1427,6 +1427,7 @@ with st.sidebar:
         "공고·매칭",
         "발송",
         "안내 메일",
+        "교육 신청 집계",
         "발송 이력",
         "캘린더",
         "설정",
@@ -5593,6 +5594,255 @@ onestop.kipcc@gmail.com""",
                     st.success(f"✅ 발송 완료 — 성공 {ok_count}건 / 실패 {fail_count}건")
                 if fail_count > 0:
                     st.error(f"실패 {fail_count}건 — 로그를 확인하세요.")
+
+
+elif page == "교육 신청 집계":
+    drive = _get_drive()
+    st.title("교육 신청 집계")
+    st.caption("Gmail 회신에서 교육 신청 내용을 자동으로 파싱하여 집계합니다.")
+
+    EDU_REG_FILE = "edu_registration.json"
+
+    # 기존 신청 데이터 로드
+    def load_edu_reg(drive):
+        try:
+            txt = load_text(drive, EDU_REG_FILE)
+            return json.loads(txt) if txt else []
+        except:
+            return []
+
+    def save_edu_reg(drive, data):
+        save_text(drive, json.dumps(data, ensure_ascii=False, indent=2), EDU_REG_FILE)
+
+    edu_data = load_edu_reg(drive)
+
+    # 현황 메트릭
+    df_c = load_excel(drive, SELECTED_FILE)
+    total_cos = len(df_c[df_c['선정구분']=='선정']) if not df_c.empty and '선정구분' in df_c.columns else 50
+    registered_cos = list(set(r['기업명'] for r in edu_data if r.get('기업명')))
+    total_people = sum(r.get('인원', 1) for r in edu_data)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("신청 기업", f"{len(registered_cos)}개사")
+    c2.metric("미신청 기업", f"{total_cos - len(registered_cos)}개사")
+    c3.metric("신청률", f"{len(registered_cos)/total_cos*100:.0f}%")
+    c4.metric("총 신청 인원", f"{total_people}명")
+
+    st.divider()
+
+    # Gmail 자동 파싱
+    st.subheader("📥 Gmail 회신 자동 파싱")
+    col1, col2 = st.columns([2,1])
+    with col1:
+        search_days = st.number_input("최근 N일 회신 검색", min_value=1, max_value=30, value=7)
+    with col2:
+        st.write("")
+        st.write("")
+        parse_btn = st.button("🔍 Gmail 회신 파싱 실행", type="primary")
+
+    if parse_btn:
+        with st.spinner("Gmail 회신 검색 중..."):
+            try:
+                after_date = (datetime.today() - timedelta(days=int(search_days))).strftime('%Y/%m/%d')
+                query = f'in:inbox subject:"원스톱 스케일업" after:{after_date}'
+                resp = gapi('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/messages',
+                            params={'q': query, 'maxResults': 100})
+
+                if not resp.ok:
+                    st.error(f"Gmail API 오류: {resp.text[:200]}")
+                else:
+                    msgs = resp.json().get('messages', [])
+                    if not msgs:
+                        st.info(f"최근 {search_days}일 내 관련 회신이 없습니다.")
+                    else:
+                        st.success(f"회신 {len(msgs)}건 발견 — AI 파싱 중...")
+                        prog = st.progress(0)
+                        new_count = 0
+
+                        for i, msg_ref in enumerate(msgs):
+                            detail = gapi('GET',
+                                f'https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_ref["id"]}',
+                                params={'format': 'full'}).json()
+
+                            # 이미 파싱된 메시지 스킵
+                            if any(r.get('msg_id') == msg_ref['id'] for r in edu_data):
+                                prog.progress((i+1)/len(msgs))
+                                continue
+
+                            # 발신자, 제목, 본문 추출
+                            headers_list = detail.get('payload', {}).get('headers', [])
+                            sender = next((h['value'] for h in headers_list if h['name']=='From'), '')
+                            subject = next((h['value'] for h in headers_list if h['name']=='Subject'), '')
+
+                            # 본문 추출
+                            import base64
+                            def extract_body(payload):
+                                if payload.get('body', {}).get('data'):
+                                    return base64.urlsafe_b64decode(
+                                        payload['body']['data'] + '==').decode('utf-8', errors='ignore')
+                                for part in payload.get('parts', []):
+                                    result = extract_body(part)
+                                    if result: return result
+                                return ''
+
+                            body = extract_body(detail.get('payload', {}))[:2000]
+
+                            # AI로 신청 정보 파싱
+                            ai_prompt = f"""아래는 교육 신청 회신 메일입니다. JSON으로만 응답하세요.
+
+제목: {subject}
+발신자: {sender}
+본문:
+{body}
+
+추출할 정보:
+{{
+  "기업명": "기업명 (없으면 null)",
+  "담당자명": "담당자명 (없으면 null)",
+  "연락처": "연락처 (없으면 null)",
+  "인원": 참여 인원 수 (숫자, 기본 1),
+  "추가참석자": ["추가 참석자 정보 목록"],
+  "교육신청여부": true/false
+}}
+
+교육신청여부는 신청 의사가 명확할 때만 true."""
+
+                            try:
+                                ai_resp = requests.post(
+                                    'https://api.anthropic.com/v1/messages',
+                                    headers={'x-api-key': st.secrets.get('ANTHROPIC_API_KEY',''),
+                                             'anthropic-version': '2023-06-01',
+                                             'content-type': 'application/json'},
+                                    json={'model': 'claude-sonnet-4-6',
+                                          'max_tokens': 500,
+                                          'messages': [{'role':'user','content': ai_prompt}]}
+                                )
+                                ai_text = ai_resp.json().get('content',[{}])[0].get('text','{}')
+                                ai_text = ai_text.strip().lstrip('```json').rstrip('```').strip()
+                                parsed = json.loads(ai_text)
+
+                                if parsed.get('교육신청여부'):
+                                    edu_data.append({
+                                        'msg_id': msg_ref['id'],
+                                        '기업명': parsed.get('기업명',''),
+                                        '담당자명': parsed.get('담당자명',''),
+                                        '연락처': parsed.get('연락처',''),
+                                        '인원': parsed.get('인원', 1),
+                                        '추가참석자': parsed.get('추가참석자', []),
+                                        '발신자': sender,
+                                        '수신일': datetime.today().strftime('%Y-%m-%d'),
+                                        '비고': ''
+                                    })
+                                    new_count += 1
+                            except:
+                                pass
+
+                            prog.progress((i+1)/len(msgs))
+
+                        save_edu_reg(drive, edu_data)
+                        st.success(f"✅ 신규 신청 {new_count}건 추가됐습니다.")
+                        st.rerun()
+
+            except Exception as e:
+                st.error(f"오류: {e}")
+
+    st.divider()
+
+    # 신청 현황 테이블
+    st.subheader("📋 신청 현황")
+
+    if edu_data:
+        import pandas as _pd_edu
+        df_edu = _pd_edu.DataFrame(edu_data)
+        display_cols = ['기업명','담당자명','연락처','인원','수신일','비고']
+        df_edu_show = df_edu[[c for c in display_cols if c in df_edu.columns]]
+
+        edited_edu = st.data_editor(
+            df_edu_show,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="dynamic",
+            column_config={
+                "인원": st.column_config.NumberColumn("인원", min_value=1),
+                "비고": st.column_config.TextColumn("비고"),
+            }
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💾 저장", type="primary"):
+                for i, row in edited_edu.iterrows():
+                    if i < len(edu_data):
+                        for col in display_cols:
+                            if col in row:
+                                edu_data[i][col] = row[col]
+                save_edu_reg(drive, edu_data)
+                st.success("저장 완료")
+
+        with col2:
+            if st.button("🗑️ 전체 초기화"):
+                if st.session_state.get('edu_reset_confirm'):
+                    edu_data = []
+                    save_edu_reg(drive, edu_data)
+                    st.session_state['edu_reset_confirm'] = False
+                    st.success("초기화 완료")
+                    st.rerun()
+                else:
+                    st.session_state['edu_reset_confirm'] = True
+                    st.warning("한 번 더 클릭하면 초기화됩니다.")
+
+        # 미신청 기업 목록
+        if not df_c.empty:
+            selected_cos = df_c[df_c['선정구분']=='선정']['기업명'].tolist()
+            unreg_cos = [co for co in selected_cos if co not in registered_cos]
+            if unreg_cos:
+                with st.expander(f"📋 미신청 기업 {len(unreg_cos)}개사"):
+                    for co in unreg_cos:
+                        st.write(f"• {co}")
+
+        # 엑셀 다운로드
+        st.divider()
+        if st.button("📥 엑셀 다운로드"):
+            import openpyxl as _xl_edu
+            wb_edu = _xl_edu.Workbook()
+            ws_edu = wb_edu.active
+            ws_edu.title = '교육신청현황'
+            ws_edu.append(['기업명','담당자명','연락처','인원','수신일','비고'])
+            for r in edu_data:
+                ws_edu.append([
+                    r.get('기업명',''), r.get('담당자명',''),
+                    r.get('연락처',''), r.get('인원',1),
+                    r.get('수신일',''), r.get('비고','')
+                ])
+            path = '/mnt/user-data/outputs/교육신청현황.xlsx'
+            wb_edu.save(path)
+            st.success("다운로드 준비 완료")
+            import subprocess
+            present_files([path])
+    else:
+        st.info("아직 신청 데이터가 없습니다. Gmail 회신 파싱을 실행해주세요.")
+
+    # 수동 추가
+    st.divider()
+    st.subheader("✏️ 수동 추가")
+    with st.expander("수동으로 신청 추가"):
+        m1, m2, m3, m4 = st.columns(4)
+        m_co   = m1.text_input("기업명", key="edu_m_co")
+        m_name = m2.text_input("담당자명", key="edu_m_name")
+        m_tel  = m3.text_input("연락처", key="edu_m_tel")
+        m_cnt  = m4.number_input("인원", min_value=1, value=1, key="edu_m_cnt")
+        if st.button("추가", key="edu_m_add"):
+            if m_co:
+                edu_data.append({
+                    'msg_id': f'manual_{datetime.today().strftime("%Y%m%d%H%M%S")}',
+                    '기업명': m_co, '담당자명': m_name,
+                    '연락처': m_tel, '인원': m_cnt,
+                    '추가참석자': [], '발신자': '수동입력',
+                    '수신일': datetime.today().strftime('%Y-%m-%d'), '비고': ''
+                })
+                save_edu_reg(drive, edu_data)
+                st.success(f"{m_co} 추가 완료")
+                st.rerun()
 
 
 elif page == "발송 이력":
