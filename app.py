@@ -1628,69 +1628,69 @@ if page == "대시보드":
 
     if 'timeline_data' not in st.session_state:
         raw = load_timeline(drive)
-        # 드라이브에 데이터 없으면 기본 활동 기록 삽입
+        # 드라이브 데이터가 없거나 비어있으면 기본 활동 기록 삽입
+        DEFAULT_TIMELINE = [
+            {
+                'date': '2026-04-29',
+                'type': 'eval',
+                'title': '2026 원스톱 스케일업 참가 신청 접수 시작',
+                'desc': '선정 대상 기업 공개 모집 · 온라인 신청 폼 운영',
+                'count': '접수 기간 4/29~5/22',
+                'note': '',
+            },
+            {
+                'date': '2026-05-22',
+                'type': 'eval',
+                'title': '참가 신청 접수 마감',
+                'desc': '총 184개사 신청 접수',
+                'count': '184개사',
+                'note': '',
+            },
+            {
+                'date': '2026-06-22',
+                'type': 'eval',
+                'title': '2026 원스톱 스케일업 최종 선정 확정',
+                'desc': '1단계 평가 → 상위 70개사 선정 확정',
+                'count': '선정 50개사 · 예비 20개사',
+                'note': '184개사 중 70개사',
+            },
+            {
+                'date': '2026-06-26',
+                'type': 'mail',
+                'title': '선정기업 대상 첫 안내 메일 발송',
+                'desc': '선정 축하 · 프로그램 안내 · 키워드 회신 요청',
+                'count': '50개사',
+                'note': '',
+            },
+            {
+                'date': '2026-07-06',
+                'type': 'match',
+                'title': '맞춤형 공고 1차 발송',
+                'desc': '나라장터 공고 크롤링 → 기업별 키워드 매칭 → 개별 발송 · 캘린더 자동 등록',
+                'count': '50개사 · 캘린더 21건',
+                'note': '',
+            },
+            {
+                'date': '2026-07-14',
+                'type': 'mail',
+                'title': '7월 교육 프로그램 신청 안내 발송',
+                'desc': 'AI 마케팅/콘텐츠 제작 활용 교육 안내 · CES 밋업 안내 포함',
+                'count': '50개사',
+                'note': '신청 마감 7/17(금) 18:00',
+            },
+            {
+                'date': '2026-07-29',
+                'type': 'edu',
+                'title': '7월 정기 교육 — AI 마케팅/콘텐츠 제작 활용',
+                'desc': '온라인 Zoom · 강사: 송윤경 (소상공인연합회)',
+                'count': '',
+                'note': '14:00~16:00 예정',
+            },
+        ]
         if not raw:
-            raw = [
-                {
-                    'date': '2026-04-29',
-                    'type': 'eval',
-                    'title': '2026 원스톱 스케일업 참가 신청 접수 시작',
-                    'desc': '선정 대상 기업 공개 모집 · 온라인 신청 폼 운영',
-                    'count': '접수 기간 4/29~5/22',
-                    'note': '',
-                },
-                {
-                    'date': '2026-05-22',
-                    'type': 'eval',
-                    'title': '참가 신청 접수 마감',
-                    'desc': '총 184개사 신청 접수',
-                    'count': '184개사',
-                    'note': '',
-                },
-                {
-                    'date': '2026-06-22',
-                    'type': 'eval',
-                    'title': '2026 원스톱 스케일업 최종 선정 확정',
-                    'desc': '1단계 평가 → 상위 70개사 선정 확정',
-                    'count': '선정 50개사 · 예비 20개사',
-                    'note': '184개사 중 70개사',
-                },
-                {
-                    'date': '2026-06-26',
-                    'type': 'mail',
-                    'title': '선정기업 대상 첫 안내 메일 발송',
-                    'desc': '선정 축하 · 프로그램 안내 · 키워드 회신 요청',
-                    'count': '50개사',
-                    'note': '',
-                },
-                {
-                    'date': '2026-07-06',
-                    'type': 'match',
-                    'title': '맞춤형 공고 1차 발송',
-                    'desc': '나라장터 공고 크롤링 → 기업별 키워드 매칭 → 개별 발송 · 캘린더 자동 등록',
-                    'count': '50개사 · 캘린더 21건',
-                    'note': '',
-                },
-                {
-                    'date': '2026-07-14',
-                    'type': 'mail',
-                    'title': '7월 교육 프로그램 신청 안내 발송',
-                    'desc': 'AI 마케팅/콘텐츠 제작 활용 교육 안내 · CES 밋업 안내 포함',
-                    'count': '50개사',
-                    'note': '신청 마감 7/17(금) 18:00',
-                },
-                {
-                    'date': '2026-07-29',
-                    'type': 'edu',
-                    'title': '7월 정기 교육 — AI 마케팅/콘텐츠 제작 활용',
-                    'desc': '온라인 Zoom · 강사: 송윤경 (소상공인연합회)',
-                    'count': '',
-                    'note': '14:00~16:00 예정',
-                },
-            ]
+            raw = DEFAULT_TIMELINE
             save_timeline(drive, raw)
         st.session_state['timeline_data'] = raw
-
     tl_data = st.session_state['timeline_data']
 
     # 필터
@@ -1787,6 +1787,14 @@ if page == "대시보드":
     st.divider()
 
     # 활동 추가
+    col_add, col_reset = st.columns([5, 1])
+    with col_reset:
+        if st.button("🔄 초기화", key="tl_reset", help="기본 데이터로 초기화"):
+            save_timeline(drive, DEFAULT_TIMELINE)
+            st.session_state['timeline_data'] = DEFAULT_TIMELINE
+            st.success("초기화 완료")
+            st.rerun()
+
     with st.expander("➕ 활동 기록 추가"):
         a1, a2, a3 = st.columns([1.5, 2, 1.5])
         with a1:
