@@ -4767,6 +4767,7 @@ JSON만 응답 (코드블록 없이):
             "첫 안내 메일 (선정 축하 + 회신 요청)",
             "선정 기업 축하 및 프로그램 안내",
             "7월 교육 프로그램 신청 안내",
+            "CES 혁신상 밋업 신청 안내",
             "교육 프로그램 수요조사",
             "성과집계 조사 요청",
             "서류 제출 안내",
@@ -4826,6 +4827,74 @@ CES 혁신상 수상 노하우 공유 밋업
 ※ 상기 일정은 내부 사정에 따라 변동될 수 있습니다.
 
 감사합니다.
+혁신제품지원센터 원스톱 스케일업 운영팀
+onestop.kipcc@gmail.com""",
+            },
+            "CES 혁신상 밋업 신청 안내": {
+                "subject": "[원스톱 스케일업] CES 혁신상 수상 노하우 공유 밋업 안내",
+                "body": """안녕하세요, 원스톱 스케일업 운영팀입니다.
+
+CES 2026(1월 6~9일, 미국 라스베이거스)에서 조달기업 30개사가
+혁신상을 수상하며 역대 최다 성과를 거뒀습니다.
+수상 노하우를 직접 들을 수 있는 밋업에 여러분을 초대합니다.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 CES 2026 조달기업 성과
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+· 혁신상 수상 30개사 (역대 최다)
+· AI 융복합 제품 17개
+· 혁신제품 지정기업 19개사 · 벤처나라 등록기업 13개사
+· 재난·안전 / 자원순환 / 헬스케어 등 공공분야 혁신제품 국제적 주목
+
+🏆 분야별 수상 제품
+· AI 융복합 | ㈜바이오커넥트 — 비전 AI 얼굴 혈류 비접촉 측정
+· 재난·안전 | ㈜아이아이에스티 — AI 기반 다중 재난감지 카메라
+· 자원순환 | ㈜에이트테크 — 이동형 AI 자원순환 솔루션
+· 헬스케어 | ㈜위로보틱스 — 성장기 아동 보행 보조 로봇
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎤 이번 밋업 | 선정기업 무료
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+주  제: CES 혁신상 수상 노하우 공유
+일  시: 2026년 7월 28일(화) (시간 추후 안내)
+방  식: 오프라인 밋업 (장소 추후 안내)
+
+🗓️ 하반기 글로벌 진출 밋업 시리즈
+· 7월  | CES 혁신상 수상 노하우 공유 밋업 (7/28 진행 예정)
+· 11월 | 글로벌 전시회 참가 전략 밋업 ① (일정 추후 안내)
+· 12월 | 글로벌 전시회 참가 전략 밋업 ② (일정 추후 안내)
+· 12월 | CES 2027 수상기업 네트워킹 파티 (일정 추후 안내)
+※ 상기 일정과 프로그램은 내부 사정에 따라 변경될 수 있습니다.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 CES 2027 혁신상 도전 안내
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+· 신청 접수: 2026. 6. 5.(금) ~ 8. 19.(수)
+· 결과 통보: 2026. 11. 2.(월)
+· 수상 발표: 2026. 11. 9.(월)
+· 출시 조건: 2026.4.1 ~ 2027.3.31 최초 출시 제품
+· 제품 1개당 최대 4개 카테고리 출품 가능
+· CES 전시 참가 없이도 혁신상 신청 가능
+
+신청 바로가기: https://cta.secure-platform.com/ces-awards
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ 참여 신청
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+아래 내용을 작성하여, 본 메일에 답장해 주세요.
+
+기업명:
+담당자명:
+연락처:
+※ 1인 이상 참여 시 참여 인원 정보를 모두 작성해 주세요.
+
+감사합니다.
+
+WITH AVING NEWS
 혁신제품지원센터 원스톱 스케일업 운영팀
 onestop.kipcc@gmail.com""",
             },
@@ -5005,7 +5074,7 @@ onestop.kipcc@gmail.com""",
 
         if df_target.empty and not direct_input_email:
             st.warning("발송 대상 기업이 없습니다.")
-        elif (not mail_subject or not mail_body) and template_choice != "7월 교육 프로그램 신청 안내":
+        elif (not mail_subject or not mail_body) and template_choice not in ("7월 교육 프로그램 신청 안내", "CES 혁신상 밋업 신청 안내"):
             st.info("제목과 본문을 작성하면 미리보기가 표시됩니다.")
         else:
             sample_company = df_target.iloc[0]['기업명'] if not df_target.empty else "샘플기업"
@@ -5137,6 +5206,129 @@ onestop.kipcc@gmail.com""",
   <div style="background:#0A1628;border-radius:0 0 14px 14px;padding:14px 28px;text-align:center;border:1px solid #1E3A5F;">
     <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:rgba(255,255,255,0.7);text-decoration:none;">onestop.kipcc@gmail.com</a></p>
     <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.5);">본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
+  </div>
+</div>
+</body></html>"""
+            elif template_choice == "CES 혁신상 밋업 신청 안내":
+                _ces_img = "https://drive.google.com/uc?export=view&id=1kwTjAWDqFz4-Y9Tfa80TNU8Ejp5Y-4gv"
+                sample_html = f"""<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#FAFAF8;font-family:'Apple SD Gothic Neo',Arial,sans-serif;">
+<div style="max-width:580px;margin:20px auto;">
+  <img src="{_ces_img}" style="width:100%;height:170px;object-fit:cover;display:block;border-radius:14px 14px 0 0;" alt="Las Vegas">
+  <div style="background:#0A0A0A;padding:24px 28px 22px;border-left:1px solid #D4AF37;border-right:1px solid #D4AF37;">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td valign="top">
+        <p style="margin:0 0 8px;font-size:10px;color:#D4AF37;letter-spacing:3px;font-weight:600;">원스톱 스케일업 · 특별 밋업</p>
+        <p style="margin:0;font-size:22px;font-weight:800;color:#fff;line-height:1.35;">CES 혁신상 수상<br><span style="color:#D4AF37;">노하우 공유 밋업</span></p>
+        <p style="margin:10px 0 0;font-size:12px;color:rgba(255,255,255,0.6);">글로벌 무대를 준비하는 기업을 위한 특별 세션</p>
+      </td>
+      <td width="70" align="right" valign="top">
+        <div style="text-align:center;">
+          <p style="margin:0;font-size:26px;font-weight:800;color:#D4AF37;line-height:1;letter-spacing:2px;">CES</p>
+          <div style="border-top:1px solid rgba(212,175,55,0.4);margin:5px 0 4px;"></div>
+          <p style="margin:0;font-size:6.5px;font-weight:600;color:rgba(212,175,55,0.7);letter-spacing:0.3px;line-height:1.4;">CONSUMER<br>ELECTRONICS SHOW</p>
+        </div>
+      </td>
+    </tr></table>
+  </div>
+  <div style="background:#fff;padding:20px 28px 16px;border-left:1px solid #EBE6DB;border-right:1px solid #EBE6DB;">
+    <p style="margin:0;font-size:13px;color:#374151;line-height:1.8;">
+      안녕하세요, 원스톱 스케일업 운영팀입니다.<br>
+      CES 2026(1월 6~9일, 미국 라스베이거스)에서 <b>조달기업 30개사가 혁신상을 수상</b>하며 역대 최다 성과를 거뒀습니다.<br>
+      수상 노하우를 직접 들을 수 있는 밋업에 여러분을 초대합니다.
+    </p>
+  </div>
+  <div style="background:#fff;padding:0 28px 16px;border-left:1px solid #EBE6DB;border-right:1px solid #EBE6DB;">
+    <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#9A7B1F;letter-spacing:1.5px;">📊 CES 2026 조달기업 성과</p>
+    <div style="background:#0A0A0A;border-radius:12px;padding:20px 18px;">
+      <table width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="text-align:center;width:33%;padding:0 6px;">
+          <p style="margin:0;font-size:30px;font-weight:800;color:#D4AF37;line-height:1;">30<span style="font-size:13px;font-weight:600;">개사</span></p>
+          <p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,0.6);font-weight:600;">혁신상 수상</p>
+        </td>
+        <td style="width:1px;background:rgba(212,175,55,0.3);"></td>
+        <td style="text-align:center;width:33%;padding:0 6px;">
+          <p style="margin:0;font-size:30px;font-weight:800;color:#D4AF37;line-height:1;">17<span style="font-size:13px;font-weight:600;">개</span></p>
+          <p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,0.6);font-weight:600;">AI 융복합 제품</p>
+        </td>
+        <td style="width:1px;background:rgba(212,175,55,0.3);"></td>
+        <td style="text-align:center;width:33%;padding:0 6px;">
+          <p style="margin:0;font-size:23px;font-weight:800;color:#D4AF37;line-height:1.1;">역대최다</p>
+          <p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,0.6);font-weight:600;">수상 성과</p>
+        </td>
+      </tr></table>
+      <div style="border-top:1px solid rgba(212,175,55,0.25);margin-top:14px;padding-top:12px;">
+        <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.75);line-height:1.7;"><b style="color:#D4AF37;">혁신제품 지정기업</b> 19개사 · <b style="color:#D4AF37;">벤처나라 등록기업</b> 13개사<br>재난·안전 / 자원순환 / 헬스케어 등 공공분야 혁신제품도 국제적 주목</p>
+      </div>
+    </div>
+  </div>
+  <div style="background:#fff;padding:0 28px 16px;border-left:1px solid #EBE6DB;border-right:1px solid #EBE6DB;">
+    <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#9A7B1F;letter-spacing:1.5px;">🏆 분야별 수상 제품</p>
+    <table width="100%" cellpadding="0" cellspacing="6">
+      <tr>
+        <td style="background:#FAF8F2;border:1px solid #EBE6DB;border-radius:8px;padding:10px 12px;width:50%;vertical-align:top;"><p style="margin:0 0 2px;font-size:10px;color:#9A7B1F;font-weight:700;">AI 융복합</p><p style="margin:0;font-size:12px;color:#0F172A;font-weight:600;">㈜바이오커넥트</p><p style="margin:0;font-size:11px;color:#6B7280;">비전 AI 얼굴 혈류 비접촉 측정</p></td>
+        <td style="background:#FAF8F2;border:1px solid #EBE6DB;border-radius:8px;padding:10px 12px;width:50%;vertical-align:top;"><p style="margin:0 0 2px;font-size:10px;color:#9A7B1F;font-weight:700;">재난·안전</p><p style="margin:0;font-size:12px;color:#0F172A;font-weight:600;">㈜아이아이에스티</p><p style="margin:0;font-size:11px;color:#6B7280;">AI 기반 다중 재난감지 카메라</p></td>
+      </tr>
+      <tr>
+        <td style="background:#FAF8F2;border:1px solid #EBE6DB;border-radius:8px;padding:10px 12px;width:50%;vertical-align:top;"><p style="margin:0 0 2px;font-size:10px;color:#9A7B1F;font-weight:700;">자원순환</p><p style="margin:0;font-size:12px;color:#0F172A;font-weight:600;">㈜에이트테크</p><p style="margin:0;font-size:11px;color:#6B7280;">이동형 AI 자원순환 솔루션</p></td>
+        <td style="background:#FAF8F2;border:1px solid #EBE6DB;border-radius:8px;padding:10px 12px;width:50%;vertical-align:top;"><p style="margin:0 0 2px;font-size:10px;color:#9A7B1F;font-weight:700;">헬스케어</p><p style="margin:0;font-size:12px;color:#0F172A;font-weight:600;">㈜위로보틱스</p><p style="margin:0;font-size:11px;color:#6B7280;">성장기 아동 보행 보조 로봇</p></td>
+      </tr>
+    </table>
+  </div>
+  <div style="background:#fff;padding:0 28px 16px;border-left:1px solid #EBE6DB;border-right:1px solid #EBE6DB;">
+    <div style="background:#0A0A0A;border:1px solid #D4AF37;border-radius:12px;padding:18px 20px;">
+      <div style="margin-bottom:12px;">
+        <span style="background:#D4AF37;color:#0A0A0A;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">이번 밋업</span>
+        <span style="border:1px solid rgba(212,175,55,0.4);color:#D4AF37;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-left:6px;">선정기업 무료</span>
+      </div>
+      <p style="margin:0 0 12px;font-size:15px;font-weight:700;color:#fff;">CES 혁신상 수상 노하우 공유</p>
+      <table width="100%" cellpadding="0" cellspacing="4"><tr>
+        <td style="padding:8px 14px;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.2);border-radius:8px;width:50%;"><p style="margin:0 0 2px;font-size:10px;color:#D4AF37;font-weight:600;">일시</p><p style="margin:0;font-size:13px;color:#fff;font-weight:600;">7월 28일(화)</p><p style="margin:0;font-size:11px;color:rgba(255,255,255,0.5);">시간 추후 안내</p></td>
+        <td style="padding:8px 14px;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.2);border-radius:8px;width:50%;"><p style="margin:0 0 2px;font-size:10px;color:#D4AF37;font-weight:600;">방식</p><p style="margin:0;font-size:13px;color:#fff;font-weight:600;">오프라인 밋업</p><p style="margin:0;font-size:11px;color:rgba(255,255,255,0.5);">장소 추후 안내</p></td>
+      </tr></table>
+    </div>
+  </div>
+  <div style="background:#fff;padding:0 28px 16px;border-left:1px solid #EBE6DB;border-right:1px solid #EBE6DB;">
+    <div style="background:#FAF8F2;border:1px solid #EBE6DB;border-radius:12px;padding:18px;">
+      <p style="margin:0 0 14px;font-size:11px;font-weight:700;color:#9A7B1F;letter-spacing:1.5px;">🗓️ 하반기 글로벌 진출 밋업 시리즈</p>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding:0 0 12px;vertical-align:top;width:52px;"><div style="background:#0A0A0A;border:1px solid #D4AF37;border-radius:8px;padding:6px 4px;text-align:center;"><p style="margin:0;font-size:13px;font-weight:800;color:#D4AF37;line-height:1;">7</p><p style="margin:1px 0 0;font-size:8px;color:rgba(255,255,255,0.6);">월</p></div></td><td style="padding:0 0 12px 12px;vertical-align:top;"><p style="margin:0;font-size:12px;font-weight:700;color:#0F172A;">CES 혁신상 수상 노하우 공유 밋업</p><p style="margin:2px 0 0;font-size:11px;color:#9A7B1F;font-weight:600;">7월 28일(화) · 진행 예정</p></td></tr>
+        <tr><td style="padding:0 0 12px;vertical-align:top;"><div style="background:#292524;border-radius:8px;padding:6px 4px;text-align:center;"><p style="margin:0;font-size:13px;font-weight:800;color:#D4AF37;line-height:1;">11</p><p style="margin:1px 0 0;font-size:8px;color:rgba(255,255,255,0.5);">월</p></div></td><td style="padding:0 0 12px 12px;vertical-align:top;"><p style="margin:0;font-size:12px;font-weight:700;color:#0F172A;">글로벌 전시회 참가 전략 밋업 ①</p><p style="margin:2px 0 0;font-size:11px;color:#A8A29E;">일정 추후 안내</p></td></tr>
+        <tr><td style="padding:0 0 12px;vertical-align:top;"><div style="background:#292524;border-radius:8px;padding:6px 4px;text-align:center;"><p style="margin:0;font-size:13px;font-weight:800;color:#D4AF37;line-height:1;">12</p><p style="margin:1px 0 0;font-size:8px;color:rgba(255,255,255,0.5);">월</p></div></td><td style="padding:0 0 12px 12px;vertical-align:top;"><p style="margin:0;font-size:12px;font-weight:700;color:#0F172A;">글로벌 전시회 참가 전략 밋업 ②</p><p style="margin:2px 0 0;font-size:11px;color:#A8A29E;">일정 추후 안내</p></td></tr>
+        <tr><td style="vertical-align:top;"><div style="background:#D4AF37;border-radius:8px;padding:6px 4px;text-align:center;"><p style="margin:0;font-size:13px;font-weight:800;color:#0A0A0A;line-height:1;">12</p><p style="margin:1px 0 0;font-size:8px;color:#5C4A15;">월</p></div></td><td style="padding:0 0 0 12px;vertical-align:top;"><p style="margin:0;font-size:12px;font-weight:700;color:#0F172A;">CES 2027 수상기업 네트워킹 파티 🥂</p><p style="margin:2px 0 0;font-size:11px;color:#A8A29E;">일정 추후 안내</p></td></tr>
+      </table>
+      <p style="margin:14px 0 0;font-size:11px;color:#A8A29E;line-height:1.6;">※ 상기 일정과 프로그램은 내부 사정에 따라 변경될 수 있습니다.</p>
+    </div>
+  </div>
+  <div style="background:#fff;padding:0 28px 16px;border-left:1px solid #EBE6DB;border-right:1px solid #EBE6DB;">
+    <div style="background:#FAFAF9;border:1px solid #E7E5E4;border-radius:12px;padding:18px;">
+      <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#57534E;letter-spacing:1.5px;">🎯 CES 2027 혁신상 도전 안내</p>
+      <p style="margin:0 0 14px;font-size:12px;color:#78716C;line-height:1.6;">이번 밋업에서 CES 2027 혁신상 도전을 함께 준비해보세요.</p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E7E5E4;border-radius:8px;overflow:hidden;">
+        <tr style="background:#fff;"><td style="padding:9px 14px;font-size:11px;color:#57534E;font-weight:700;white-space:nowrap;width:80px;border-bottom:1px solid #F5F5F4;">신청 접수</td><td style="padding:9px 14px;font-size:12px;color:#0F172A;border-bottom:1px solid #F5F5F4;">2026. 6. 5.(금) ~ 8. 19.(수)</td></tr>
+        <tr style="background:#fff;"><td style="padding:9px 14px;font-size:11px;color:#57534E;font-weight:700;white-space:nowrap;border-bottom:1px solid #F5F5F4;">결과 통보</td><td style="padding:9px 14px;font-size:12px;color:#0F172A;border-bottom:1px solid #F5F5F4;">2026. 11. 2.(월)</td></tr>
+        <tr style="background:#fff;"><td style="padding:9px 14px;font-size:11px;color:#57534E;font-weight:700;white-space:nowrap;border-bottom:1px solid #F5F5F4;">수상 발표</td><td style="padding:9px 14px;font-size:12px;color:#0F172A;border-bottom:1px solid #F5F5F4;">2026. 11. 9.(월)</td></tr>
+        <tr style="background:#fff;"><td style="padding:9px 14px;font-size:11px;color:#57534E;font-weight:700;white-space:nowrap;">출시 조건</td><td style="padding:9px 14px;font-size:12px;color:#0F172A;">2026.4.1 ~ 2027.3.31 최초 출시 제품</td></tr>
+      </table>
+      <p style="margin:12px 0 14px;font-size:11px;color:#78716C;line-height:1.7;">· 제품 1개당 최대 4개 카테고리 출품 가능<br>· CES 전시 참가 없이도 혁신상 신청 가능</p>
+      <a href="https://cta.secure-platform.com/ces-awards" style="display:block;background:#0A0A0A;color:#D4AF37;text-align:center;padding:12px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:700;border:1px solid #D4AF37;">CES 2027 혁신상 신청 바로가기 →</a>
+    </div>
+  </div>
+  <div style="background:#FAF8F2;padding:20px 28px;border:1px solid #EBE6DB;">
+    <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#9A7B1F;letter-spacing:2px;">✅ 참여 신청</p>
+    <p style="margin:0 0 14px;font-size:14px;font-weight:600;color:#0A0A0A;">아래 내용을 작성하여, 본 메일에 답장해 주세요</p>
+    <div style="background:#fff;border:1px solid #EBE6DB;border-radius:8px;padding:14px 16px;font-size:13px;color:#292524;line-height:2.4;">
+      기업명 : <span style="color:#C4B896;">____________</span><br>
+      담당자명 : <span style="color:#C4B896;">____________</span><br>
+      연락처 : <span style="color:#C4B896;">____________</span>
+    </div>
+    <p style="margin:10px 0 0;font-size:11px;color:#9A7B1F;">※ 1인 이상 참여 시 참여 인원 정보를 모두 작성해 주세요.</p>
+  </div>
+  <div style="background:#0A0A0A;border-radius:0 0 14px 14px;padding:16px 28px;text-align:center;border:1px solid #D4AF37;">
+    <p style="margin:0 0 6px;font-size:10px;color:#D4AF37;letter-spacing:3px;font-weight:700;">WITH AVING NEWS</p>
+    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · onestop.kipcc@gmail.com</p>
+    <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.45);">본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
   </div>
 </div>
 </body></html>"""
@@ -5446,6 +5638,108 @@ onestop.kipcc@gmail.com""",
 </div>
 </body></html>"""
                         body_html_co = mail_body.replace('\n', '<br>')
+                    elif template_choice == "CES 혁신상 밋업 신청 안내":
+                        _ces_img = "https://drive.google.com/uc?export=view&id=1kwTjAWDqFz4-Y9Tfa80TNU8Ejp5Y-4gv"
+                        html_body = f"""<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#FAFAF8;font-family:'Apple SD Gothic Neo',Arial,sans-serif;">
+<div style="max-width:580px;margin:20px auto;">
+  <img src="{_ces_img}" style="width:100%;height:170px;object-fit:cover;display:block;border-radius:14px 14px 0 0;" alt="Las Vegas">
+  <div style="background:#0A0A0A;padding:24px 28px 22px;border-left:1px solid #D4AF37;border-right:1px solid #D4AF37;">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td valign="top">
+        <p style="margin:0 0 8px;font-size:10px;color:#D4AF37;letter-spacing:3px;font-weight:600;">원스톱 스케일업 · 특별 밋업</p>
+        <p style="margin:0;font-size:22px;font-weight:800;color:#fff;line-height:1.35;">CES 혁신상 수상<br><span style="color:#D4AF37;">노하우 공유 밋업</span></p>
+        <p style="margin:10px 0 0;font-size:12px;color:rgba(255,255,255,0.6);">글로벌 무대를 준비하는 기업을 위한 특별 세션</p>
+      </td>
+      <td width="70" align="right" valign="top">
+        <div style="text-align:center;">
+          <p style="margin:0;font-size:26px;font-weight:800;color:#D4AF37;line-height:1;letter-spacing:2px;">CES</p>
+          <div style="border-top:1px solid rgba(212,175,55,0.4);margin:5px 0 4px;"></div>
+          <p style="margin:0;font-size:6.5px;font-weight:600;color:rgba(212,175,55,0.7);letter-spacing:0.3px;line-height:1.4;">CONSUMER<br>ELECTRONICS SHOW</p>
+        </div>
+      </td>
+    </tr></table>
+  </div>
+  <div style="background:#fff;padding:20px 28px 16px;border-left:1px solid #EBE6DB;border-right:1px solid #EBE6DB;">
+    <p style="margin:0;font-size:13px;color:#374151;line-height:1.8;">안녕하세요, 원스톱 스케일업 운영팀입니다.<br>CES 2026(1월 6~9일, 미국 라스베이거스)에서 <b>조달기업 30개사가 혁신상을 수상</b>하며 역대 최다 성과를 거뒀습니다.<br>수상 노하우를 직접 들을 수 있는 밋업에 여러분을 초대합니다.</p>
+  </div>
+  <div style="background:#fff;padding:0 28px 16px;border-left:1px solid #EBE6DB;border-right:1px solid #EBE6DB;">
+    <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#9A7B1F;letter-spacing:1.5px;">📊 CES 2026 조달기업 성과</p>
+    <div style="background:#0A0A0A;border-radius:12px;padding:20px 18px;">
+      <table width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="text-align:center;width:33%;padding:0 6px;"><p style="margin:0;font-size:30px;font-weight:800;color:#D4AF37;line-height:1;">30<span style="font-size:13px;font-weight:600;">개사</span></p><p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,0.6);font-weight:600;">혁신상 수상</p></td>
+        <td style="width:1px;background:rgba(212,175,55,0.3);"></td>
+        <td style="text-align:center;width:33%;padding:0 6px;"><p style="margin:0;font-size:30px;font-weight:800;color:#D4AF37;line-height:1;">17<span style="font-size:13px;font-weight:600;">개</span></p><p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,0.6);font-weight:600;">AI 융복합 제품</p></td>
+        <td style="width:1px;background:rgba(212,175,55,0.3);"></td>
+        <td style="text-align:center;width:33%;padding:0 6px;"><p style="margin:0;font-size:23px;font-weight:800;color:#D4AF37;line-height:1.1;">역대최다</p><p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,0.6);font-weight:600;">수상 성과</p></td>
+      </tr></table>
+      <div style="border-top:1px solid rgba(212,175,55,0.25);margin-top:14px;padding-top:12px;"><p style="margin:0;font-size:11px;color:rgba(255,255,255,0.75);line-height:1.7;"><b style="color:#D4AF37;">혁신제품 지정기업</b> 19개사 · <b style="color:#D4AF37;">벤처나라 등록기업</b> 13개사<br>재난·안전 / 자원순환 / 헬스케어 등 공공분야 혁신제품도 국제적 주목</p></div>
+    </div>
+  </div>
+  <div style="background:#fff;padding:0 28px 16px;border-left:1px solid #EBE6DB;border-right:1px solid #EBE6DB;">
+    <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#9A7B1F;letter-spacing:1.5px;">🏆 분야별 수상 제품</p>
+    <table width="100%" cellpadding="0" cellspacing="6">
+      <tr>
+        <td style="background:#FAF8F2;border:1px solid #EBE6DB;border-radius:8px;padding:10px 12px;width:50%;vertical-align:top;"><p style="margin:0 0 2px;font-size:10px;color:#9A7B1F;font-weight:700;">AI 융복합</p><p style="margin:0;font-size:12px;color:#0F172A;font-weight:600;">㈜바이오커넥트</p><p style="margin:0;font-size:11px;color:#6B7280;">비전 AI 얼굴 혈류 비접촉 측정</p></td>
+        <td style="background:#FAF8F2;border:1px solid #EBE6DB;border-radius:8px;padding:10px 12px;width:50%;vertical-align:top;"><p style="margin:0 0 2px;font-size:10px;color:#9A7B1F;font-weight:700;">재난·안전</p><p style="margin:0;font-size:12px;color:#0F172A;font-weight:600;">㈜아이아이에스티</p><p style="margin:0;font-size:11px;color:#6B7280;">AI 기반 다중 재난감지 카메라</p></td>
+      </tr>
+      <tr>
+        <td style="background:#FAF8F2;border:1px solid #EBE6DB;border-radius:8px;padding:10px 12px;width:50%;vertical-align:top;"><p style="margin:0 0 2px;font-size:10px;color:#9A7B1F;font-weight:700;">자원순환</p><p style="margin:0;font-size:12px;color:#0F172A;font-weight:600;">㈜에이트테크</p><p style="margin:0;font-size:11px;color:#6B7280;">이동형 AI 자원순환 솔루션</p></td>
+        <td style="background:#FAF8F2;border:1px solid #EBE6DB;border-radius:8px;padding:10px 12px;width:50%;vertical-align:top;"><p style="margin:0 0 2px;font-size:10px;color:#9A7B1F;font-weight:700;">헬스케어</p><p style="margin:0;font-size:12px;color:#0F172A;font-weight:600;">㈜위로보틱스</p><p style="margin:0;font-size:11px;color:#6B7280;">성장기 아동 보행 보조 로봇</p></td>
+      </tr>
+    </table>
+  </div>
+  <div style="background:#fff;padding:0 28px 16px;border-left:1px solid #EBE6DB;border-right:1px solid #EBE6DB;">
+    <div style="background:#0A0A0A;border:1px solid #D4AF37;border-radius:12px;padding:18px 20px;">
+      <div style="margin-bottom:12px;"><span style="background:#D4AF37;color:#0A0A0A;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">이번 밋업</span><span style="border:1px solid rgba(212,175,55,0.4);color:#D4AF37;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-left:6px;">선정기업 무료</span></div>
+      <p style="margin:0 0 12px;font-size:15px;font-weight:700;color:#fff;">CES 혁신상 수상 노하우 공유</p>
+      <table width="100%" cellpadding="0" cellspacing="4"><tr>
+        <td style="padding:8px 14px;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.2);border-radius:8px;width:50%;"><p style="margin:0 0 2px;font-size:10px;color:#D4AF37;font-weight:600;">일시</p><p style="margin:0;font-size:13px;color:#fff;font-weight:600;">7월 28일(화)</p><p style="margin:0;font-size:11px;color:rgba(255,255,255,0.5);">시간 추후 안내</p></td>
+        <td style="padding:8px 14px;background:rgba(212,175,55,0.08);border:1px solid rgba(212,175,55,0.2);border-radius:8px;width:50%;"><p style="margin:0 0 2px;font-size:10px;color:#D4AF37;font-weight:600;">방식</p><p style="margin:0;font-size:13px;color:#fff;font-weight:600;">오프라인 밋업</p><p style="margin:0;font-size:11px;color:rgba(255,255,255,0.5);">장소 추후 안내</p></td>
+      </tr></table>
+    </div>
+  </div>
+  <div style="background:#fff;padding:0 28px 16px;border-left:1px solid #EBE6DB;border-right:1px solid #EBE6DB;">
+    <div style="background:#FAF8F2;border:1px solid #EBE6DB;border-radius:12px;padding:18px;">
+      <p style="margin:0 0 14px;font-size:11px;font-weight:700;color:#9A7B1F;letter-spacing:1.5px;">🗓️ 하반기 글로벌 진출 밋업 시리즈</p>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding:0 0 12px;vertical-align:top;width:52px;"><div style="background:#0A0A0A;border:1px solid #D4AF37;border-radius:8px;padding:6px 4px;text-align:center;"><p style="margin:0;font-size:13px;font-weight:800;color:#D4AF37;line-height:1;">7</p><p style="margin:1px 0 0;font-size:8px;color:rgba(255,255,255,0.6);">월</p></div></td><td style="padding:0 0 12px 12px;vertical-align:top;"><p style="margin:0;font-size:12px;font-weight:700;color:#0F172A;">CES 혁신상 수상 노하우 공유 밋업</p><p style="margin:2px 0 0;font-size:11px;color:#9A7B1F;font-weight:600;">7월 28일(화) · 진행 예정</p></td></tr>
+        <tr><td style="padding:0 0 12px;vertical-align:top;"><div style="background:#292524;border-radius:8px;padding:6px 4px;text-align:center;"><p style="margin:0;font-size:13px;font-weight:800;color:#D4AF37;line-height:1;">11</p><p style="margin:1px 0 0;font-size:8px;color:rgba(255,255,255,0.5);">월</p></div></td><td style="padding:0 0 12px 12px;vertical-align:top;"><p style="margin:0;font-size:12px;font-weight:700;color:#0F172A;">글로벌 전시회 참가 전략 밋업 ①</p><p style="margin:2px 0 0;font-size:11px;color:#A8A29E;">일정 추후 안내</p></td></tr>
+        <tr><td style="padding:0 0 12px;vertical-align:top;"><div style="background:#292524;border-radius:8px;padding:6px 4px;text-align:center;"><p style="margin:0;font-size:13px;font-weight:800;color:#D4AF37;line-height:1;">12</p><p style="margin:1px 0 0;font-size:8px;color:rgba(255,255,255,0.5);">월</p></div></td><td style="padding:0 0 12px 12px;vertical-align:top;"><p style="margin:0;font-size:12px;font-weight:700;color:#0F172A;">글로벌 전시회 참가 전략 밋업 ②</p><p style="margin:2px 0 0;font-size:11px;color:#A8A29E;">일정 추후 안내</p></td></tr>
+        <tr><td style="vertical-align:top;"><div style="background:#D4AF37;border-radius:8px;padding:6px 4px;text-align:center;"><p style="margin:0;font-size:13px;font-weight:800;color:#0A0A0A;line-height:1;">12</p><p style="margin:1px 0 0;font-size:8px;color:#5C4A15;">월</p></div></td><td style="padding:0 0 0 12px;vertical-align:top;"><p style="margin:0;font-size:12px;font-weight:700;color:#0F172A;">CES 2027 수상기업 네트워킹 파티 🥂</p><p style="margin:2px 0 0;font-size:11px;color:#A8A29E;">일정 추후 안내</p></td></tr>
+      </table>
+      <p style="margin:14px 0 0;font-size:11px;color:#A8A29E;line-height:1.6;">※ 상기 일정과 프로그램은 내부 사정에 따라 변경될 수 있습니다.</p>
+    </div>
+  </div>
+  <div style="background:#fff;padding:0 28px 16px;border-left:1px solid #EBE6DB;border-right:1px solid #EBE6DB;">
+    <div style="background:#FAFAF9;border:1px solid #E7E5E4;border-radius:12px;padding:18px;">
+      <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#57534E;letter-spacing:1.5px;">🎯 CES 2027 혁신상 도전 안내</p>
+      <p style="margin:0 0 14px;font-size:12px;color:#78716C;line-height:1.6;">이번 밋업에서 CES 2027 혁신상 도전을 함께 준비해보세요.</p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E7E5E4;border-radius:8px;overflow:hidden;">
+        <tr style="background:#fff;"><td style="padding:9px 14px;font-size:11px;color:#57534E;font-weight:700;white-space:nowrap;width:80px;border-bottom:1px solid #F5F5F4;">신청 접수</td><td style="padding:9px 14px;font-size:12px;color:#0F172A;border-bottom:1px solid #F5F5F4;">2026. 6. 5.(금) ~ 8. 19.(수)</td></tr>
+        <tr style="background:#fff;"><td style="padding:9px 14px;font-size:11px;color:#57534E;font-weight:700;white-space:nowrap;border-bottom:1px solid #F5F5F4;">결과 통보</td><td style="padding:9px 14px;font-size:12px;color:#0F172A;border-bottom:1px solid #F5F5F4;">2026. 11. 2.(월)</td></tr>
+        <tr style="background:#fff;"><td style="padding:9px 14px;font-size:11px;color:#57534E;font-weight:700;white-space:nowrap;border-bottom:1px solid #F5F5F4;">수상 발표</td><td style="padding:9px 14px;font-size:12px;color:#0F172A;border-bottom:1px solid #F5F5F4;">2026. 11. 9.(월)</td></tr>
+        <tr style="background:#fff;"><td style="padding:9px 14px;font-size:11px;color:#57534E;font-weight:700;white-space:nowrap;">출시 조건</td><td style="padding:9px 14px;font-size:12px;color:#0F172A;">2026.4.1 ~ 2027.3.31 최초 출시 제품</td></tr>
+      </table>
+      <p style="margin:12px 0 14px;font-size:11px;color:#78716C;line-height:1.7;">· 제품 1개당 최대 4개 카테고리 출품 가능<br>· CES 전시 참가 없이도 혁신상 신청 가능</p>
+      <a href="https://cta.secure-platform.com/ces-awards" style="display:block;background:#0A0A0A;color:#D4AF37;text-align:center;padding:12px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:700;border:1px solid #D4AF37;">CES 2027 혁신상 신청 바로가기 →</a>
+    </div>
+  </div>
+  <div style="background:#FAF8F2;padding:20px 28px;border:1px solid #EBE6DB;">
+    <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#9A7B1F;letter-spacing:2px;">✅ 참여 신청</p>
+    <p style="margin:0 0 14px;font-size:14px;font-weight:600;color:#0A0A0A;">아래 내용을 작성하여, 본 메일에 답장해 주세요</p>
+    <div style="background:#fff;border:1px solid #EBE6DB;border-radius:8px;padding:14px 16px;font-size:13px;color:#292524;line-height:2.4;">기업명 : &nbsp;<br>담당자명 : &nbsp;<br>연락처 : &nbsp;</div>
+    <p style="margin:10px 0 0;font-size:11px;color:#9A7B1F;">※ 1인 이상 참여 시 참여 인원 정보를 모두 작성해 주세요.</p>
+  </div>
+  <div style="background:#0A0A0A;border-radius:0 0 14px 14px;padding:16px 28px;text-align:center;border:1px solid #D4AF37;">
+    <p style="margin:0 0 6px;font-size:10px;color:#D4AF37;letter-spacing:3px;font-weight:700;">WITH AVING NEWS</p>
+    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · onestop.kipcc@gmail.com</p>
+    <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.45);">본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
+  </div>
+</div>
+</body></html>"""
+                        body_html_co = ""
 
                     # 기업 키워드 카드를 "▣ 한 가지 부탁드립니다" 앞에 삽입
                     if kw_section_html and '▣ 한 가지 부탁드립니다' in body_html_co:
@@ -5466,7 +5760,7 @@ onestop.kipcc@gmail.com""",
                           <a href="{form_link}" style="font-size:13px;color:#10B981;">{form_link}</a>
                         </div>"""
 
-                    if template_choice != "7월 교육 프로그램 신청 안내":
+                    if template_choice not in ("7월 교육 프로그램 신청 안내", "CES 혁신상 밋업 신청 안내"):
                         html_body = f"""<!DOCTYPE html>
     <html lang="ko"><head><meta charset="UTF-8"></head>
     <body style="margin:0;padding:0;background:#F2F4F7;
