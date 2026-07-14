@@ -1491,22 +1491,39 @@ header    { visibility:hidden; }
   color: #F0F0F0 !important;
 }
 [data-baseweb="menu"] li:hover {
-  background: #FF008022 !important;
   background: #FF0080 !important;
   color: #000000 !important;
+}
 [data-baseweb="option"] {
   background: #1A1A1A !important;
   color: #F0F0F0 !important;
 }
 [data-baseweb="option"]:hover {
-  background: #FF008022 !important;
   background: #FF0080 !important;
   color: #000000 !important;
+}
 /* 선택된 항목 */
 [aria-selected="true"] {
-  background: #FF008033 !important;
   background: #FF0080 !important;
   color: #000000 !important;
+}
+/* ── 드롭다운 팝오버 강제 (body 최상위 렌더 대응) ── */
+div[data-baseweb="popover"] > div,
+div[data-baseweb="popover"] ul {
+  background: #1A1A1A !important;
+}
+ul[role="listbox"] { background: #1A1A1A !important; }
+ul[role="listbox"] li,
+li[role="option"] {
+  background: #1A1A1A !important;
+  color: #F0F0F0 !important;
+}
+ul[role="listbox"] li:hover,
+li[role="option"]:hover,
+li[role="option"][aria-selected="true"] {
+  background: #FF0080 !important;
+  color: #000000 !important;
+}
 
 /* ── radio 버튼 ── */
 [data-testid="stRadio"] label {
