@@ -1505,8 +1505,9 @@ header    { visibility:hidden; }
 /* 선택된 항목 (드롭다운 옵션에만 적용) */
 [data-baseweb="menu"] [aria-selected="true"],
 [data-baseweb="popover"] [aria-selected="true"] {
-  background: #FF0080 !important;
-  color: #000000 !important;
+  background: rgba(255,0,128,0.18) !important;
+  color: #FF66B2 !important;
+  font-weight: 600 !important;
 }
 /* ── 드롭다운 팝오버 강제 (body 최상위 렌더 대응) ── */
 div[data-baseweb="popover"] > div,
@@ -1520,10 +1521,14 @@ li[role="option"] {
   color: #F0F0F0 !important;
 }
 ul[role="listbox"] li:hover,
-li[role="option"]:hover,
-li[role="option"][aria-selected="true"] {
+li[role="option"]:hover {
   background: #FF0080 !important;
   color: #000000 !important;
+}
+li[role="option"][aria-selected="true"] {
+  background: rgba(255,0,128,0.18) !important;
+  color: #FF66B2 !important;
+  font-weight: 600 !important;
 }
 
 /* ── radio 버튼 ── */
@@ -1533,6 +1538,9 @@ li[role="option"][aria-selected="true"] {
   background: transparent !important;
   transition: color 0.15s !important;
 }
+[data-testid="stRadio"] label > div {
+  background: transparent !important;
+}
 [data-testid="stRadio"] [data-testid="stMarkdownContainer"] p {
   color: inherit !important;
 }
@@ -1540,20 +1548,12 @@ li[role="option"][aria-selected="true"] {
 [data-testid="stRadio"] label:has(input:checked) {
   color: var(--accent) !important;
   font-weight: 600 !important;
+  background: transparent !important;
 }
 [data-testid="stRadio"] label:has(input:checked) [data-testid="stMarkdownContainer"] p {
   color: var(--accent) !important;
 }
 [data-testid="stRadio"] label:hover { color: var(--text-1) !important; }
-/* 라디오 dot */
-[data-testid="stRadio"] input:checked + div {
-  background: var(--accent) !important;
-  border-color: var(--accent) !important;
-}
-[data-testid="stRadio"] div[data-checked="true"] {
-  background: var(--accent) !important;
-  border-color: var(--accent) !important;
-}
 
 /* ── 타임라인 필터 버튼 명시적 색상 ── */
 .tl-filter-active {
