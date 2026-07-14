@@ -29,13 +29,13 @@ def check_password():
         return True
     st.markdown("""
     <div style="max-width:380px;margin:100px auto;text-align:center;">
-      <div style="width:52px;height:52px;background:#ECFDF5;
+      <div style="width:52px;height:52px;background:#0A1F15;
                   border:1px solid #A7F3D0;border-radius:14px;
                   display:flex;align-items:center;justify-content:center;
                   margin:0 auto 20px;font-size:24px;box-shadow:0 2px 8px rgba(16,185,129,0.15);">📢</div>
-      <h2 style="color:#0F172A;font-size:22px;font-weight:700;margin:0 0 6px;
+      <h2 style="color:#F0F0F0;font-size:22px;font-weight:700;margin:0 0 6px;
                  font-family:'Inter','Apple SD Gothic Neo',sans-serif;">원스톱 스케일업</h2>
-      <p style="color:#64748B;font-size:13px;margin:0 0 32px;
+      <p style="color:#888888;font-size:13px;margin:0 0 32px;
                 font-family:'Inter','Apple SD Gothic Neo',sans-serif;">혁신제품지원센터 공고 매칭 시스템</p>
     </div>
     """, unsafe_allow_html=True)
@@ -1274,39 +1274,47 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --accent:       #10B981;
-  --accent-light: #ECFDF5;
-  --accent-dark:  #059669;
-  --border:       #E2E8F0;
-  --border-2:     #CBD5E1;
-  --surface:      #FFFFFF;
-  --bg:           #F8FAFC;
-  --text-1:       #0F172A;
-  --text-2:       #475569;
-  --text-3:       #94A3B8;
+  --accent:       #FF0080;
+  --accent-light: #1A0010;
+  --accent-dark:  #CC0066;
+  --border:       #2A2A2A;
+  --border-2:     #333333;
+  --surface:      #151515;
+  --bg:           #0A0A0A;
+  --text-1:       #F0F0F0;
+  --text-2:       #AAAAAA;
+  --text-3:       #666666;
   --blue:         #3B82F6;
   --yellow:       #F59E0B;
   --red:          #EF4444;
   --radius:       8px;
-  --shadow:       0 1px 3px rgba(0,0,0,0.08);
-  --shadow-md:    0 4px 12px rgba(0,0,0,0.08);
+  --shadow:       0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md:    0 4px 12px rgba(255,0,128,0.1);
 }
 
-/* ── 전체 폰트 ── */
+/* ── 전체 폰트·배경 ── */
 .stApp {
   font-family: 'Inter','Apple SD Gothic Neo','Malgun Gothic',sans-serif !important;
   background: var(--bg) !important;
+  color: var(--text-1) !important;
 }
 
 /* ── 타이포 ── */
 h1 { font-size:22px !important; font-weight:700 !important; color:var(--text-1) !important; letter-spacing:-0.3px !important; }
 h2 { font-size:17px !important; font-weight:600 !important; color:var(--text-1) !important; }
 h3 { font-size:15px !important; font-weight:600 !important; color:var(--text-1) !important; }
-strong { color:var(--accent-dark) !important; font-weight:600 !important; }
+p, span, div, label { color: var(--text-1) !important; }
+strong { color: var(--accent) !important; font-weight:600 !important; }
 code {
-  color:var(--accent-dark) !important;
-  background:var(--accent-light) !important;
+  color: var(--accent) !important;
+  background: var(--accent-light) !important;
   border-radius:4px !important; padding:1px 6px !important; font-size:12px !important;
+}
+
+/* ── 메인 컨테이너 ── */
+.main .block-container {
+  background: var(--bg) !important;
+  color: var(--text-1) !important;
 }
 
 /* ── 메트릭 카드 ── */
@@ -1315,64 +1323,107 @@ code {
   border: 1px solid var(--border) !important;
   border-radius: var(--radius) !important;
   padding: 14px 18px !important;
-  box-shadow: var(--shadow) !important;
+  box-shadow: var(--shadow-md) !important;
 }
 [data-testid="stMetricLabel"] {
   font-size: 11px !important; font-weight:500 !important;
   text-transform: uppercase !important; letter-spacing:0.5px !important;
   color: var(--text-2) !important;
 }
-[data-testid="stMetricValue"] { font-size:24px !important; font-weight:700 !important; }
+[data-testid="stMetricValue"] {
+  font-size:24px !important; font-weight:700 !important;
+  color: var(--accent) !important;
+}
 
 /* ── primary 버튼 ── */
 button[kind="primary"] {
   background: var(--accent) !important;
   color: #fff !important; border:none !important; font-weight:600 !important;
-  box-shadow: 0 1px 3px rgba(16,185,129,0.3) !important;
+  box-shadow: 0 1px 6px rgba(255,0,128,0.4) !important;
 }
 button[kind="primary"]:hover { background: var(--accent-dark) !important; }
 
 /* ── 일반 버튼 ── */
 .stButton button {
   border-radius: var(--radius) !important;
-  font-size:13px !important; font-weight:500 !important;
+  font-size:13px !important; font-weight:600 !important;
   border: 1px solid var(--border-2) !important;
+  background: var(--surface) !important;
+  color: var(--text-1) !important;
   transition: all 0.15s !important;
 }
-.stButton button:hover { border-color: var(--accent) !important; color: var(--accent-dark) !important; }
+.stButton button:hover {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+  box-shadow: 0 0 8px rgba(255,0,128,0.2) !important;
+}
 
-/* ── 입력창 포커스 ── */
+/* ── 입력창 ── */
+.stTextInput input, .stTextArea textarea, .stSelectbox select,
+[data-baseweb="input"] input, [data-baseweb="textarea"] textarea {
+  background: var(--surface) !important;
+  color: var(--text-1) !important;
+  border-color: var(--border-2) !important;
+}
 .stTextInput input:focus, .stTextArea textarea:focus {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px rgba(16,185,129,0.15) !important;
+  box-shadow: 0 0 0 3px rgba(255,0,128,0.15) !important;
 }
+.stTextInput input::placeholder, .stTextArea textarea::placeholder {
+  color: var(--text-3) !important;
+}
+
+/* ── 셀렉트박스 ── */
+[data-baseweb="select"] { background: var(--surface) !important; }
+[data-baseweb="select"] * { background: var(--surface) !important; color: var(--text-1) !important; }
+[data-baseweb="popover"] { background: #1A1A1A !important; border: 1px solid var(--border-2) !important; }
+[data-baseweb="menu"] li:hover { background: var(--accent-light) !important; }
 
 /* ── 탭 ── */
 .stTabs [data-baseweb="tab-list"] {
   border-bottom: 2px solid var(--border) !important;
+  background: transparent !important;
+}
+.stTabs [data-baseweb="tab"] {
+  color: var(--text-2) !important;
+  background: transparent !important;
 }
 .stTabs [aria-selected="true"] {
-  color: var(--accent-dark) !important;
+  color: var(--accent) !important;
   font-weight:600 !important;
   border-bottom: 2px solid var(--accent) !important;
   background: var(--accent-light) !important;
 }
 
 /* ── 알림 박스 ── */
-.stSuccess, .stSuccess * { color: #065F46 !important; }
-.stSuccess { background: #ECFDF5 !important; border-left: 3px solid var(--accent) !important; border-radius:var(--radius) !important; }
-.stWarning, .stWarning * { color: #78350F !important; }
-.stWarning { background: #FFFBEB !important; border-left: 3px solid var(--yellow) !important; border-radius:var(--radius) !important; }
-.stError, .stError * { color: #7F1D1D !important; }
-.stError { background: #FEF2F2 !important; border-left: 3px solid var(--red) !important; border-radius:var(--radius) !important; }
-.stInfo, .stInfo * { color: #1E3A8A !important; }
-.stInfo { background: #EFF6FF !important; border-left: 3px solid var(--blue) !important; border-radius:var(--radius) !important; }
+.stSuccess { background: #0A1F15 !important; border-left: 3px solid #10B981 !important; border-radius:var(--radius) !important; }
+.stSuccess * { color: #4DFFAA !important; }
+.stWarning { background: #1A1200 !important; border-left: 3px solid var(--yellow) !important; border-radius:var(--radius) !important; }
+.stWarning * { color: #FFD080 !important; }
+.stError { background: #1A0000 !important; border-left: 3px solid var(--red) !important; border-radius:var(--radius) !important; }
+.stError * { color: #FF8080 !important; }
+.stInfo { background: #001020 !important; border-left: 3px solid var(--blue) !important; border-radius:var(--radius) !important; }
+.stInfo * { color: #80BFFF !important; }
 
 /* ── 구분선 ── */
 hr { border: none !important; border-top: 1px solid var(--border) !important; }
 
 /* ── 캡션 ── */
 .stCaption, [data-testid="stCaptionContainer"] { color: var(--text-3) !important; font-size:12px !important; }
+
+/* ── data editor / dataframe ── */
+[data-testid="stDataFrame"], .stDataFrame {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+}
+
+/* ── 사이드바 ── */
+section[data-testid="stSidebar"] {
+  background: #0D0D0D !important;
+  border-right: 1px solid #FF008033 !important;
+}
+section[data-testid="stSidebar"] * { color: var(--text-1) !important; }
+section[data-testid="stSidebar"] .stRadio label:hover { color: var(--accent) !important; }
 
 /* ── progress ── */
 .stProgress > div > div { background: var(--accent) !important; }
@@ -1382,10 +1433,20 @@ hr { border: none !important; border-top: 1px solid var(--border) !important; }
 .stLinkButton a {
   border: 1px solid var(--border-2) !important;
   border-radius: var(--radius) !important;
+  color: var(--text-1) !important;
   font-size:13px !important; text-decoration:none !important;
+  background: var(--surface) !important;
   transition: all 0.15s !important;
 }
-.stLinkButton a:hover { border-color: var(--accent) !important; color: var(--accent-dark) !important; }
+.stLinkButton a:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
+
+/* ── expander ── */
+.streamlit-expander {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+}
+.streamlit-expander summary { color: var(--text-1) !important; }
 
 /* ── 사이드바 항상 표시 ── */
 [data-testid="stSidebarCollapseButton"] { display:none !important; }
@@ -1405,13 +1466,25 @@ div[data-testid="stStatusWidget"] { display:none !important; }
 footer    { visibility:hidden; }
 header    { visibility:hidden; }
 
-/* ── 슬라이더 진행바만 에메랄드 ── */
+/* ── 슬라이더 ── */
 [data-testid="stSlider"] [role="progressbar"] { background: var(--accent) !important; }
 [data-testid="stSlider"] [role="slider"] {
   background: var(--accent) !important; border-color: var(--accent) !important;
 }
+
+/* ── 체크박스 ── */
+[data-testid="stCheckbox"] label span { border-color: var(--border-2) !important; }
+[data-testid="stCheckbox"] input:checked + span { background: var(--accent) !important; border-color: var(--accent) !important; }
+
+/* ── 타임라인 필터 버튼 명시적 색상 ── */
+.tl-filter-active {
+  background: #FF0080 !important;
+  color: #ffffff !important;
+  border-color: #FF0080 !important;
+}
 </style>
 """, unsafe_allow_html=True)
+
 
 
 # ── 사이드바 ──────────────────────────────────────────
@@ -1708,10 +1781,10 @@ if page == "대시보드":
         "meetup": "#F59E0B", "system": "#8B5CF6", "eval": "#F59E0B",
     }
     TYPE_BADGE = {
-        "mail": "background:#EFF6FF;color:#1D4ED8",
+        "mail": "background:#001020;color:#1D4ED8",
         "match": "background:#FFF1F2;color:#BE123C",
-        "edu": "background:#F0FDF4;color:#059669",
-        "meetup": "background:#FFF7ED;color:#C2410C",
+        "edu": "background:#0A1A0F;color:#059669",
+        "meetup": "background:#1A0A00;color:#C2410C",
         "system": "background:#F5F3FF;color:#6D28D9",
         "eval": "background:#FFFBEB;color:#92400E",
     }
@@ -1720,9 +1793,14 @@ if page == "대시보드":
     tl_filter = st.session_state.get('tl_filter', 'all')
     for i, (k, v) in enumerate(TYPE_LABELS.items()):
         with filter_cols[i]:
-            if st.button(v, key=f"tl_f_{k}",
-                         type="primary" if tl_filter == k else "secondary",
-                         use_container_width=True):
+            is_active = tl_filter == k
+            label = f"**{v}**" if is_active else v
+            if st.button(
+                label,
+                key=f"tl_f_{k}",
+                type="primary" if is_active else "secondary",
+                use_container_width=True
+            ):
                 st.session_state['tl_filter'] = k
                 st.rerun()
 
@@ -1747,12 +1825,12 @@ if page == "대시보드":
             except:
                 mo_label = month
 
-            st.markdown(f"<p style='font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:1.5px;margin:12px 0 8px;'>{mo_label}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:10px;font-weight:900;color:#FF0080;letter-spacing:3px;text-transform:uppercase;margin:16px 0 8px 0;'>{mo_label}</p>", unsafe_allow_html=True)
 
             for item in items:
                 t = item.get('type','system')
                 color = TYPE_COLORS.get(t, '#94A3B8')
-                badge_style = TYPE_BADGE.get(t, 'background:#F1F5F9;color:#475569')
+                badge_style = TYPE_BADGE.get(t, 'background:#F1F5F9;color:#AAAAAA')
                 badge_label = TYPE_LABELS.get(t, t)
                 date_str = item.get('date','')
                 try:
@@ -1770,17 +1848,17 @@ if page == "대시보드":
                 st.markdown(f"""
 <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;">
   <div style="width:36px;text-align:right;flex-shrink:0;padding-top:8px;">
-    <div style="font-size:13px;font-weight:700;color:#374151;">{day}</div>
-    <div style="font-size:10px;color:#94A3B8;">{dow}</div>
+    <div style="font-size:16px;font-weight:900;color:#F0F0F0;">{day}</div>
+    <div style="font-size:10px;color:#666666;">{dow}</div>
   </div>
-  <div style="width:10px;height:10px;border-radius:50%;background:{color};flex-shrink:0;margin-top:11px;border:2px solid #fff;box-shadow:0 0 0 2px {color}44;"></div>
-  <div style="background:#fff;border-radius:10px;padding:10px 14px;flex:1;border:1px solid #F1F5F9;">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-      <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;{badge_style}">{badge_label}</span>
-      <span style="font-size:13px;font-weight:600;color:#0F172A;">{item.get('title','')}</span>
+  <div style="width:10px;height:10px;border-radius:50%;background:{color};flex-shrink:0;margin-top:13px;box-shadow:0 0 8px {color},0 0 16px {color}66;"></div>
+  <div style="background:#151515;border-radius:10px;padding:10px 14px;flex:1;border:1px solid #252525;border-left:3px solid {color};">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
+      <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:{color}22;color:{color};">{badge_label}</span>
+      <span style="font-size:13px;font-weight:600;color:#F0F0F0;">{item.get('title','')}</span>
     </div>
-    <div style="font-size:11px;color:#64748B;">{item.get('desc','')}</div>
-    {"<div style='font-size:10px;color:#94A3B8;margin-top:4px;'>" + meta_html + "</div>" if meta_html else ""}
+    <div style="font-size:11px;color:#AAAAAA;line-height:1.5;">{item.get('desc','')}</div>
+    {"<div style='font-size:10px;color:#888888;margin-top:4px;'>" + meta_html + "</div>" if meta_html else ""}
   </div>
 </div>""", unsafe_allow_html=True)
 
@@ -1794,6 +1872,8 @@ if page == "대시보드":
             st.session_state['timeline_data'] = DEFAULT_TIMELINE
             st.success("초기화 완료")
             st.rerun()
+
+    st.markdown("<p style='text-align:right;font-size:9px;color:#1A1A1A;letter-spacing:2px;font-weight:700;margin-top:24px;' title='🖤💗'>BLACKPINK IN MY AREA</p>", unsafe_allow_html=True)
 
     with st.expander("➕ 활동 기록 추가"):
         a1, a2, a3 = st.columns([1.5, 2, 1.5])
@@ -3148,17 +3228,17 @@ elif page == "공고·매칭":
                                 badges += f" &nbsp;<span style='font-size:11px;background:{ai_col}22;color:{ai_col};padding:2px 7px;border-radius:10px;font-weight:600;'>{ai_badge}</span>"
                             st.markdown(
                                 f"{badges}<br>"
-                                f"<span style='font-size:15px;font-weight:700;color:#0F172A;'>{nm}</span>"
-                                f"<span style='font-size:12px;color:#94A3B8;font-weight:400;'> ({int(row.get('점수', 0))}점)</span><br>"
-                                f"<span style='font-size:12px;color:#64748B;'>{org}</span>",
+                                f"<span style='font-size:15px;font-weight:700;color:#F0F0F0;'>{nm}</span>"
+                                f"<span style='font-size:12px;color:#666666;font-weight:400;'> ({int(row.get('점수', 0))}점)</span><br>"
+                                f"<span style='font-size:12px;color:#888888;'>{org}</span>",
                                 unsafe_allow_html=True
                             )
                         with top_c2:
                             st.markdown(
                                 f"<div style='text-align:right;'>"
                                 f"<span style='font-size:14px;font-weight:700;color:{d_color};'>{d_day_txt}</span><br>"
-                                f"<span style='font-size:11px;color:#94A3B8;'>{dl_txt}</span><br>"
-                                f"<span style='font-size:11px;color:#94A3B8;'>{loc_txt}</span>"
+                                f"<span style='font-size:11px;color:#666666;'>{dl_txt}</span><br>"
+                                f"<span style='font-size:11px;color:#666666;'>{loc_txt}</span>"
                                 f"</div>",
                                 unsafe_allow_html=True
                             )
@@ -3168,7 +3248,7 @@ elif page == "공고·매칭":
                             # 매칭근거를 태그별로 파싱해서 보기 좋게 표시
                             parts = [p.strip() for p in reason.split('+') if p.strip()]
                             tags_html = " ".join([
-                                f"<span style='display:inline-block;background:#EFF6FF;color:#1D4ED8;"
+                                f"<span style='display:inline-block;background:#001020;color:#1D4ED8;"
                                 f"border:1px solid #BFDBFE;border-radius:12px;padding:1px 8px;"
                                 f"font-size:11px;margin:2px 2px;'>{p}</span>"
                                 for p in parts
@@ -3181,7 +3261,7 @@ elif page == "공고·매칭":
                             summary = ai_res.get('한줄요약','')
                             if summary:
                                 st.markdown(
-                                    f"<div style='font-size:12px;color:#374151;padding:3px 0;"
+                                    f"<div style='font-size:12px;color:#CCCCCC;padding:3px 0;"
                                     f"border-left:3px solid #10B981;padding-left:8px;margin:4px 0;'>"
                                     f"{summary}</div>",
                                     unsafe_allow_html=True
@@ -3215,8 +3295,8 @@ elif page == "공고·매칭":
                             info_parts.append(f"<b>접수기간</b> {str(row.get('접수기간',''))[:30]}")
                         if info_parts:
                             st.markdown(
-                                "<div style='background:#F8FAFC;border-radius:6px;padding:8px 12px;"
-                                "margin:6px 0;font-size:12px;color:#374151;line-height:1.8;'>"
+                                "<div style='background:#151515;border-radius:6px;padding:8px 12px;"
+                                "margin:6px 0;font-size:12px;color:#CCCCCC;line-height:1.8;'>"
                                 + "<br>".join(info_parts) +
                                 "</div>",
                                 unsafe_allow_html=True
@@ -3493,18 +3573,18 @@ elif page == "발송":
             if hashtags:
                 tag_html = "<div style=\'margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;\'>"
                 for tag in hashtags.split():
-                    tag_html += f"<span style=\'font-size:11px;background:#EFF6FF;color:#1D4ED8;padding:3px 8px;border-radius:20px;\'>{tag}</span>"
+                    tag_html += f"<span style=\'font-size:11px;background:#001020;color:#1D4ED8;padding:3px 8px;border-radius:20px;\'>{tag}</span>"
                 tag_html += "</div>"
             nm = n.get('공고명','')
             return f"""
             <table width="100%" cellpadding="0" cellspacing="0"
-                   style="margin-bottom:8px;background:#FFFFFF;border:1px solid #E2E8F0;
+                   style="margin-bottom:8px;background:#151515;border:1px solid #2A2A2A;
                           border-radius:10px;overflow:hidden;">
               <tr>
                 <td style="padding:12px 16px;">
                   <a href="{n.get('공고링크','#')}" style="font-size:14px;font-weight:600;
-                     color:#0F172A;text-decoration:none;display:block;">{nm}</a>
-                  <p style="margin:3px 0;font-size:12px;color:#94A3B8;">
+                     color:#F0F0F0;text-decoration:none;display:block;">{nm}</a>
+                  <p style="margin:3px 0;font-size:12px;color:#666666;">
                     {n.get('주관기관','')} · 마감 {dl or '상시'}
                   </p>
                   {tag_html}
@@ -3602,7 +3682,7 @@ elif page == "발송":
 
         _preview_html = f"""
         <div style="max-width:600px;margin:0 auto;font-family:'Apple SD Gothic Neo',Arial,sans-serif;
-                    border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;">
+                    border:1px solid #2A2A2A;border-radius:12px;overflow:hidden;">
           <div style="background:#0F1D2E;padding:24px 28px 20px;">
             <p style="margin:0 0 4px;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">
               혁신제품지원센터 · 원스톱 스케일업</p>
@@ -3633,7 +3713,7 @@ elif page == "발송":
                 이번 공고 안내가 도움이 됐나요?</p>
               <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_up2.quote('[이번 주 공고 안내 피드백]\\n반응: 도움됐어요\\n\\n[추가 의견]\\n\\n[Gmail 주소]\\n')}"
                  style="display:inline-block;margin:0 4px;padding:8px 16px;font-size:12px;
-                        font-weight:600;color:#065F46;background:#ECFDF5;
+                        font-weight:600;color:#065F46;background:#0A1F15;
                         border:1px solid #A7F3D0;border-radius:8px;text-decoration:none;">
                 👍 도움됐어요</a>
               <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_up2.quote('[이번 주 공고 안내 피드백]\\n반응: 별로였어요\\n\\n[추가 의견]\\n\\n[Gmail 주소]\\n')}"
@@ -3651,23 +3731,23 @@ elif page == "발송":
             </div>
           </div>
           <div style="background:#0F1D2E;padding:0 28px 20px;">
-            <div style="background:#F8FAFC;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
+            <div style="background:#151515;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
               <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#1F4E79;letter-spacing:1px;">
                 ✏️ 추가 키워드가 있으신가요?</p>
-              <p style="margin:0 0 10px;font-size:12px;color:#475569;line-height:1.6;">
+              <p style="margin:0 0 10px;font-size:12px;color:#AAAAAA;line-height:1.6;">
                 더 잘 맞는 공고를 드리기 위해 받고 싶은 분야나 키워드를 답장으로 알려주세요.</p>
               <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_kw_body}"
                  style="display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;
                         color:#fff;background:#1F4E79;border-radius:6px;text-decoration:none;">
                 답장하기 →</a>
             </div>
-            <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:8px;padding:14px 16px;">
+            <div style="background:#0A1A0F;border:1px solid #A7F3D0;border-radius:8px;padding:14px 16px;">
               <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#059669;letter-spacing:1px;">
                 📅 공고 마감일 캘린더</p>
-              <p style="margin:0 0 10px;font-size:12px;color:#374151;line-height:1.6;">
+              <p style="margin:0 0 10px;font-size:12px;color:#CCCCCC;line-height:1.6;">
                 전체 지원사업 공고 마감일을 한눈에 확인하세요.</p>
               {"<a href='"+CALENDAR_LINK_PREV+"' style='display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;color:#fff;background:#10B981;border-radius:6px;text-decoration:none;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK_PREV else ""}
-              <p style="margin:10px 0 0;font-size:11px;color:#374151;line-height:1.7;">
+              <p style="margin:10px 0 0;font-size:11px;color:#CCCCCC;line-height:1.7;">
                 💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
               </p>
             </div>
@@ -3775,22 +3855,22 @@ elif page == "발송":
                     if hashtags:
                         tag_html = "<div style=\'margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;\'>"
                         for tag in hashtags.split():
-                            tag_html += f"<span style=\'font-size:11px;background:#EFF6FF;color:#1D4ED8;padding:3px 8px;border-radius:20px;\'>{tag}</span>"
+                            tag_html += f"<span style=\'font-size:11px;background:#001020;color:#1D4ED8;padding:3px 8px;border-radius:20px;\'>{tag}</span>"
                         tag_html += "</div>"
                     notice_name = n.get("공고명","")
                     return f"""
                     <table width="100%" cellpadding="0" cellspacing="0"
-                           style="margin-bottom:8px;background:#FFFFFF;
-                                  border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;
+                           style="margin-bottom:8px;background:#151515;
+                                  border:1px solid #2A2A2A;border-radius:10px;overflow:hidden;
                                   box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                       <tr>
                         <td style="padding:12px 16px;">
                           <a href="{n.get("공고링크","#")}"
-                             style="font-size:14px;font-weight:600;color:#0F172A;
+                             style="font-size:14px;font-weight:600;color:#F0F0F0;
                                     text-decoration:none;line-height:1.5;display:block;">
                             {notice_name}
                           </a>
-                          <p style="margin:4px 0 0;font-size:12px;color:#94A3B8;">
+                          <p style="margin:4px 0 0;font-size:12px;color:#666666;">
                             {n.get("주관기관","")} &nbsp;·&nbsp; 마감 {dl_raw if dl_raw else "상시"}
                           </p>
                           {tag_html}
@@ -3880,7 +3960,7 @@ elif page == "발송":
                   </p>
                   <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_good}"
                      style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                            font-weight:600;color:#065F46;background:#ECFDF5;
+                            font-weight:600;color:#065F46;background:#0A1F15;
                             border:1px solid #A7F3D0;border-radius:8px;text-decoration:none;">
                     👍 도움됐어요
                   </a>
@@ -3916,13 +3996,13 @@ elif page == "발송":
                 )
 
                 keyword_sec = f"""
-                <div style="background:#F8FAFC;border:1px solid #E2E8F0;
+                <div style="background:#151515;border:1px solid #2A2A2A;
                             border-radius:10px;padding:16px 18px;margin:16px 0;">
                   <p style="margin:0 0 8px;color:#1F4E79;font-weight:700;font-size:11px;
                              letter-spacing:1.5px;text-transform:uppercase;">
                     ✏️ 추가 키워드가 있으신가요?
                   </p>
-                  <p style="margin:0 0 12px;font-size:12px;color:#475569;line-height:1.7;">
+                  <p style="margin:0 0 12px;font-size:12px;color:#AAAAAA;line-height:1.7;">
                     더 잘 맞는 공고를 드리기 위해 받고 싶은 분야나 키워드를 답장으로 알려주세요.
                   </p>
                   <a href="mailto:onestop.kipcc@gmail.com?subject={kw_subject}&body={kw_body}"
@@ -3934,17 +4014,17 @@ elif page == "발송":
                 </div>"""
 
                 cal_sec = f"""
-                <div style="background:#F0FDF4;border-radius:10px;
+                <div style="background:#0A1A0F;border-radius:10px;
                             padding:16px 18px;border:1px solid #A7F3D0;margin:16px 0;">
                   <p style="margin:0 0 4px;color:#059669;font-weight:700;font-size:11px;
                              letter-spacing:1.5px;text-transform:uppercase;">
                     📅 공고 마감일 캘린더
                   </p>
-                  <p style="margin:0 0 10px;font-size:12px;color:#374151;">
+                  <p style="margin:0 0 10px;font-size:12px;color:#CCCCCC;">
                     전체 지원사업 공고 마감일을 한눈에 확인하세요.
                   </p>
                   {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#10B981;color:#fff;padding:7px 16px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK else ""}
-                  <p style="margin:10px 0 0;font-size:11px;color:#374151;line-height:1.7;">
+                  <p style="margin:10px 0 0;font-size:11px;color:#CCCCCC;line-height:1.7;">
                     💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
                   </p>
                 </div>"""
@@ -3956,16 +4036,16 @@ elif page == "발송":
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
 </head>
-<body style="margin:0;padding:0;background:#F2F4F7;
+<body style="margin:0;padding:0;background:#0A0A0A;
              font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0"
-       style="background:#F2F4F7;padding:36px 0 52px;">
+       style="background:#0A0A0A;padding:36px 0 52px;">
 <tr><td align="center">
 <table width="560" cellpadding="0" cellspacing="0">
 
   <!-- ── 로고 헤더 (흰 배경) ── -->
   <tr>
-    <td style="background:#ffffff;border-radius:14px 14px 0 0;
+    <td style="background:#151515;border-radius:14px 14px 0 0;
                padding:20px 28px;border-bottom:1px solid #E8ECF0;">
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
@@ -4080,7 +4160,7 @@ elif page == "발송":
 
   <!-- ── 흰 푸터 ── -->
   <tr>
-    <td style="background:#ffffff;border-radius:0 0 14px 14px;
+    <td style="background:#151515;border-radius:0 0 14px 14px;
                padding:18px 28px;border-top:1px solid #E8ECF0;">
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
@@ -5371,18 +5451,18 @@ onestop.kipcc@gmail.com""",
                         co_kw_extra = str(row.get('키워드보완', '') or '')
                         if any([co_interest, co_keywords, co_biztype]):
                             kw_section_html = f"""
-                        <div style="background:#F0FDF4;border:1px solid #BBF7D0;
+                        <div style="background:#0A1A0F;border:1px solid #BBF7D0;
                                     border-left:4px solid #10B981;border-radius:8px;
                                     padding:16px 18px;margin:16px 0;">
                           <p style="margin:0 0 10px;font-size:11px;font-weight:700;
                                     color:#059669;letter-spacing:1px;">
                             📊 저희가 파악한 귀사 정보
                           </p>
-                          {'<p style="margin:4px 0;font-size:13px;color:#0F172A;"><b>관심분야:</b> ' + co_interest + '</p>' if co_interest else ''}
-                          {'<p style="margin:4px 0;font-size:13px;color:#0F172A;"><b>기술키워드:</b> ' + co_keywords + '</p>' if co_keywords else ''}
-                          {'<p style="margin:4px 0;font-size:13px;color:#0F172A;"><b>기업유형:</b> ' + co_biztype + '</p>' if co_biztype else ''}
-                          {'<p style="margin:4px 0;font-size:13px;color:#0F172A;"><b>추가 키워드:</b> ' + co_kw_extra + '</p>' if co_kw_extra else ''}
-                          <p style="margin:10px 0 0;font-size:12px;color:#64748B;">
+                          {'<p style="margin:4px 0;font-size:13px;color:#F0F0F0;"><b>관심분야:</b> ' + co_interest + '</p>' if co_interest else ''}
+                          {'<p style="margin:4px 0;font-size:13px;color:#F0F0F0;"><b>기술키워드:</b> ' + co_keywords + '</p>' if co_keywords else ''}
+                          {'<p style="margin:4px 0;font-size:13px;color:#F0F0F0;"><b>기업유형:</b> ' + co_biztype + '</p>' if co_biztype else ''}
+                          {'<p style="margin:4px 0;font-size:13px;color:#F0F0F0;"><b>추가 키워드:</b> ' + co_kw_extra + '</p>' if co_kw_extra else ''}
+                          <p style="margin:10px 0 0;font-size:12px;color:#888888;">
                             위 정보를 기반으로 맞춤 공고를 선별하고 있습니다.<br>
                             다르거나 추가하고 싶은 내용은 Q1, Q2 답변에 자유롭게 적어주세요.
                           </p>
@@ -6782,20 +6862,20 @@ elif page == "시스템 명세":
         st.subheader("원스톱 스케일업 시스템 전체 흐름")
 
         st.markdown("""
-<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:24px;font-family:'Apple SD Gothic Neo',sans-serif;">
+<div style="background:#151515;border:1px solid #2A2A2A;border-radius:12px;padding:24px;font-family:'Apple SD Gothic Neo',sans-serif;">
 
-<h4 style="color:#0F172A;margin:0 0 20px;">📌 전체 파이프라인</h4>
+<h4 style="color:#F0F0F0;margin:0 0 20px;">📌 전체 파이프라인</h4>
 
 <div style="display:flex;flex-direction:column;gap:4px;">
 
 <!-- 단계 1 -->
-<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;">
+<div style="background:#151515;border:1px solid #2A2A2A;border-radius:8px;padding:14px 18px;">
   <div style="display:flex;align-items:center;gap:12px;">
     <span style="background:#10B981;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 1</span>
-    <span style="font-size:14px;font-weight:600;color:#0F172A;">기업 DB 구축</span>
-    <span style="font-size:11px;color:#94A3B8;margin-left:auto;">기수 시작 시 1회</span>
+    <span style="font-size:14px;font-weight:600;color:#F0F0F0;">기업 DB 구축</span>
+    <span style="font-size:11px;color:#666666;margin-left:auto;">기수 시작 시 1회</span>
   </div>
-  <div style="margin-top:10px;padding-left:4px;color:#475569;font-size:13px;line-height:1.8;">
+  <div style="margin-top:10px;padding-left:4px;color:#AAAAAA;font-size:13px;line-height:1.8;">
     WALLA 신청서 → <code>walla_to_selected.py</code> → <code>선정기업_명단.xlsx</code> → 구글 드라이브<br>
     포함 정보: 기업명, 이메일, 소재지, 기업유형, TRL, 관심사업분야, 기술키워드, 핵심수요태그, 수출실적
   </div>
@@ -6804,13 +6884,13 @@ elif page == "시스템 명세":
 <div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
 
 <!-- 단계 2 -->
-<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;">
+<div style="background:#151515;border:1px solid #2A2A2A;border-radius:8px;padding:14px 18px;">
   <div style="display:flex;align-items:center;gap:12px;">
     <span style="background:#10B981;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 2</span>
-    <span style="font-size:14px;font-weight:600;color:#0F172A;">공고 수집</span>
-    <span style="font-size:11px;color:#94A3B8;margin-left:auto;">매주 월요일 (수동 실행)</span>
+    <span style="font-size:14px;font-weight:600;color:#F0F0F0;">공고 수집</span>
+    <span style="font-size:11px;color:#666666;margin-left:auto;">매주 월요일 (수동 실행)</span>
   </div>
-  <div style="margin-top:10px;padding-left:4px;color:#475569;font-size:13px;line-height:1.8;">
+  <div style="margin-top:10px;padding-left:4px;color:#AAAAAA;font-size:13px;line-height:1.8;">
     bizinfo API → 8개 분야 공고 수집 → <code>notices_db.xlsx</code><br>
     이후 Playwright 크롤링 → 공고 전문 → <code>notices_detail.xlsx</code>
   </div>
@@ -6819,13 +6899,13 @@ elif page == "시스템 명세":
 <div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
 
 <!-- 단계 3 -->
-<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;">
+<div style="background:#151515;border:1px solid #2A2A2A;border-radius:8px;padding:14px 18px;">
   <div style="display:flex;align-items:center;gap:12px;">
     <span style="background:#10B981;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 3</span>
-    <span style="font-size:14px;font-weight:600;color:#0F172A;">매칭 실행</span>
-    <span style="font-size:11px;color:#94A3B8;margin-left:auto;">격주 수요일 (수동 실행)</span>
+    <span style="font-size:14px;font-weight:600;color:#F0F0F0;">매칭 실행</span>
+    <span style="font-size:11px;color:#666666;margin-left:auto;">격주 수요일 (수동 실행)</span>
   </div>
-  <div style="margin-top:10px;padding-left:4px;color:#475569;font-size:13px;line-height:1.8;">
+  <div style="margin-top:10px;padding-left:4px;color:#AAAAAA;font-size:13px;line-height:1.8;">
     50개사 × 전체 공고 → 7개 축 점수 계산 → 별점 판정 → 상위 N건 추출<br>
     출력: 기업별 ★★★/★★ 공고 목록 (소재지 강등 · 쏠림 페널티 · 세그먼트 부스트 적용)
   </div>
@@ -6834,13 +6914,13 @@ elif page == "시스템 명세":
 <div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
 
 <!-- 단계 4 -->
-<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;">
+<div style="background:#151515;border:1px solid #2A2A2A;border-radius:8px;padding:14px 18px;">
   <div style="display:flex;align-items:center;gap:12px;">
     <span style="background:#3B82F6;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 4</span>
-    <span style="font-size:14px;font-weight:600;color:#0F172A;">담당자 검토</span>
-    <span style="font-size:11px;color:#94A3B8;margin-left:auto;">격주 수~목 (수동)</span>
+    <span style="font-size:14px;font-weight:600;color:#F0F0F0;">담당자 검토</span>
+    <span style="font-size:11px;color:#666666;margin-left:auto;">격주 수~목 (수동)</span>
   </div>
-  <div style="margin-top:10px;padding-left:4px;color:#475569;font-size:13px;line-height:1.8;">
+  <div style="margin-top:10px;padding-left:4px;color:#AAAAAA;font-size:13px;line-height:1.8;">
     기업별 검토 탭 → 공고 상세 확인 + AI 분석 → ✅ 승인 / ❌ 제외<br>
     검토 상태 드라이브 자동 저장 → 이전/다음 버튼으로 50개사 순회
   </div>
@@ -6849,13 +6929,13 @@ elif page == "시스템 명세":
 <div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
 
 <!-- 단계 5 -->
-<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;">
+<div style="background:#151515;border:1px solid #2A2A2A;border-radius:8px;padding:14px 18px;">
   <div style="display:flex;align-items:center;gap:12px;">
     <span style="background:#10B981;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 5</span>
-    <span style="font-size:14px;font-weight:600;color:#0F172A;">발송</span>
-    <span style="font-size:11px;color:#94A3B8;margin-left:auto;">격주 목요일 (수동 실행)</span>
+    <span style="font-size:14px;font-weight:600;color:#F0F0F0;">발송</span>
+    <span style="font-size:11px;color:#666666;margin-left:auto;">격주 목요일 (수동 실행)</span>
   </div>
-  <div style="margin-top:10px;padding-left:4px;color:#475569;font-size:13px;line-height:1.8;">
+  <div style="margin-top:10px;padding-left:4px;color:#AAAAAA;font-size:13px;line-height:1.8;">
     승인된 공고 → 기업별 HTML 메일 발송 (Gmail API)<br>
     메일 내 공고카드: 공고명 + 마감일 + <b style="color:#10B981;">매칭근거 자연어 한 줄</b><br>
     동시에: 공고 마감 D-7·D-3 → 기업별 구글 캘린더 이벤트 등록
@@ -6865,13 +6945,13 @@ elif page == "시스템 명세":
 <div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
 
 <!-- 단계 6 -->
-<div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px 18px;">
+<div style="background:#151515;border:1px solid #2A2A2A;border-radius:8px;padding:14px 18px;">
   <div style="display:flex;align-items:center;gap:12px;">
     <span style="background:#F59E0B;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 6</span>
-    <span style="font-size:14px;font-weight:600;color:#0F172A;">피드백 수집 · 개선</span>
-    <span style="font-size:11px;color:#94A3B8;margin-left:auto;">상시</span>
+    <span style="font-size:14px;font-weight:600;color:#F0F0F0;">피드백 수집 · 개선</span>
+    <span style="font-size:11px;color:#666666;margin-left:auto;">상시</span>
   </div>
-  <div style="margin-top:10px;padding-left:4px;color:#475569;font-size:13px;line-height:1.8;">
+  <div style="margin-top:10px;padding-left:4px;color:#AAAAAA;font-size:13px;line-height:1.8;">
     기업 회신 메일 → Gmail API 읽기 → Claude 키워드 추출 → 기업 키워드 보완 자동 저장<br>
     검토 제외 패턴 → 피드백 루프 → 다음 매칭 자동 감점<br>
     신청여부·선정결과 → 발송 이력 입력 → 분기 성과 집계
