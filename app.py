@@ -1885,9 +1885,9 @@ if page == "대시보드":
   opacity: 0 !important;
   transition: opacity 0.4s !important;
   text-align: right;
-  font-size: 9px;
-  letter-spacing: 2px;
-  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 3px;
+  font-weight: 900;
   color: #FF0080 !important;
   margin-top: 32px;
   cursor: default;
@@ -1895,7 +1895,7 @@ if page == "대시보드":
 }
 .bp-egg:hover { opacity: 1 !important; }
 </style>
-<p class="bp-egg">🖤 BLACKPINK IN MY AREA 💗</p>
+<p class="bp-egg">BLACKPINK IN MY AREA</p>
 """, unsafe_allow_html=True)
 
     with st.expander("➕ 활동 기록 추가"):
