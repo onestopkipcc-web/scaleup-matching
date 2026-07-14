@@ -1492,21 +1492,21 @@ header    { visibility:hidden; }
 }
 [data-baseweb="menu"] li:hover {
   background: #FF008022 !important;
-  color: #FF0080 !important;
-}
+  background: #FF0080 !important;
+  color: #000000 !important;
 [data-baseweb="option"] {
   background: #1A1A1A !important;
   color: #F0F0F0 !important;
 }
 [data-baseweb="option"]:hover {
   background: #FF008022 !important;
-  color: #FF0080 !important;
-}
+  background: #FF0080 !important;
+  color: #000000 !important;
 /* 선택된 항목 */
 [aria-selected="true"] {
   background: #FF008033 !important;
-  color: #FF0080 !important;
-}
+  background: #FF0080 !important;
+  color: #000000 !important;
 
 /* ── 타임라인 필터 버튼 명시적 색상 ── */
 .tl-filter-active {
