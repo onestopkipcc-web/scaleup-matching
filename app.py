@@ -1476,6 +1476,38 @@ header    { visibility:hidden; }
 [data-testid="stCheckbox"] label span { border-color: var(--border-2) !important; }
 [data-testid="stCheckbox"] input:checked + span { background: var(--accent) !important; border-color: var(--accent) !important; }
 
+/* ── 셀렉트박스 드롭다운 ── */
+[data-baseweb="select"] > div {
+  background: #151515 !important;
+  border-color: #333333 !important;
+  color: #F0F0F0 !important;
+}
+[data-baseweb="select"] span { color: #F0F0F0 !important; }
+[data-baseweb="popover"] { background: #1A1A1A !important; border: 1px solid #333 !important; }
+[data-baseweb="menu"] { background: #1A1A1A !important; }
+[data-baseweb="menu"] ul { background: #1A1A1A !important; }
+[data-baseweb="menu"] li {
+  background: #1A1A1A !important;
+  color: #F0F0F0 !important;
+}
+[data-baseweb="menu"] li:hover {
+  background: #FF008022 !important;
+  color: #FF0080 !important;
+}
+[data-baseweb="option"] {
+  background: #1A1A1A !important;
+  color: #F0F0F0 !important;
+}
+[data-baseweb="option"]:hover {
+  background: #FF008022 !important;
+  color: #FF0080 !important;
+}
+/* 선택된 항목 */
+[aria-selected="true"] {
+  background: #FF008033 !important;
+  color: #FF0080 !important;
+}
+
 /* ── 타임라인 필터 버튼 명시적 색상 ── */
 .tl-filter-active {
   background: #FF0080 !important;
