@@ -1,23 +1,31 @@
-name: 공고 전문 크롤링 (수동 전용)
+name: 공고 전문 크롤링
 
 on:
+  schedule:
+    # UTC 00:30 = KST 09:30 (GitHub 부하에 따라 수 분~수십 분 지연될 수 있음)
+    - cron: '30 0 * * *'
   workflow_dispatch:
     inputs:
       limit:
         description: '크롤링 건수 (0=전체)'
         required: false
-        default: '100'
+        default: '0'
+
+concurrency:
+  group: crawl-notices
+  cancel-in-progress: false
 
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
+          cache: 'pip'
 
       - name: 라이브러리 설치
         run: |
@@ -30,5 +38,9 @@ jobs:
       - name: 크롤링 실행
         env:
           GOOGLE_TOKEN_JSON: ${{ secrets.GOOGLE_TOKEN_JSON }}
-          CRAWL_LIMIT: ${{ github.event.inputs.limit }}
+          # 스케줄 실행 시 inputs가 없으므로 기본값 '0'(전체)
+          CRAWL_LIMIT: ${{ github.event.inputs.limit || '0' }}
+          BATCH_SIZE: '25'
+          TIME_BUDGET_MIN: '90'
+          PAGE_DELAY: '0.5'
         run: python crawl_notices.py
