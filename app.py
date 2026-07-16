@@ -9,11 +9,29 @@ from datetime import datetime, timedelta
 from google.auth.transport.requests import Request as GRequest
 
 def install_playwright():
+    """Chromium 설치 — 세션당 1회만 실행. (Streamlit Cloud는 sudo 불가 →
+    시스템 라이브러리는 packages.txt로 사전 설치 필요)"""
+    if st.session_state.get('_pw_ready'):
+        return True, ""
+    import pathlib
+    # 이미 설치돼 있으면 스킵 (컨테이너 재시작 전까지 유지)
+    cache = pathlib.Path.home() / ".cache" / "ms-playwright"
+    if cache.exists() and any(cache.glob("chromium-*")):
+        st.session_state['_pw_ready'] = True
+        return True, ""
     try:
-        subprocess.run(["playwright", "install", "chromium"],
-                      capture_output=True, timeout=120)
-    except Exception:
-        pass
+        r = subprocess.run(["playwright", "install", "chromium"],
+                           capture_output=True, text=True, timeout=300)
+        if r.returncode == 0:
+            st.session_state['_pw_ready'] = True
+            return True, ""
+        return False, (r.stderr or r.stdout or "")[-500:]
+    except FileNotFoundError:
+        return False, "playwright 명령을 찾을 수 없습니다 (패키지 미설치)."
+    except subprocess.TimeoutExpired:
+        return False, "Chromium 설치 시간 초과(300초)."
+    except Exception as e:
+        return False, str(e)[:300]
 
 
 st.set_page_config(
@@ -2496,12 +2514,26 @@ elif page == "공고·매칭":
 
                 # bizinfo 상세페이지는 SPA(JS 렌더링) 구조라 requests로는 빈 body만 받아온다
                 # (실측: html 8~9만자, body 자식태그 0개 — 진단 확정됨) → Playwright로 브라우저를 띄워 렌더링 후 텍스트 추출
-                with st.spinner("Chromium 설치 중..."):
-                    install_playwright()
-                from playwright.sync_api import sync_playwright
+                with st.spinner("Chromium 준비 중... (최초 1회 최대 3분)"):
+                    _pw_ok, _pw_err = install_playwright()
+                if not _pw_ok:
+                    st.error(f"Chromium 설치 실패 — 상세 크롤링을 실행할 수 없습니다.\n\n{_pw_err}")
+                    st.info("requirements.txt에 `playwright`, packages.txt에 시스템 라이브러리가 "
+                            "포함됐는지 확인 후 재배포해 주세요.")
+                    st.stop()
+                try:
+                    from playwright.sync_api import sync_playwright
+                except ModuleNotFoundError:
+                    st.error("Playwright가 설치되지 않아 상세 크롤링을 실행할 수 없습니다. "
+                             "requirements.txt에 `playwright` 추가 후 재배포해 주세요.")
+                    st.stop()
 
                 with sync_playwright() as pw:
-                    browser = pw.chromium.launch(headless=True)
+                    browser = pw.chromium.launch(
+                        headless=True,
+                        args=["--no-sandbox", "--disable-dev-shm-usage",
+                              "--disable-gpu", "--single-process"],
+                    )
                     page = browser.new_page(user_agent=HEADERS["User-Agent"])
 
                     for i, (_, row) in enumerate(df_target.iterrows()):
