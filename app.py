@@ -1405,6 +1405,37 @@ button[kind="primary"]:hover { background: var(--accent-dark) !important; }
 .stInfo { background: #001020 !important; border-left: 3px solid var(--blue) !important; border-radius:var(--radius) !important; }
 .stInfo * { color: #80BFFF !important; }
 
+/* Streamlit 1.40+ 알림 (data-testid 기반) */
+[data-testid="stAlert"] { border-radius: var(--radius) !important; }
+[data-testid="stAlertContentSuccess"] {
+  background: #0A1F15 !important; border-left: 3px solid #10B981 !important;
+}
+[data-testid="stAlertContentSuccess"] * { color: #4DFFAA !important; }
+[data-testid="stAlertContentWarning"] {
+  background: #1A1200 !important; border-left: 3px solid var(--yellow) !important;
+}
+[data-testid="stAlertContentWarning"] * { color: #FFD080 !important; }
+[data-testid="stAlertContentError"] {
+  background: #1A0000 !important; border-left: 3px solid var(--red) !important;
+}
+[data-testid="stAlertContentError"] * { color: #FF8080 !important; }
+[data-testid="stAlertContentInfo"] {
+  background: #001020 !important; border-left: 3px solid var(--blue) !important;
+}
+[data-testid="stAlertContentInfo"] * { color: #80BFFF !important; }
+
+/* ── 코드블록(발송 로그) ── */
+[data-testid="stCode"], pre {
+  background: #0F0F0F !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+}
+[data-testid="stCode"] code, pre code {
+  background: transparent !important;
+  color: #E0E0E0 !important;
+}
+[data-testid="stCode"] * { background: transparent !important; }
+
 /* ── 구분선 ── */
 hr { border: none !important; border-top: 1px solid var(--border) !important; }
 
@@ -1447,6 +1478,30 @@ section[data-testid="stSidebar"] .stRadio label:hover { color: var(--accent) !im
   border-radius: var(--radius) !important;
 }
 .streamlit-expander summary { color: var(--text-1) !important; }
+/* Streamlit 1.40+ expander (data-testid 기반) */
+[data-testid="stExpander"] {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+}
+[data-testid="stExpander"] details {
+  background: var(--surface) !important;
+  border: none !important;
+}
+[data-testid="stExpander"] summary {
+  background: var(--surface) !important;
+  color: var(--text-1) !important;
+}
+[data-testid="stExpander"] summary:hover { color: var(--accent) !important; }
+[data-testid="stExpander"] summary p,
+[data-testid="stExpander"] summary span,
+[data-testid="stExpander"] summary svg {
+  color: var(--text-1) !important;
+  fill: var(--text-1) !important;
+}
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+  background: var(--surface) !important;
+}
 
 /* ── 사이드바 항상 표시 ── */
 [data-testid="stSidebarCollapseButton"] { display:none !important; }
