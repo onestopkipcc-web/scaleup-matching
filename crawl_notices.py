@@ -70,20 +70,29 @@ def drive_download(creds, filename):
     return resp.content if resp.ok else None
 
 def drive_upload(creds, filename, content_bytes):
+    """Drive multipart/related 업로드.
+    (구글은 form-data가 아닌 related를 요구 → 본문을 직접 조립하되 헤더 형식을 정확히)"""
     mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     fid  = drive_file_id(creds, filename)
-    bnd  = b"----MIMEBoundary"; crlf = b"\r\n"
-    ct   = "multipart/related; boundary=----MIMEBoundary"
-    meta = json.dumps({"name": filename} if fid else
-                      {"name": filename, "parents": [DRIVE_FOLDER_ID]}).encode()
-    body  = b"--" + bnd + crlf + b"Content-Type: application/json; charset=UTF-8" + crlf + crlf
-    body += meta + crlf + b"--" + bnd + crlf + mime.encode() + crlf + crlf
-    body += content_bytes + crlf + b"--" + bnd + b"--"
-    url    = (f'https://www.googleapis.com/upload/drive/v3/files/{fid}'
-              if fid else 'https://www.googleapis.com/upload/drive/v3/files')
-    resp   = gapi('PATCH' if fid else 'POST', url, creds,
-                  params={'uploadType': 'multipart'},
-                  data=body, headers={'Content-Type': ct})
+    meta = {"name": filename} if fid else {"name": filename, "parents": [DRIVE_FOLDER_ID]}
+
+    bnd  = "boundary_kipcc_scaleup"
+    crlf = b"\r\n"
+    parts = []
+    parts.append(b"--" + bnd.encode() + crlf)
+    parts.append(b"Content-Type: application/json; charset=UTF-8" + crlf + crlf)
+    parts.append(json.dumps(meta).encode("utf-8") + crlf)
+    parts.append(b"--" + bnd.encode() + crlf)
+    parts.append(b"Content-Type: " + mime.encode() + crlf + crlf)   # ← 접두사 필수
+    parts.append(content_bytes + crlf)
+    parts.append(b"--" + bnd.encode() + b"--" + crlf)
+    body = b"".join(parts)
+
+    url = (f'https://www.googleapis.com/upload/drive/v3/files/{fid}'
+           if fid else 'https://www.googleapis.com/upload/drive/v3/files')
+    resp = gapi('PATCH' if fid else 'POST', url, creds,
+                params={'uploadType': 'multipart'}, data=body,
+                headers={'Content-Type': f'multipart/related; boundary={bnd}'})
     if not resp.ok:
         print(f"    드라이브 업로드 실패: {resp.status_code} {resp.text[:200]}")
     return resp.ok
