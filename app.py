@@ -5548,6 +5548,14 @@ onestop.kipcc@gmail.com""",
                 for i, (_, row) in enumerate(df_send.iterrows()):
                     company  = row['기업명']
                     to_email  = row['이메일'].strip() if not test_mode else get_test_recipients()[0]
+                    # 추가 수신자(수신이메일2/3) → Cc
+                    cc_list = []
+                    if not test_mode:
+                        for _c in ('수신이메일2', '수신이메일3'):
+                            _v = str(row.get(_c, '') or '').strip()
+                            if _v and '@' in _v and _v.lower() != to_email.lower() \
+                               and _v.lower() not in [x.lower() for x in cc_list]:
+                                cc_list.append(_v)
                     today_str = datetime.today().strftime('%Y.%m.%d')
 
                     # 기업별 키워드 섹션 생성
@@ -5955,10 +5963,13 @@ onestop.kipcc@gmail.com""",
                         msg['Subject'] = mail_subject if not test_mode else f"[TEST] {mail_subject}"
                         msg['From']    = "onestop.kipcc@gmail.com"
                         msg['To']      = to_email
+                        if cc_list:
+                            msg['Cc'] = ", ".join(cc_list)
                         raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
                         gmail_send(raw)
                         ok_count += 1
                         logs.append(f"✅ {company} → {to_email}"
+                                    + (f" (+Cc {len(cc_list)})" if cc_list else "")
                                     + (" 📎" if attach_data else ""))
                     except Exception as e:
                         fail_count += 1
