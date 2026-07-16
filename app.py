@@ -1443,10 +1443,27 @@ hr { border: none !important; border-top: 1px solid var(--border) !important; }
 .stCaption, [data-testid="stCaptionContainer"] { color: var(--text-3) !important; font-size:12px !important; }
 
 /* ── data editor / dataframe ── */
-[data-testid="stDataFrame"], .stDataFrame {
+[data-testid="stDataFrame"], .stDataFrame,
+[data-testid="stDataFrameResizable"] {
   background: var(--surface) !important;
   border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
 }
+/* glide-data-grid 캔버스 컨테이너 */
+[data-testid="stDataFrame"] > div,
+[data-testid="stDataFrame"] .dvn-scroller,
+[data-testid="stDataFrame"] .gdg-wmyidgi {
+  background: var(--surface) !important;
+}
+/* 표 상단 툴바(검색/다운로드 아이콘) */
+[data-testid="stElementToolbar"],
+[data-testid="stElementToolbarButtonContainer"] {
+  background: var(--surface-2, #1A1A1A) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+}
+[data-testid="stElementToolbar"] button svg { fill: var(--text-1) !important; }
+[data-testid="stElementToolbar"] button:hover { background: #FF008033 !important; }
 
 /* ── 사이드바 ── */
 section[data-testid="stSidebar"] {
