@@ -4886,7 +4886,8 @@ JSON만 응답 (코드블록 없이):
             if has_status:
                 target_group = st.radio(
                     "발송 그룹",
-                    ["선정 50개사", "예비 20개사", "전체 70개사", "직접 선택", "이메일 직접 입력"],
+                    ["선정 50개사", "예비 20개사", "전체 70개사",
+                     "리마인더 (선정-교육 미신청)", "직접 선택", "이메일 직접 입력"],
                     horizontal=False, key="notice_mail_group"
                 )
             else:
@@ -4900,6 +4901,34 @@ JSON만 응답 (코드블록 없이):
                 df_target = df_active[df_active['선정구분'] == '선정']
             elif target_group == "예비 20개사":
                 df_target = df_active[df_active['선정구분'] == '예비']
+            elif target_group == "리마인더 (선정-교육 미신청)":
+                # 교육 신청 이력(edu_registration.json)에서 특정 회차 신청자를 제외
+                import json as _json_rem
+                def _load_edu_rem(drv):
+                    try:
+                        raw = load_json(drv, "edu_registration.json")
+                        return raw if isinstance(raw, list) else []
+                    except Exception:
+                        return []
+                def _norm_co(s):
+                    s = str(s)
+                    s = re.sub(r'\(주\)|\(유\)|주식회사|㈜', '', s)
+                    return s.replace(' ', '').strip()
+                _edu = _load_edu_rem(drive)
+                _rounds = sorted({r.get('교육회차', '') for r in _edu if r.get('교육회차')}, reverse=True)
+                if not _rounds:
+                    st.warning("교육 신청 이력에 회차 정보가 없습니다. '교육 신청 집계' 탭에서 먼저 회신을 파싱해 주세요.")
+                    df_target = df_active.head(0)
+                else:
+                    _sel_round = st.selectbox("제외할 교육 회차 (이 회차 신청자에게는 발송 안 함)",
+                                              _rounds, key="rem_round")
+                    _applied_keys = {_norm_co(r['기업명']) for r in _edu
+                                     if r.get('교육회차') == _sel_round and r.get('기업명')}
+                    _sel_df = df_active[df_active['선정구분'] == '선정'].copy()
+                    _mask = ~_sel_df['기업명'].apply(lambda x: _norm_co(x) in _applied_keys)
+                    df_target = _sel_df[_mask]
+                    st.caption(f"선정 50개사 중 {_sel_round} 신청 {len(_applied_keys)}개사 제외 "
+                               f"→ 발송 대상 {len(df_target)}개사")
             elif target_group == "직접 선택":
                 selected_names = st.multiselect(
                     "기업 직접 선택", df_active['기업명'].tolist(), key="notice_mail_select"
@@ -6123,7 +6152,20 @@ elif page == "교육 신청 집계":
 
     # Gmail 자동 파싱
     st.subheader("📥 Gmail 회신 자동 파싱")
-    
+
+    # ── 교육 회차 키 추출 (제목의 "N월" → 2026-0N) ──
+    def extract_edu_round(subject_text):
+        """메일 제목에서 'N월'을 찾아 YYYY-MM 회차 키로 변환.
+        [리마인더] 유무·괄호 날짜에 무관하게 같은 달이면 동일 회차로 묶임."""
+        m = re.search(r'(\d{1,2})\s*월', str(subject_text))
+        if not m:
+            return ''
+        month = int(m.group(1))
+        # 제목에 연도가 있으면 사용, 없으면 올해
+        ym = re.search(r'(20\d{2})', str(subject_text))
+        year = int(ym.group(1)) if ym else datetime.today().year
+        return f"{year}-{month:02d}"
+
     col_s1, col_s2 = st.columns([3, 1])
     with col_s1:
         mail_subject_input = st.text_input(
@@ -6229,6 +6271,8 @@ elif page == "교육 신청 집계":
                                         '추가참석자': parsed.get('추가참석자', []),
                                         '발신자': sender,
                                         '수신일': datetime.today().strftime('%Y-%m-%d'),
+                                        # 개별 회신 제목 우선, 없으면 검색어 제목에서 회차 추출
+                                        '교육회차': extract_edu_round(subject) or extract_edu_round(mail_subject_input),
                                         '비고': ''
                                     })
                                     new_count += 1
@@ -6252,7 +6296,7 @@ elif page == "교육 신청 집계":
     if edu_data:
         import pandas as _pd_edu
         df_edu = _pd_edu.DataFrame(edu_data)
-        display_cols = ['기업명','담당자명','연락처','인원','수신일','비고']
+        display_cols = ['기업명','담당자명','연락처','인원','교육회차','수신일','비고']
         df_edu_show = df_edu[[c for c in display_cols if c in df_edu.columns]]
 
         edited_edu = st.data_editor(
