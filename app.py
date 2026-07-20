@@ -5318,8 +5318,8 @@ onestop.kipcc@gmail.com""",
       </td>
       <td width="64" align="right" valign="top">
         <div style="background:#F59E0B;border-radius:10px;padding:8px 10px;text-align:center;min-width:48px;">
-          <p style="margin:0;font-size:16px;font-weight:800;color:#0F172A;line-height:1;">D-4</p>
-          <p style="margin:2px 0 0;font-size:9px;font-weight:700;color:#0F172A;letter-spacing:1px;">신청마감</p>
+          <p style="margin:0;font-size:18px;font-weight:800;color:#0F172A;line-height:1;">⏰</p>
+          <p style="margin:3px 0 0;font-size:9px;font-weight:700;color:#0F172A;letter-spacing:0.5px;">마감임박</p>
         </div>
       </td>
     </tr></table>
@@ -5748,8 +5748,8 @@ onestop.kipcc@gmail.com""",
       </td>
       <td width="64" align="right" valign="top">
         <div style="background:#F59E0B;border-radius:10px;padding:8px 10px;text-align:center;min-width:48px;">
-          <p style="margin:0;font-size:16px;font-weight:800;color:#0F172A;line-height:1;">D-4</p>
-          <p style="margin:2px 0 0;font-size:9px;font-weight:700;color:#0F172A;letter-spacing:1px;">신청마감</p>
+          <p style="margin:0;font-size:18px;font-weight:800;color:#0F172A;line-height:1;">⏰</p>
+          <p style="margin:3px 0 0;font-size:9px;font-weight:700;color:#0F172A;letter-spacing:0.5px;">마감임박</p>
         </div>
       </td>
     </tr></table>
