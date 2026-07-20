@@ -4995,7 +4995,7 @@ JSON만 응답 (코드블록 없이):
 ※ 줌 링크·교육자료는 다음 주 초 별도 안내드릴 예정입니다.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ 신청 방법 | 마감: 7월 17일(목)
+✅ 신청 방법 | 마감: 7월 22일(수)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 이 메일에 아래 내용을 작성하여, 본 메일에 답장해 주세요.
@@ -5314,7 +5314,7 @@ onestop.kipcc@gmail.com""",
       <td valign="top">
         <p style="margin:0 0 2px;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:2px;">원스톱 스케일업 · 혁신제품지원센터</p>
         <p style="margin:0;font-size:20px;font-weight:700;color:#fff;">7월 교육 프로그램 신청 안내</p>
-        <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 7월 14일(화) ~ 17일(금)</p>
+        <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 ~ 7월 22일(수)</p>
       </td>
       <td width="64" align="right" valign="top">
         <div style="background:#F59E0B;border-radius:10px;padding:8px 10px;text-align:center;min-width:48px;">
@@ -5375,7 +5375,7 @@ onestop.kipcc@gmail.com""",
     </div>
     <p style="margin:10px 0 0;font-size:11px;color:#3B82F6;">※ 1인 이상 참여 시 참여 인원 정보를 모두 작성해 주세요.</p>
     <div style="margin-top:12px;background:#F59E0B;border-radius:8px;padding:10px 16px;text-align:center;">
-      <p style="margin:0;font-size:13px;font-weight:700;color:#0F172A;">📅 신청 마감: 7월 17일(금)까지</p>
+      <p style="margin:0;font-size:13px;font-weight:700;color:#0F172A;">📅 신청 마감: 7월 22일(수)까지</p>
     </div>
   </div>
   <div style="background:#fff;padding:16px 28px;border-left:1px solid #E2E8F0;border-right:1px solid #E2E8F0;">
@@ -5744,7 +5744,7 @@ onestop.kipcc@gmail.com""",
       <td valign="top">
         <p style="margin:0 0 2px;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:2px;">원스톱 스케일업 · 혁신제품지원센터</p>
         <p style="margin:0;font-size:20px;font-weight:700;color:#fff;">7월 교육 프로그램 신청 안내</p>
-        <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 7월 14일(화) ~ 17일(금)</p>
+        <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 ~ 7월 22일(수)</p>
       </td>
       <td width="64" align="right" valign="top">
         <div style="background:#F59E0B;border-radius:10px;padding:8px 10px;text-align:center;min-width:48px;">
@@ -5805,7 +5805,7 @@ onestop.kipcc@gmail.com""",
     </div>
     <p style="margin:10px 0 0;font-size:11px;color:#3B82F6;">※ 1인 이상 참여 시 참여 인원 정보를 모두 작성해 주세요.</p>
     <div style="margin-top:12px;background:#F59E0B;border-radius:8px;padding:10px 16px;text-align:center;">
-      <p style="margin:0;font-size:13px;font-weight:700;color:#0F172A;">📅 신청 마감: 7월 17일(금)까지</p>
+      <p style="margin:0;font-size:13px;font-weight:700;color:#0F172A;">📅 신청 마감: 7월 22일(수)까지</p>
     </div>
   </div>
   <div style="background:#fff;padding:16px 28px;border-left:1px solid #E2E8F0;border-right:1px solid #E2E8F0;">
