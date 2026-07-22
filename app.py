@@ -2529,11 +2529,18 @@ elif page == "공고·매칭":
                     st.stop()
 
                 with sync_playwright() as pw:
-                    browser = pw.chromium.launch(
-                        headless=True,
-                        args=["--no-sandbox", "--disable-dev-shm-usage",
-                              "--disable-gpu", "--single-process"],
-                    )
+                    try:
+                        browser = pw.chromium.launch(
+                            headless=True,
+                            # --single-process 는 컨테이너에서 크래시(TargetClosedError) 유발 → 사용 안 함
+                            args=["--no-sandbox", "--disable-dev-shm-usage",
+                                  "--disable-gpu", "--disable-software-rasterizer"],
+                        )
+                    except Exception as _e:
+                        st.error(f"Chromium 실행 실패 — {str(_e)[:200]}")
+                        st.info("Streamlit Cloud에서는 브라우저 실행이 제한될 수 있습니다. "
+                                "GitHub Actions 자동 크롤링(매일 09:30)을 이용해 주세요.")
+                        st.stop()
                     page = browser.new_page(user_agent=HEADERS["User-Agent"])
 
                     for i, (_, row) in enumerate(df_target.iterrows()):
