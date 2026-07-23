@@ -3761,8 +3761,23 @@ elif page == "발송":
         c1.metric("승인 건수", f"{len(approved)}건")
         c2.metric("대상 기업", f"{len(companies)}개사")
         c3.metric("발송 모드", "테스트" if test_mode else "실제")
-        if test_mode: st.warning("⚠️ 테스트 모드 — 본인 메일로만 발송")
-        else:         st.success("✅ 실제 모드 — 기업 담당자 이메일로 발송")
+        if test_mode:
+            st.warning("⚠️ 테스트 모드 — 본인 메일로만 발송")
+            _tc1, _tc2 = st.columns([1, 2])
+            with _tc1:
+                _test_limit = st.number_input(
+                    "테스트 발송 기업 수", min_value=1, max_value=50, value=4,
+                    key="match_test_limit",
+                    help="전체 대신 지정한 개수만 발송합니다 (0건 기업 포함해 다양하게 추출)")
+            with _tc2:
+                _test_pick = st.radio(
+                    "추출 방식",
+                    ["유형별 샘플", "공고 많은 순", "무작위"],
+                    horizontal=True, key="match_test_pick",
+                    help="유형별 샘플: 공고 많음/1건/0건 등 서로 다른 케이스를 섞어 추출")
+        else:
+            st.success("✅ 실제 모드 — 기업 담당자 이메일로 발송")
+            _test_limit, _test_pick = 0, ""
 
         # 0건 기업 표시
         approved_cos = set(r['기업명'] for r in approved)
@@ -4044,6 +4059,36 @@ elif page == "발송":
                 if co not in grouped:
                     grouped[co] = []  # 승인 공고 없음 → 빈 리스트로 추가
 
+            # ── 테스트 모드: 지정 개수만 추출 ──────────────
+            if test_mode and _test_limit and _test_limit < len(grouped):
+                _items = list(grouped.items())
+                if _test_pick == "공고 많은 순":
+                    _items.sort(key=lambda x: len(x[1]), reverse=True)
+                    _picked = _items[:_test_limit]
+                elif _test_pick == "무작위":
+                    import random as _rnd
+                    _picked = _rnd.sample(_items, _test_limit)
+                else:  # 유형별 샘플 — 서로 다른 케이스가 섞이도록
+                    _many = sorted([x for x in _items if len(x[1]) >= 3],
+                                   key=lambda x: len(x[1]), reverse=True)
+                    _few  = [x for x in _items if 1 <= len(x[1]) <= 2]
+                    _zero = [x for x in _items if len(x[1]) == 0]
+                    _picked, _seen = [], set()
+                    for _bucket in (_many, _few, _zero):   # 각 유형에서 번갈아 뽑기
+                        for _it in _bucket:
+                            if len(_picked) >= _test_limit: break
+                            if _it[0] not in _seen:
+                                _picked.append(_it); _seen.add(_it[0])
+                            break  # 버킷당 1개씩 → 라운드로빈
+                    _pool = _many + _few + _zero          # 남는 자리는 순서대로 채움
+                    for _it in _pool:
+                        if len(_picked) >= _test_limit: break
+                        if _it[0] not in _seen:
+                            _picked.append(_it); _seen.add(_it[0])
+                grouped = dict(_picked)
+                st.info(f"테스트 추출: {len(grouped)}개사 — "
+                        + ", ".join(f"{c}({len(n)}건)" for c, n in grouped.items()))
+
             for idx,(company,notices) in enumerate(grouped.items()):
                 # 기업 정보 조회
                 co_row = {}
@@ -4294,10 +4339,10 @@ elif page == "발송":
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
 </head>
-<body style="margin:0;padding:0;background:#0A0A0A;
+<body style="margin:0;padding:0;background:#F2F4F7;
              font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0"
-       style="background:#0A0A0A;padding:36px 0 52px;">
+       style="background:#F2F4F7;padding:36px 0 52px;">
 <tr><td align="center">
 <table width="560" cellpadding="0" cellspacing="0">
 
@@ -4479,7 +4524,8 @@ elif page == "발송":
                     msg['To']      = to
                     if cc_list and not test_mode:
                         msg['Cc'] = ", ".join(cc_list)
-                    msg['Subject'] = f"[원스톱 스케일업] {today_str} 이번 주 맞춤 지원사업 공고 — {company}"
+                    msg['Subject'] = (f"[TEST] " if test_mode else "") + \
+                        f"[원스톱 스케일업] {today_str} 이번 주 맞춤 지원사업 공고 — {company}"
                     msg.attach(MIMEText(html,'html','utf-8'))
                     gmail_send(base64.urlsafe_b64encode(msg.as_bytes()).decode())
                     logs.append(f"✅ {company} → {to}" + (f" (+Cc {len(cc_list)})" if cc_list and not test_mode else ""))
