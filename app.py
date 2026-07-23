@@ -3902,7 +3902,7 @@ elif page == "발송":
                          color:rgba(255,255,255,0.8);">
                 이번 주 귀사에 딱 맞는 공고를 찾지 못했습니다.
               </p>
-              <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);line-height:1.7;">
+              <p style="margin:0;font-size:12px;color:#9FD6C0;line-height:1.7;">
                 더 정확한 공고를 드리기 위해 추가 키워드나 관심 분야를
                 아래 답장하기 버튼으로 알려주세요.
               </p>
@@ -3937,80 +3937,80 @@ elif page == "발송":
 
         _preview_html = f"""
         <div style="max-width:600px;margin:0 auto;font-family:'Apple SD Gothic Neo',Arial,sans-serif;
-                    border:1px solid #2A2A2A;border-radius:12px;overflow:hidden;">
+                    border:1px solid #24405F;border-radius:12px;overflow:hidden;">
           <div style="background:#0F1D2E;padding:24px 28px 20px;">
             <p style="margin:0 0 4px;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">
               혁신제품지원센터 · 원스톱 스케일업</p>
             <p style="margin:0;font-size:20px;font-weight:500;color:#fff;">이번 주 맞춤 지원사업 공고</p>
-            <p style="margin:4px 0 0;font-size:13px;color:rgba(255,255,255,0.5);">{preview_co} 담당자님께</p>
+            <p style="margin:4px 0 0;font-size:13px;color:#A8BDD1;">{preview_co} 담당자님께</p>
           </div>
           <div style="background:#0F1D2E;padding:0 28px 20px;">
-            <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);
-                        border-left:3px solid #10B981;border-radius:8px;padding:12px 16px;">
-              <p style="margin:0 0 8px;font-size:10px;font-weight:600;color:#10B981;letter-spacing:1.5px;">
+            <div style="background:#132E26;border:1px solid #1D6E56;
+                        border-left:3px solid #5DCAA5;border-radius:8px;padding:12px 16px;">
+              <p style="margin:0 0 8px;font-size:10px;font-weight:600;color:#5DCAA5;letter-spacing:1.5px;">
                 저희가 파악한 귀사 정보</p>
-              <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.45);">
+              <p style="margin:0 0 4px;font-size:12px;color:#9FD6C0;">
                 기술키워드 <span style="color:#fff;word-break:keep-all;">{_kw}</span></p>
-              <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.45);">
+              <p style="margin:0 0 4px;font-size:12px;color:#9FD6C0;">
                 관심분야 <span style="color:#fff;">{_area}</span></p>
-              <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.45);">
+              <p style="margin:0 0 4px;font-size:12px;color:#9FD6C0;">
                 기업유형 <span style="color:#fff;word-break:keep-all;">{_type}</span></p>
-              <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);">
+              <p style="margin:0;font-size:12px;color:#9FD6C0;">
                 소재지 <span style="color:#fff;">{_loc}</span></p>
             </div>
           </div>
           <div style="background:#0F1D2E;padding:0 28px 8px;">{_cards_html}</div>
           <div style="background:#0F1D2E;padding:8px 28px 20px;">{_common_html}</div>
           <div style="background:#0F1D2E;padding:0 28px 16px;">
-            <div style="border-top:1px solid rgba(255,255,255,0.1);
+            <div style="border-top:1px solid #1E3048;
                         padding-top:16px;text-align:center;">
               <p style="margin:0 0 12px;font-size:12px;color:rgba(255,255,255,0.4);">
                 이번 공고 안내가 도움이 됐나요?</p>
               <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_up2.quote('[이번 주 공고 안내 피드백]\\n반응: 도움됐어요\\n\\n[추가 의견]\\n\\n[Gmail 주소]\\n')}"
                  style="display:inline-block;margin:0 4px;padding:8px 16px;font-size:12px;
-                        font-weight:600;color:#065F46;background:#0A1F15;
-                        border:1px solid #A7F3D0;border-radius:8px;text-decoration:none;">
+                        font-weight:600;color:#5DCAA5;background:#0F3A2E;
+                        border:1px solid #1D6E56;border-radius:8px;text-decoration:none;">
                 👍 도움됐어요</a>
               <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_up2.quote('[이번 주 공고 안내 피드백]\\n반응: 별로였어요\\n\\n[추가 의견]\\n\\n[Gmail 주소]\\n')}"
                  style="display:inline-block;margin:0 4px;padding:8px 16px;font-size:12px;
-                        font-weight:600;color:#991B1B;background:#FEF2F2;
-                        border:1px solid #FECACA;border-radius:8px;text-decoration:none;">
+                        font-weight:600;color:#A8BDD1;background:#17293F;
+                        border:1px solid #24405F;border-radius:8px;text-decoration:none;">
                 👎 별로였어요</a>
               <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_kw_body}"
                  style="display:inline-block;margin:0 4px;padding:8px 16px;font-size:12px;
                         font-weight:600;color:rgba(255,255,255,0.55);
                         background:rgba(255,255,255,0.05);
-                        border:1px solid rgba(255,255,255,0.15);
+                        border:1px solid #24405F;
                         border-radius:8px;text-decoration:none;">
                 💬 의견 남기기</a>
             </div>
           </div>
           <div style="background:#0F1D2E;padding:0 28px 20px;">
-            <div style="background:#151515;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
-              <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#1F4E79;letter-spacing:1px;">
+            <div style="background:#17293F;border:1px solid #24405F;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
+              <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#5DCAA5;letter-spacing:1px;">
                 ✏️ 추가 키워드가 있으신가요?</p>
-              <p style="margin:0 0 10px;font-size:12px;color:#AAAAAA;line-height:1.6;">
+              <p style="margin:0 0 10px;font-size:12px;color:#A8BDD1;line-height:1.6;">
                 더 잘 맞는 공고를 드리기 위해 받고 싶은 분야나 키워드를 답장으로 알려주세요.</p>
               <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_kw_body}"
                  style="display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;
-                        color:#fff;background:#1F4E79;border-radius:6px;text-decoration:none;">
+                        color:#04342C;background:#5DCAA5;border-radius:6px;text-decoration:none;">
                 답장하기 →</a>
             </div>
-            <div style="background:#0A1A0F;border:1px solid #A7F3D0;border-radius:8px;padding:14px 16px;">
-              <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#059669;letter-spacing:1px;">
+            <div style="background:#0F2E24;border:1px solid #1D6E56;border-radius:8px;padding:14px 16px;">
+              <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#5DCAA5;letter-spacing:1px;">
                 📅 공고 마감일 캘린더</p>
-              <p style="margin:0 0 10px;font-size:12px;color:#CCCCCC;line-height:1.6;">
+              <p style="margin:0 0 10px;font-size:12px;color:#9FD6C0;line-height:1.6;">
                 전체 지원사업 공고 마감일을 한눈에 확인하세요.</p>
-              {"<a href='"+CALENDAR_LINK_PREV+"' style='display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;color:#fff;background:#10B981;border-radius:6px;text-decoration:none;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK_PREV else ""}
-              <p style="margin:10px 0 0;font-size:11px;color:#CCCCCC;line-height:1.7;">
+              {"<a href='"+CALENDAR_LINK_PREV+"' style='display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;color:#04342C;background:#5DCAA5;border-radius:6px;text-decoration:none;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK_PREV else ""}
+              <p style="margin:10px 0 0;font-size:11px;color:#9FD6C0;line-height:1.7;">
                 💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
               </p>
             </div>
           </div>
-          <div style="background:#0A1628;padding:14px 28px;text-align:center;">
-            <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.3);">
-              혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:rgba(255,255,255,0.7);text-decoration:none;">onestop.kipcc@gmail.com</a></p>
-              <p style="margin:4px 0 0;font-size:11px;color:rgba(255,255,255,0.2);">
+          <div style="background:#0A1628;padding:14px 28px;text-align:center;border-top:1px solid #1E3048;">
+            <p style="margin:0;font-size:12px;color:#A8BDD1;">
+              혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:#5DCAA5;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
+              <p style="margin:4px 0 0;font-size:11px;color:#7A96B2;">
                 본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
           </div>
         </div>"""
@@ -4156,7 +4156,7 @@ elif page == "발송":
                                  color:rgba(255,255,255,0.8);">
                         이번 주 귀사에 딱 맞는 공고를 찾지 못했습니다.
                       </p>
-                      <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);line-height:1.7;">
+                      <p style="margin:0;font-size:12px;color:#9FD6C0;line-height:1.7;">
                         더 정확한 공고를 드리기 위해 추가 키워드나 관심 분야를
                         아래 답장하기 버튼으로 알려주세요.
                       </p>
@@ -4210,28 +4210,28 @@ elif page == "발송":
                 fb_bad  = _up_fb.quote("[이번 주 공고 안내 피드백]\n반응: 별로였어요\n\n[추가 의견]\n어떤 점이 아쉬우셨나요?\n\n[Gmail 주소]\n")
                 fb_msg  = _up_fb.quote("[이번 주 공고 안내 피드백]\n\n[추가 의견]\n\n[더 받고 싶은 분야/키워드]\n\n[Gmail 주소]\n")
                 rows_html += f"""
-                <div style="border-top:1px solid rgba(255,255,255,0.1);
+                <div style="border-top:1px solid #1E3048;
                             margin-top:20px;padding-top:16px;text-align:center;">
                   <p style="margin:0 0 12px;font-size:12px;color:rgba(255,255,255,0.4);">
                     이번 공고 안내가 도움이 됐나요?
                   </p>
                   <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_good}"
                      style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                            font-weight:600;color:#065F46;background:#0A1F15;
-                            border:1px solid #A7F3D0;border-radius:8px;text-decoration:none;">
+                            font-weight:600;color:#5DCAA5;background:#0F3A2E;
+                        border:1px solid #1D6E56;border-radius:8px;text-decoration:none;">
                     👍 도움됐어요
                   </a>
                   <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_bad}"
                      style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                            font-weight:600;color:#991B1B;background:#FEF2F2;
-                            border:1px solid #FECACA;border-radius:8px;text-decoration:none;">
+                            font-weight:600;color:#A8BDD1;background:#17293F;
+                        border:1px solid #24405F;border-radius:8px;text-decoration:none;">
                     👎 별로였어요
                   </a>
                   <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_msg}"
                      style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
                             font-weight:600;color:rgba(255,255,255,0.55);
                             background:rgba(255,255,255,0.05);
-                            border:1px solid rgba(255,255,255,0.15);
+                            border:1px solid #24405F;
                             border-radius:8px;text-decoration:none;">
                     💬 의견 남기기
                   </a>
@@ -4282,7 +4282,7 @@ elif page == "발송":
                     전체 지원사업 공고 마감일을 한눈에 확인하세요.
                   </p>
                   {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#10B981;color:#fff;padding:7px 16px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK else ""}
-                  <p style="margin:10px 0 0;font-size:11px;color:#CCCCCC;line-height:1.7;">
+                  <p style="margin:10px 0 0;font-size:11px;color:#9FD6C0;line-height:1.7;">
                     💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
                   </p>
                 </div>"""
@@ -4383,18 +4383,18 @@ elif page == "발송":
                         background:rgba(16,185,129,0.08);
                         border:1px solid rgba(16,185,129,0.2);
                         border-left:3px solid #10B981;border-radius:8px;">
-              <p style="margin:0 0 8px;font-size:10px;font-weight:600;color:#10B981;letter-spacing:1.5px;">
+              <p style="margin:0 0 8px;font-size:10px;font-weight:600;color:#5DCAA5;letter-spacing:1.5px;">
                 저희가 파악한 귀사 정보</p>
-              <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.45);">
+              <p style="margin:0 0 4px;font-size:12px;color:#9FD6C0;">
                 기술키워드 <span style="color:#fff;word-break:keep-all;">{str(co_row.get("기술키워드","") or co_row.get("키워드보완","") or "—")[:30]}</span>
               </p>
-              <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.45);">
+              <p style="margin:0 0 4px;font-size:12px;color:#9FD6C0;">
                 관심분야 <span style="color:#fff;">{str(co_row.get("관심사업분야","") or "—")}</span>
               </p>
-              <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.45);">
+              <p style="margin:0 0 4px;font-size:12px;color:#9FD6C0;">
                 기업유형 <span style="color:#fff;word-break:keep-all;">{str(co_row.get("기업유형","") or "—")[:25]}</span>
               </p>
-              <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.45);">
+              <p style="margin:0;font-size:12px;color:#9FD6C0;">
                 소재지 <span style="color:#fff;">{str(co_row.get("소재지","") or "—")}</span>
               </p>
             </div>""" if not df_c_cur.empty and not df_c_cur[df_c_cur["기업명"]==company].empty
@@ -5387,7 +5387,7 @@ onestop.kipcc@gmail.com""",
       <td valign="top">
         <p style="margin:0 0 2px;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:2px;">원스톱 스케일업 · 혁신제품지원센터</p>
         <p style="margin:0;font-size:20px;font-weight:700;color:#fff;">7월 교육 프로그램 신청 안내</p>
-        <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 ~ 7월 22일(수)</p>
+        <p style="margin:4px 0 0;font-size:12px;color:#9FD6C0;">신청 기간 ~ 7월 22일(수)</p>
       </td>
       <td width="64" align="right" valign="top">
         <div style="background:#F59E0B;border-radius:10px;padding:8px 10px;text-align:center;min-width:48px;">
@@ -5483,7 +5483,7 @@ onestop.kipcc@gmail.com""",
     </div>
   </div>
   <div style="background:#0A1628;border-radius:0 0 14px 14px;padding:14px 28px;text-align:center;border:1px solid #1E3A5F;">
-    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:rgba(255,255,255,0.7);text-decoration:none;">onestop.kipcc@gmail.com</a></p>
+    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:#5DCAA5;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
     <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.5);">본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
   </div>
 </div>
@@ -5600,7 +5600,7 @@ onestop.kipcc@gmail.com""",
   </div>
   <div style="background:#0A0A0A;border-radius:0 0 14px 14px;padding:16px 28px;text-align:center;border:1px solid #D4AF37;">
     <p style="margin:0 0 6px;font-size:10px;color:#D4AF37;letter-spacing:3px;font-weight:700;">WITH AVING NEWS</p>
-    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:rgba(255,255,255,0.7);text-decoration:none;">onestop.kipcc@gmail.com</a></p>
+    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:#5DCAA5;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
     <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.45);">본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
   </div>
 </div>
@@ -5817,7 +5817,7 @@ onestop.kipcc@gmail.com""",
       <td valign="top">
         <p style="margin:0 0 2px;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:2px;">원스톱 스케일업 · 혁신제품지원센터</p>
         <p style="margin:0;font-size:20px;font-weight:700;color:#fff;">7월 교육 프로그램 신청 안내</p>
-        <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.45);">신청 기간 ~ 7월 22일(수)</p>
+        <p style="margin:4px 0 0;font-size:12px;color:#9FD6C0;">신청 기간 ~ 7월 22일(수)</p>
       </td>
       <td width="64" align="right" valign="top">
         <div style="background:#F59E0B;border-radius:10px;padding:8px 10px;text-align:center;min-width:48px;">
@@ -5913,7 +5913,7 @@ onestop.kipcc@gmail.com""",
     </div>
   </div>
   <div style="background:#0A1628;border-radius:0 0 14px 14px;padding:14px 28px;text-align:center;border:1px solid #1E3A5F;">
-    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:rgba(255,255,255,0.7);text-decoration:none;">onestop.kipcc@gmail.com</a></p>
+    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:#5DCAA5;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
     <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.5);">본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
   </div>
 </div>
@@ -6031,7 +6031,7 @@ onestop.kipcc@gmail.com""",
   </div>
   <div style="background:#0A0A0A;border-radius:0 0 14px 14px;padding:16px 28px;text-align:center;border:1px solid #D4AF37;">
     <p style="margin:0 0 6px;font-size:10px;color:#D4AF37;letter-spacing:3px;font-weight:700;">WITH AVING NEWS</p>
-    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:rgba(255,255,255,0.7);text-decoration:none;">onestop.kipcc@gmail.com</a></p>
+    <p style="margin:0 0 4px;font-size:12px;color:rgba(255,255,255,0.7);">혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:#5DCAA5;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
     <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.45);">본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
   </div>
 </div>
