@@ -3731,13 +3731,35 @@ elif page == "발송":
         st.session_state['ai_analysis'] = _cached
 
     ai_cache = st.session_state.get('ai_analysis', {})
+
+    # ── 마감 지난 공고 제외 (발송 시점 기준) ──────────────
+    _today_str = datetime.today().strftime('%Y-%m-%d')
+    def _not_expired(r):
+        """마감일이 없으면(상시) 통과, 있으면 오늘 이후만 통과."""
+        _dl = str(r.get('마감일','') or '').strip()
+        if not _dl or _dl.lower() in ('nan','none','상시'):
+            # 마감일 컬럼이 비면 접수기간 끝부분으로 재확인
+            _rp = str(r.get('접수기간','') or '')
+            if '~' in _rp:
+                _dl = _rp.split('~')[-1].strip()
+            else:
+                return True
+        _dl = _dl[:10]
+        try:
+            return datetime.strptime(_dl, '%Y-%m-%d').date() >= datetime.today().date()
+        except Exception:
+            return True   # 날짜 형식이 아니면(차수별 상이 등) 통과
+
+    _results_live = [r for r in results if _not_expired(r)]
+    _n_expired = len(results) - len(_results_live)
+
     approved = [
-        r for r in results
+        r for r in _results_live
         if review_state.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", '') == '○'
     ]
     # AI 검토 등급 공고 (미검토 상태 + AI검토 판정)
     review_grade = [
-        r for r in results
+        r for r in _results_live
         if review_state.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", '') == ''
         and ai_cache.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", {}).get('추천여부','') == '검토'
     ]
@@ -3747,6 +3769,8 @@ elif page == "발송":
         st.warning("승인된 공고 없음 — '매칭 결과'에서 검토 완료 후 진행")
     else:
         st.info(f"📌 현재 매칭 대상 그룹: **{matched_group}** (다른 그룹 발송 시 '매칭 결과'에서 그룹 변경 후 재매칭 필요)")
+        if _n_expired:
+            st.warning(f"⏰ 마감 지난 공고 {_n_expired}건은 발송 대상에서 자동 제외되었습니다. (기준일 {_today_str})")
         # 전체 기업 목록 로드 (선정 기업만)
         _df_c_top = load_excel(drive, SELECTED_FILE)
         if not _df_c_top.empty and '기업명' in _df_c_top.columns:
@@ -3954,16 +3978,14 @@ elif page == "발송":
         _preview_html = f"""
         <div style="max-width:600px;margin:0 auto;font-family:'Apple SD Gothic Neo',Arial,sans-serif;
                     border:1px solid #24405F;border-radius:12px;overflow:hidden;">
-          <div style="background:#122031;padding:20px 28px;border-bottom:1px solid #24405F;">
+          <div style="background:#FFFFFF;padding:20px 28px;border-bottom:1px solid #E8ECF0;">
             <table width="100%" cellpadding="0" cellspacing="0"><tr>
               <td valign="middle">
-                <span style="display:inline-block;background:#FFFFFF;border-radius:8px;padding:7px 12px;line-height:0;">
-                  <img src="{LOGO_URL}" alt="혁신제품지원센터" width="150" height="auto"
-                       style="display:block;height:auto;max-height:30px;object-fit:contain;object-position:left;">
-                </span>
+                <img src="{LOGO_URL}" alt="혁신제품지원센터" width="160" height="auto"
+                     style="display:block;height:auto;max-height:36px;object-fit:contain;object-position:left;">
               </td>
               <td align="right" valign="middle">
-                <p style="margin:0;font-size:11px;color:#7A96B2;letter-spacing:0.3px;">{_today_prev}</p>
+                <p style="margin:0;font-size:11px;color:#A0ADB8;letter-spacing:0.3px;">{_today_prev}</p>
               </td>
             </tr></table>
           </div>
@@ -4373,22 +4395,19 @@ elif page == "발송":
 
   <!-- ── 로고 헤더 (흰 배경) ── -->
   <tr>
-    <td style="background:#122031;border-radius:14px 14px 0 0;
-               padding:20px 28px;border-bottom:1px solid #24405F;">
+    <td style="background:#FFFFFF;border-radius:14px 14px 0 0;
+               padding:20px 28px;border-bottom:1px solid #E8ECF0;">
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td valign="middle">
-            <span style="display:inline-block;background:#FFFFFF;
-                         border-radius:8px;padding:7px 12px;line-height:0;">
-              <img src="{LOGO_URL}"
-                   alt="혁신제품지원센터"
-                   width="150" height="auto"
-                   style="display:block;height:auto;max-height:30px;
-                          object-fit:contain;object-position:left;">
-            </span>
+            <img src="{LOGO_URL}"
+                 alt="혁신제품지원센터"
+                 width="160" height="auto"
+                 style="display:block;height:auto;max-height:36px;
+                        object-fit:contain;object-position:left;">
           </td>
           <td align="right" valign="middle">
-            <p style="margin:0;font-size:11px;color:#7A96B2;letter-spacing:0.3px;">
+            <p style="margin:0;font-size:11px;color:#A0ADB8;letter-spacing:0.3px;">
               {today_str}
             </p>
           </td>
