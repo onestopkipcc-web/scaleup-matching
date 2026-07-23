@@ -700,6 +700,30 @@ def save_json(drive, data, filename):
         json.dumps(data, ensure_ascii=False, indent=2).encode('utf-8'),
         "application/json")
 
+def trigger_github_crawl(limit=0):
+    """GitHub Actions의 크롤링 워크플로를 원격 실행.
+    Streamlit Cloud에서는 chromium 실행이 불안정하므로 Actions에 위임한다.
+    필요: st.secrets['github_token'] (repo 또는 workflow 권한 PAT)"""
+    token = st.secrets.get("github_token", "")
+    if not token:
+        return False, "GitHub 토큰이 설정되지 않았습니다. (Streamlit Secrets에 github_token 추가 필요)"
+    owner_repo = st.secrets.get("github_repo", "onestopkipcc-web/scaleup-matching")
+    wf = st.secrets.get("github_workflow", "crawl.yml")
+    url = f"https://api.github.com/repos/{owner_repo}/actions/workflows/{wf}/dispatches"
+    try:
+        r = requests.post(url,
+            headers={"Authorization": f"Bearer {token}",
+                     "Accept": "application/vnd.github+json",
+                     "X-GitHub-Api-Version": "2022-11-28"},
+            json={"ref": "main", "inputs": {"limit": str(int(limit))}},
+            timeout=30)
+        if r.status_code == 204:
+            return True, ""
+        return False, f"{r.status_code} {r.text[:200]}"
+    except Exception as e:
+        return False, str(e)[:200]
+
+
 def load_text(drive, filename):
     content = drive_download(drive, filename)
     return content.decode('utf-8').strip() if content else ""
@@ -2444,7 +2468,23 @@ elif page == "공고·매칭":
                     help="이 건수마다 드라이브에 저장 → 중간에 끊겨도 이전 작업 보존"
                 )
 
-            if st.button("🕷️ 지금 크롤링 실행", type="primary", key="crawl_btn"):
+            # ── 권장: GitHub Actions에 위임 (Streamlit Cloud는 chromium 실행이 불안정) ──
+            _cA, _cB = st.columns([1, 1])
+            with _cA:
+                if st.button("☁️ GitHub Actions로 크롤링 실행 (권장)",
+                             type="primary", key="crawl_gh_btn"):
+                    _ok, _err = trigger_github_crawl(crawl_limit)
+                    if _ok:
+                        st.success("크롤링 실행을 요청했습니다. GitHub Actions에서 진행됩니다 (수 분 소요).")
+                        st.markdown("[▶ 진행 상황 보기]"
+                                    "(https://github.com/onestopkipcc-web/scaleup-matching/actions)")
+                        st.caption("완료 후 이 페이지를 새로고침하면 갱신된 전문 DB가 반영됩니다.")
+                    else:
+                        st.error(f"실행 요청 실패 — {_err}")
+            with _cB:
+                st.caption("이 앱 서버에서 직접 실행 (환경에 따라 실패할 수 있음)")
+
+            if st.button("🕷️ 지금 크롤링 실행", key="crawl_btn"):
                 import time as _time
                 from bs4 import BeautifulSoup
 
@@ -3442,7 +3482,7 @@ elif page == "공고·매칭":
                             st.markdown(
                                 f"{badges}<br>"
                                 f"<span style='font-size:15px;font-weight:700;color:#F0F0F0;'>{nm}</span>"
-                                f"<span style='font-size:12px;color:#666666;font-weight:400;'> ({int(row.get('점수', 0))}점)</span><br>"
+                                f"<span style='font-size:12px;color:#A8BDD1;font-weight:400;'> ({int(row.get('점수', 0))}점)</span><br>"
                                 f"<span style='font-size:12px;color:#888888;'>{org}</span>",
                                 unsafe_allow_html=True
                             )
@@ -3461,7 +3501,7 @@ elif page == "공고·매칭":
                             # 매칭근거를 태그별로 파싱해서 보기 좋게 표시
                             parts = [p.strip() for p in reason.split('+') if p.strip()]
                             tags_html = " ".join([
-                                f"<span style='display:inline-block;background:#001020;color:#1D4ED8;"
+                                f"<span style='display:inline-block;background:#1E3048;color:#A8BDD1;"
                                 f"border:1px solid #BFDBFE;border-radius:12px;padding:1px 8px;"
                                 f"font-size:11px;margin:2px 2px;'>{p}</span>"
                                 for p in parts
@@ -3785,27 +3825,29 @@ elif page == "발송":
             tag_html = ""
             if hashtags:
                 tag_html = "<div style=\'margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;\'>"
-                for tag in hashtags.split():
-                    tag_html += f"<span style=\'font-size:11px;background:#001020;color:#1D4ED8;padding:3px 8px;border-radius:20px;\'>{tag}</span>"
+                for _ti, tag in enumerate(hashtags.split()):
+                    _tc = ("background:#0F3A2E;color:#5DCAA5" if _ti == 0
+                           else "background:#1E3048;color:#A8BDD1")
+                    tag_html += f"<span style=\'font-size:11px;{_tc};padding:3px 8px;border-radius:20px;\'>{tag}</span>"
                 tag_html += "</div>"
             nm = n.get('공고명','')
             return f"""
             <table width="100%" cellpadding="0" cellspacing="0"
-                   style="margin-bottom:8px;background:#151515;border:1px solid #2A2A2A;
+                   style="margin-bottom:8px;background:#16293F;border:1px solid #24405F;
                           border-radius:10px;overflow:hidden;">
               <tr>
                 <td style="padding:12px 16px;">
                   <a href="{n.get('공고링크','#')}" style="font-size:14px;font-weight:600;
-                     color:#F0F0F0;text-decoration:none;display:block;">{nm}</a>
-                  <p style="margin:3px 0;font-size:12px;color:#666666;">
-                    {n.get('주관기관','')} · 마감 {dl or '상시'}
+                     color:#E8EFF6;text-decoration:none;display:block;">{nm}</a>
+                  <p style="margin:3px 0;font-size:12px;color:#A8BDD1;">
+                    {n.get('주관기관','')} · 마감 {f'<span style="color:#E0A458;font-weight:600;">{dl}</span>' if dl else '상시'}
                   </p>
                   {tag_html}
                 </td>
                 <td width="60" align="center" valign="middle"
-                    style="padding:14px 12px;border-left:1px solid #F1F5F9;">
+                    style="padding:14px 12px;border-left:1px solid #24405F;">
                   <a href="{n.get('공고링크','#')}"
-                     style="font-size:12px;font-weight:600;color:#10B981;
+                     style="font-size:12px;font-weight:600;color:#5DCAA5;
                             text-decoration:none;white-space:nowrap;">보기 →</a>
                 </td>
               </tr>
@@ -4067,32 +4109,34 @@ elif page == "발송":
                     tag_html = ""
                     if hashtags:
                         tag_html = "<div style=\'margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;\'>"
-                        for tag in hashtags.split():
-                            tag_html += f"<span style=\'font-size:11px;background:#001020;color:#1D4ED8;padding:3px 8px;border-radius:20px;\'>{tag}</span>"
+                        for _ti, tag in enumerate(hashtags.split()):
+                            _tc = ("background:#0F3A2E;color:#5DCAA5" if _ti == 0
+                                   else "background:#1E3048;color:#A8BDD1")
+                            tag_html += f"<span style=\'font-size:11px;{_tc};padding:3px 8px;border-radius:20px;\'>{tag}</span>"
                         tag_html += "</div>"
                     notice_name = n.get("공고명","")
                     return f"""
                     <table width="100%" cellpadding="0" cellspacing="0"
-                           style="margin-bottom:8px;background:#151515;
-                                  border:1px solid #2A2A2A;border-radius:10px;overflow:hidden;
+                           style="margin-bottom:8px;background:#16293F;
+                                  border:1px solid #24405F;border-radius:10px;overflow:hidden;
                                   box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                       <tr>
                         <td style="padding:12px 16px;">
                           <a href="{n.get("공고링크","#")}"
-                             style="font-size:14px;font-weight:600;color:#F0F0F0;
+                             style="font-size:14px;font-weight:600;color:#E8EFF6;
                                     text-decoration:none;line-height:1.5;display:block;">
                             {notice_name}
                           </a>
-                          <p style="margin:4px 0 0;font-size:12px;color:#666666;">
-                            {n.get("주관기관","")} &nbsp;·&nbsp; 마감 {dl_raw if dl_raw else "상시"}
+                          <p style="margin:4px 0 0;font-size:12px;color:#A8BDD1;">
+                            {n.get("주관기관","")} &nbsp;·&nbsp; 마감 {f'<span style="color:#E0A458;font-weight:600;">{dl_raw}</span>' if dl_raw else "상시"}
                           </p>
                           {tag_html}
                         </td>
                         <td width="60" align="center" valign="middle"
-                            style="padding:14px 12px;border-left:1px solid #F1F5F9;">
+                            style="padding:14px 12px;border-left:1px solid #24405F;">
                           <a href="{n.get("공고링크","#")}"
                              style="display:inline-block;font-size:12px;font-weight:600;
-                                    color:#10B981;text-decoration:none;white-space:nowrap;">
+                                    color:#5DCAA5;text-decoration:none;white-space:nowrap;">
                             보기 →
                           </a>
                         </td>
@@ -4209,7 +4253,8 @@ elif page == "발송":
                 )
 
                 keyword_sec = f"""
-                <div style="background:#151515;border:1px solid #2A2A2A;
+                <div style="background:#16293F;
+                                  border:1px solid #24405F;
                             border-radius:10px;padding:16px 18px;margin:16px 0;">
                   <p style="margin:0 0 8px;color:#1F4E79;font-weight:700;font-size:11px;
                              letter-spacing:1.5px;text-transform:uppercase;">
@@ -4258,8 +4303,8 @@ elif page == "발송":
 
   <!-- ── 로고 헤더 (흰 배경) ── -->
   <tr>
-    <td style="background:#151515;border-radius:14px 14px 0 0;
-               padding:20px 28px;border-bottom:1px solid #E8ECF0;">
+    <td style="background:#122031;border-radius:14px 14px 0 0;
+               padding:20px 28px;border-bottom:1px solid #24405F;">
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td valign="middle">
@@ -4270,7 +4315,7 @@ elif page == "발송":
                         object-fit:contain;object-position:left;">
           </td>
           <td align="right" valign="middle">
-            <p style="margin:0;font-size:11px;color:#A0ADB8;letter-spacing:0.3px;">
+            <p style="margin:0;font-size:11px;color:#7A96B2;letter-spacing:0.3px;">
               {today_str}
             </p>
           </td>
@@ -4288,7 +4333,7 @@ elif page == "발송":
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td style="padding:30px 28px 24px;
-                     background:linear-gradient(150deg,#0D1B2A 0%,#132B47 100%);
+                     background:#101F33;
                      border-bottom:1px solid rgba(255,255,255,0.06);">
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
@@ -4373,24 +4418,24 @@ elif page == "발송":
 
   <!-- ── 흰 푸터 ── -->
   <tr>
-    <td style="background:#151515;border-radius:0 0 14px 14px;
-               padding:18px 28px;border-top:1px solid #E8ECF0;">
+    <td style="background:#0A1628;border-radius:0 0 14px 14px;
+               padding:18px 28px;border-top:1px solid #1E3048;">
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td>
-            <p style="margin:0;font-size:12px;color:#8A96A3;line-height:1.9;">
+            <p style="margin:0;font-size:12px;color:#A8BDD1;line-height:1.9;">
               혁신제품지원센터 원스톱 스케일업 운영팀<br>
               <a href="mailto:onestop.kipcc@gmail.com"
-                 style="color:#1F4E79;text-decoration:none;font-weight:600;">
+                 style="color:#5DCAA5;text-decoration:none;font-weight:600;">
                 onestop.kipcc@gmail.com
               </a>
             </p>
-            <p style="margin:8px 0 0;font-size:11px;color:#B0BAC4;">
+            <p style="margin:8px 0 0;font-size:11px;color:#7A96B2;">
               본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.
             </p>
           </td>
           <td align="right" valign="middle">
-            <p style="margin:0;font-size:10px;color:#C5CDD6;letter-spacing:0.5px;">
+            <p style="margin:0;font-size:10px;color:#5F7A96;letter-spacing:0.5px;">
               수신 동의 기업 대상 발송
             </p>
           </td>
@@ -4404,19 +4449,40 @@ elif page == "발송":
 </table>
 </body></html>"""
 
-                co_email=""
+                co_email=""; cc_list=[]; _optout=False
                 if not df_c_cur.empty and '이메일' in df_c_cur.columns:
                     m = df_c_cur[df_c_cur['기업명']==company]
-                    if not m.empty: co_email = m.iloc[0].get('이메일','')
+                    if not m.empty:
+                        _r0 = m.iloc[0]
+                        co_email = str(_r0.get('이메일','') or '').strip()
+                        _optout = str(_r0.get('수신거부','') or '').strip().upper() == 'Y'
+                        # 추가 수신자(수신이메일2/3) → Cc
+                        for _c in ('수신이메일2','수신이메일3'):
+                            _v = str(_r0.get(_c,'') or '').strip()
+                            if _v and '@' in _v and _v.lower() != co_email.lower() \
+                               and _v.lower() not in [x.lower() for x in cc_list]:
+                                cc_list.append(_v)
 
-                recipients = get_test_recipients() if test_mode else ([co_email] if co_email else [])
+                if _optout and not test_mode:
+                    logs.append(f"⏭️ {company} — 수신거부 (발송 제외)")
+                    prog.progress((idx+1)/max(len(grouped),1)); log.text("\n".join(logs[-8:]))
+                    continue
+                if not test_mode and not co_email:
+                    logs.append(f"⚠️ {company} — 이메일 없음 (발송 실패)")
+                    prog.progress((idx+1)/max(len(grouped),1)); log.text("\n".join(logs[-8:]))
+                    continue
+
+                recipients = get_test_recipients() if test_mode else [co_email]
                 for to in recipients:
                     msg = MIMEMultipart('alternative')
                     msg['From']    = "onestop.kipcc@gmail.com"
                     msg['To']      = to
+                    if cc_list and not test_mode:
+                        msg['Cc'] = ", ".join(cc_list)
                     msg['Subject'] = f"[원스톱 스케일업] {today_str} 이번 주 맞춤 지원사업 공고 — {company}"
                     msg.attach(MIMEText(html,'html','utf-8'))
                     gmail_send(base64.urlsafe_b64encode(msg.as_bytes()).decode())
+                    logs.append(f"✅ {company} → {to}" + (f" (+Cc {len(cc_list)})" if cc_list and not test_mode else ""))
 
                 for n in notices:
                     dl  = parse_deadline(n.get('접수기간','')); pid = n.get('공고ID','')
@@ -5568,7 +5634,7 @@ onestop.kipcc@gmail.com""",
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td style="padding:28px 28px 20px;
-                         background:linear-gradient(150deg,#0D1B2A 0%,#132B47 100%);
+                         background:#101F33;
                          border-bottom:1px solid rgba(255,255,255,0.06);">
                 <p style="margin:0 0 2px;font-size:10px;font-weight:700;letter-spacing:2.5px;
                            color:rgba(255,255,255,0.3);text-transform:uppercase;">
@@ -5600,10 +5666,10 @@ onestop.kipcc@gmail.com""",
       <tr>
         <td style="background:#ffffff;border-radius:0 0 14px 14px;
                    padding:18px 28px;border-top:1px solid #E8ECF0;">
-          <p style="margin:0;font-size:12px;color:#8A96A3;line-height:1.9;">
+          <p style="margin:0;font-size:12px;color:#A8BDD1;line-height:1.9;">
             혁신제품지원센터 원스톱 스케일업 운영팀<br>
             <a href="mailto:onestop.kipcc@gmail.com"
-               style="color:#1F4E79;text-decoration:none;font-weight:600;">
+               style="color:#5DCAA5;text-decoration:none;font-weight:600;">
               onestop.kipcc@gmail.com
             </a>
           </p>
@@ -6019,7 +6085,7 @@ onestop.kipcc@gmail.com""",
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td style="padding:28px 28px 20px;
-                         background:linear-gradient(150deg,#0D1B2A 0%,#132B47 100%);
+                         background:#101F33;
                          border-bottom:1px solid rgba(255,255,255,0.06);">
                 <p style="margin:0 0 2px;font-size:10px;font-weight:700;letter-spacing:2.5px;
                            color:rgba(255,255,255,0.3);text-transform:uppercase;">
@@ -6052,10 +6118,10 @@ onestop.kipcc@gmail.com""",
       <tr>
         <td style="background:#ffffff;border-radius:0 0 14px 14px;
                    padding:18px 28px;border-top:1px solid #E8ECF0;">
-          <p style="margin:0;font-size:12px;color:#8A96A3;line-height:1.9;">
+          <p style="margin:0;font-size:12px;color:#A8BDD1;line-height:1.9;">
             혁신제품지원센터 원스톱 스케일업 운영팀<br>
             <a href="mailto:onestop.kipcc@gmail.com"
-               style="color:#1F4E79;text-decoration:none;font-weight:600;">
+               style="color:#5DCAA5;text-decoration:none;font-weight:600;">
               onestop.kipcc@gmail.com
             </a>
           </p>
@@ -7137,14 +7203,16 @@ elif page == "시스템 명세":
         st.subheader("원스톱 스케일업 시스템 전체 흐름")
 
         st.markdown("""
-<div style="background:#151515;border:1px solid #2A2A2A;border-radius:12px;padding:24px;font-family:'Apple SD Gothic Neo',sans-serif;">
+<div style="background:#16293F;
+                                  border:1px solid #24405F;border-radius:12px;padding:24px;font-family:'Apple SD Gothic Neo',sans-serif;">
 
 <h4 style="color:#F0F0F0;margin:0 0 20px;">📌 전체 파이프라인</h4>
 
 <div style="display:flex;flex-direction:column;gap:4px;">
 
 <!-- 단계 1 -->
-<div style="background:#151515;border:1px solid #2A2A2A;border-radius:8px;padding:14px 18px;">
+<div style="background:#16293F;
+                                  border:1px solid #24405F;border-radius:8px;padding:14px 18px;">
   <div style="display:flex;align-items:center;gap:12px;">
     <span style="background:#10B981;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 1</span>
     <span style="font-size:14px;font-weight:600;color:#F0F0F0;">기업 DB 구축</span>
@@ -7159,7 +7227,8 @@ elif page == "시스템 명세":
 <div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
 
 <!-- 단계 2 -->
-<div style="background:#151515;border:1px solid #2A2A2A;border-radius:8px;padding:14px 18px;">
+<div style="background:#16293F;
+                                  border:1px solid #24405F;border-radius:8px;padding:14px 18px;">
   <div style="display:flex;align-items:center;gap:12px;">
     <span style="background:#10B981;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 2</span>
     <span style="font-size:14px;font-weight:600;color:#F0F0F0;">공고 수집</span>
@@ -7174,7 +7243,8 @@ elif page == "시스템 명세":
 <div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
 
 <!-- 단계 3 -->
-<div style="background:#151515;border:1px solid #2A2A2A;border-radius:8px;padding:14px 18px;">
+<div style="background:#16293F;
+                                  border:1px solid #24405F;border-radius:8px;padding:14px 18px;">
   <div style="display:flex;align-items:center;gap:12px;">
     <span style="background:#10B981;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 3</span>
     <span style="font-size:14px;font-weight:600;color:#F0F0F0;">매칭 실행</span>
@@ -7189,7 +7259,8 @@ elif page == "시스템 명세":
 <div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
 
 <!-- 단계 4 -->
-<div style="background:#151515;border:1px solid #2A2A2A;border-radius:8px;padding:14px 18px;">
+<div style="background:#16293F;
+                                  border:1px solid #24405F;border-radius:8px;padding:14px 18px;">
   <div style="display:flex;align-items:center;gap:12px;">
     <span style="background:#3B82F6;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 4</span>
     <span style="font-size:14px;font-weight:600;color:#F0F0F0;">담당자 검토</span>
@@ -7204,7 +7275,8 @@ elif page == "시스템 명세":
 <div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
 
 <!-- 단계 5 -->
-<div style="background:#151515;border:1px solid #2A2A2A;border-radius:8px;padding:14px 18px;">
+<div style="background:#16293F;
+                                  border:1px solid #24405F;border-radius:8px;padding:14px 18px;">
   <div style="display:flex;align-items:center;gap:12px;">
     <span style="background:#10B981;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 5</span>
     <span style="font-size:14px;font-weight:600;color:#F0F0F0;">발송</span>
@@ -7220,7 +7292,8 @@ elif page == "시스템 명세":
 <div style="text-align:center;color:#10B981;font-size:18px;margin:2px 0;">↓</div>
 
 <!-- 단계 6 -->
-<div style="background:#151515;border:1px solid #2A2A2A;border-radius:8px;padding:14px 18px;">
+<div style="background:#16293F;
+                                  border:1px solid #24405F;border-radius:8px;padding:14px 18px;">
   <div style="display:flex;align-items:center;gap:12px;">
     <span style="background:#F59E0B;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;">STEP 6</span>
     <span style="font-size:14px;font-weight:600;color:#F0F0F0;">피드백 수집 · 개선</span>
