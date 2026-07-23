@@ -3868,14 +3868,15 @@ elif page == "발송":
               </tr>
             </table>"""
 
+        _today_prev = datetime.today().strftime('%Y.%m.%d')
+        _sss = [n for n in _notices_custom if n.get('관련도','') == '★★★']
+        _ss  = [n for n in _notices_custom if n.get('관련도','') == '★★']
         _cards_html = ""
         if _notices_custom:
             # ★★★ 주목할 만한 공고
-            _sss = [n for n in _notices_custom if n.get('관련도','') == '★★★']
-            _ss  = [n for n in _notices_custom if n.get('관련도','') == '★★']
             if _sss:
                 _cards_html += """<p style="margin:0 0 12px;font-size:10px;font-weight:700;
-                                    color:#6EE7B7;letter-spacing:2px;">🔦 &nbsp;주목할 만한 공고</p>"""
+                                    color:#5DCAA5;letter-spacing:2px;">🔦 &nbsp;주목할 만한 공고</p>"""
                 for n in _sss: _cards_html += _prev_card(n)
             if _ss:
                 _cards_html += """<div style="border-top:1px solid rgba(255,255,255,0.08);
@@ -3953,13 +3954,37 @@ elif page == "발송":
         _preview_html = f"""
         <div style="max-width:600px;margin:0 auto;font-family:'Apple SD Gothic Neo',Arial,sans-serif;
                     border:1px solid #24405F;border-radius:12px;overflow:hidden;">
-          <div style="background:#0F1D2E;padding:24px 28px 20px;">
-            <p style="margin:0 0 4px;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;">
-              혁신제품지원센터 · 원스톱 스케일업</p>
-            <p style="margin:0;font-size:20px;font-weight:500;color:#fff;">이번 주 맞춤 지원사업 공고</p>
-            <p style="margin:4px 0 0;font-size:13px;color:#A8BDD1;">{preview_co} 담당자님께</p>
+          <div style="background:#122031;padding:20px 28px;border-bottom:1px solid #24405F;">
+            <table width="100%" cellpadding="0" cellspacing="0"><tr>
+              <td valign="middle">
+                <span style="display:inline-block;background:#FFFFFF;border-radius:8px;padding:7px 12px;line-height:0;">
+                  <img src="{LOGO_URL}" alt="혁신제품지원센터" width="150" height="auto"
+                       style="display:block;height:auto;max-height:30px;object-fit:contain;object-position:left;">
+                </span>
+              </td>
+              <td align="right" valign="middle">
+                <p style="margin:0;font-size:11px;color:#7A96B2;letter-spacing:0.3px;">{_today_prev}</p>
+              </td>
+            </tr></table>
           </div>
-          <div style="background:#0F1D2E;padding:0 28px 20px;">
+          <div style="background:#101F33;padding:24px 28px 20px;">
+            <table width="100%" cellpadding="0" cellspacing="0"><tr>
+              <td>
+                <p style="margin:0 0 4px;font-size:11px;color:#7A96B2;letter-spacing:1px;">
+                  혁신제품지원센터 · 원스톱 스케일업</p>
+                <p style="margin:0;font-size:20px;font-weight:500;color:#fff;">이번 주 맞춤 지원사업 공고</p>
+                <p style="margin:4px 0 0;font-size:13px;color:#A8BDD1;">{preview_co} 담당자님께</p>
+              </td>
+              <td align="right" valign="middle" width="72">
+                <div style="background:#0F3A2E;border:1px solid #1D6E56;border-radius:12px;
+                            padding:10px 0;width:60px;text-align:center;">
+                  <p style="margin:0;font-size:22px;font-weight:700;color:#5DCAA5;line-height:1;">{len(_sss)+len(_ss)}</p>
+                  <p style="margin:3px 0 0;font-size:9px;letter-spacing:1.2px;color:#5DCAA5;">PICKS</p>
+                </div>
+              </td>
+            </tr></table>
+          </div>
+          <div style="background:#0F1D2E;padding:0 28px 20px;padding-top:20px;">
             <div style="background:#132E26;border:1px solid #1D6E56;
                         border-left:3px solid #5DCAA5;border-radius:8px;padding:12px 16px;">
               <p style="margin:0 0 8px;font-size:10px;font-weight:600;color:#5DCAA5;letter-spacing:1.5px;">
@@ -4211,7 +4236,7 @@ elif page == "발송":
                 if notices_sss:
                     rows_html += """
                     <p style="margin:0 0 12px;font-size:10px;font-weight:700;
-                               color:#6EE7B7;letter-spacing:2px;text-transform:uppercase;">
+                               color:#5DCAA5;letter-spacing:2px;text-transform:uppercase;">
                       🔦 &nbsp;주목할 만한 공고
                     </p>"""
                     for i, n in enumerate(notices_sss):
@@ -4301,23 +4326,23 @@ elif page == "발송":
                 <div style="background:#16293F;
                                   border:1px solid #24405F;
                             border-radius:10px;padding:16px 18px;margin:16px 0;">
-                  <p style="margin:0 0 8px;color:#1F4E79;font-weight:700;font-size:11px;
+                  <p style="margin:0 0 8px;color:#5DCAA5;font-weight:700;font-size:11px;
                              letter-spacing:1.5px;text-transform:uppercase;">
                     ✏️ 추가 키워드가 있으신가요?
                   </p>
-                  <p style="margin:0 0 12px;font-size:12px;color:#AAAAAA;line-height:1.7;">
+                  <p style="margin:0 0 12px;font-size:12px;color:#A8BDD1;line-height:1.7;">
                     더 잘 맞는 공고를 드리기 위해 받고 싶은 분야나 키워드를 답장으로 알려주세요.
                   </p>
                   <a href="mailto:onestop.kipcc@gmail.com?subject={kw_subject}&body={kw_body}"
                      style="display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;
-                            color:#FFFFFF;background:#1F4E79;border-radius:8px;
+                            color:#04342C;background:#5DCAA5;border-radius:8px;
                             text-decoration:none;">
                     답장하기 →
                   </a>
                 </div>"""
 
                 cal_sec = f"""
-                <div style="background:#0A1A0F;border-radius:10px;
+                <div style="background:#0F2E24;border-radius:10px;
                             padding:16px 18px;border:1px solid #A7F3D0;margin:16px 0;">
                   <p style="margin:0 0 4px;color:#059669;font-weight:700;font-size:11px;
                              letter-spacing:1.5px;text-transform:uppercase;">
@@ -4353,11 +4378,14 @@ elif page == "발송":
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td valign="middle">
-            <img src="{LOGO_URL}"
-                 alt="혁신제품지원센터"
-                 width="160" height="auto"
-                 style="display:block;height:auto;max-height:36px;
-                        object-fit:contain;object-position:left;">
+            <span style="display:inline-block;background:#FFFFFF;
+                         border-radius:8px;padding:7px 12px;line-height:0;">
+              <img src="{LOGO_URL}"
+                   alt="혁신제품지원센터"
+                   width="150" height="auto"
+                   style="display:block;height:auto;max-height:30px;
+                          object-fit:contain;object-position:left;">
+            </span>
           </td>
           <td align="right" valign="middle">
             <p style="margin:0;font-size:11px;color:#7A96B2;letter-spacing:0.3px;">
@@ -4530,7 +4558,8 @@ elif page == "발송":
                     gmail_send(base64.urlsafe_b64encode(msg.as_bytes()).decode())
                     logs.append(f"✅ {company} → {to}" + (f" (+Cc {len(cc_list)})" if cc_list and not test_mode else ""))
 
-                for n in notices:
+                # 테스트 모드에서는 캘린더 등록을 건너뜀 (실제 캘린더 오염 방지)
+                for n in ([] if test_mode else notices):
                     dl  = parse_deadline(n.get('접수기간','')); pid = n.get('공고ID','')
                     if not dl or not pid: continue
                     desc  = f"주관기관: {n.get('주관기관','')}\n공고링크: {n.get('공고링크','')}\n안내기업: {company}"
@@ -4564,7 +4593,8 @@ elif page == "발송":
             if test_mode:
                 prog.progress(1.0)
                 st.success(f"✅ 테스트 발송 완료 — {len(history_records)}건 (발송 이력 저장 안 함)")
-                st.info("테스트 모드에서는 발송 이력이 저장되지 않습니다. 실제 발송 시에만 이력이 기록됩니다.")
+                st.info("테스트 모드에서는 발송 이력 저장과 캘린더 등록이 모두 생략됩니다. "
+                        "실제 발송 시에만 기록·등록됩니다.")
             else:
                 with st.spinner("발송 이력 드라이브 저장 중..."):
                     df_h   = load_excel(drive, HISTORY_FILE)
