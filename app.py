@@ -1577,13 +1577,22 @@ section[data-testid="stSidebar"] .stRadio label:hover { color: var(--accent) !im
   /* 최소 폰트 보정 */
   html { -webkit-text-size-adjust:100%; }
 }
-[data-testid="collapsedControl"]        { display:none !important; }
-section[data-testid="stSidebar"] {
-  display:block !important; transform:translateX(0) !important;
-  min-width:244px !important; visibility:visible !important;
+@media (min-width: 768px) {
+  [data-testid="collapsedControl"]        { display:none !important; }
+  section[data-testid="stSidebar"] {
+    display:block !important; transform:translateX(0) !important;
+    min-width:244px !important; visibility:visible !important;
+  }
+  section[data-testid="stSidebar"][aria-expanded="false"] {
+    display:block !important; transform:translateX(0) !important; margin-left:0 !important;
+  }
 }
-section[data-testid="stSidebar"][aria-expanded="false"] {
-  display:block !important; transform:translateX(0) !important; margin-left:0 !important;
+@media (max-width: 767px) {
+  /* 모바일: 접힘 상태를 존중 — 강제 표시 해제 */
+  section[data-testid="stSidebar"][aria-expanded="false"] {
+    transform:translateX(-100%) !important; min-width:0 !important;
+  }
+  [data-testid="collapsedControl"] { display:flex !important; }
 }
 
 /* ── 시스템 UI 숨김 ── */
