@@ -1588,9 +1588,26 @@ section[data-testid="stSidebar"] .stRadio label:hover { color: var(--accent) !im
   }
 }
 @media (max-width: 767px) {
-  /* 모바일: 접힘 상태를 존중 — 강제 표시 해제 */
+  /* 모바일 접힘: 화면 밖으로 완전히 밀어내고 내부까지 숨김 */
   section[data-testid="stSidebar"][aria-expanded="false"] {
-    transform:translateX(-100%) !important; min-width:0 !important;
+    transform:translateX(-110%) !important;
+    width:0 !important; min-width:0 !important; max-width:0 !important;
+    visibility:hidden !important; opacity:0 !important;
+    padding:0 !important; overflow:hidden !important; pointer-events:none !important;
+  }
+  section[data-testid="stSidebar"][aria-expanded="false"] * {
+    visibility:hidden !important; opacity:0 !important;
+  }
+  /* 모바일 펼침: 본문 위에 오버레이 (본문을 밀지 않음) */
+  section[data-testid="stSidebar"][aria-expanded="true"] {
+    position:fixed !important; left:0 !important; top:0 !important;
+    z-index:9999 !important; width:80vw !important; max-width:320px !important;
+    box-shadow:0 0 40px rgba(0,0,0,0.7) !important;
+    visibility:visible !important; opacity:1 !important;
+  }
+  /* 본문은 항상 전체 폭 */
+  section.main, .main .block-container {
+    width:100% !important; margin-left:0 !important;
   }
   [data-testid="collapsedControl"] { display:flex !important; }
 }
