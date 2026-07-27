@@ -1562,8 +1562,21 @@ section[data-testid="stSidebar"] .stRadio label:hover { color: var(--accent) !im
   background: var(--surface) !important;
 }
 
-/* ── 사이드바 항상 표시 ── */
-[data-testid="stSidebarCollapseButton"] { display:none !important; }
+/* ── 사이드바: 데스크톱은 항상 표시, 모바일은 접기 허용 ── */
+@media (min-width: 768px) {
+  [data-testid="stSidebarCollapseButton"] { display:none !important; }
+}
+@media (max-width: 767px) {
+  /* 모바일: 닫기 버튼 복원 + 잘 보이게 */
+  [data-testid="stSidebarCollapseButton"] {
+    display:flex !important;
+  }
+  [data-testid="stSidebarCollapseButton"] svg { fill:#FF0080 !important; }
+  /* 본문 여백 축소 */
+  .main .block-container { padding-left:12px !important; padding-right:12px !important; }
+  /* 최소 폰트 보정 */
+  html { -webkit-text-size-adjust:100%; }
+}
 [data-testid="collapsedControl"]        { display:none !important; }
 section[data-testid="stSidebar"] {
   display:block !important; transform:translateX(0) !important;
