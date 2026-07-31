@@ -4173,6 +4173,71 @@ elif page == "발송":
         st.components.v1.html(_preview_html, height=900, scrolling=True)
 
         st.divider()
+
+        # ── 직전 발송 실패분 재발송 ──────────────────────
+        _failed = st.session_state.get('failed_sends', {})
+        if _failed:
+            with st.container():
+                st.error(f"📮 이전 발송에서 실패한 {len(_failed)}개사가 있습니다.")
+                for _co, _info in _failed.items():
+                    st.caption(f"• {_co} ({_info['email']}) — {_info['reason']} [{_info['time']}]")
+                _rc1, _rc2 = st.columns([1, 3])
+                with _rc1:
+                    if st.button("🔁 실패분만 재발송", type="primary", key="resend_failed"):
+                        from email.mime.multipart import MIMEMultipart
+                        from email.mime.text import MIMEText
+                        import base64
+                        _still_failed = {}
+                        _resent = 0
+                        _rlog = st.empty()
+                        _rlogs = []
+                        for _co, _info in list(_failed.items()):
+                            try:
+                                _msg = MIMEMultipart('alternative')
+                                _msg['From'] = "onestop.kipcc@gmail.com"
+                                _msg['To']   = _info['email']
+                                if _info.get('cc'):
+                                    _msg['Cc'] = ", ".join(_info['cc'])
+                                _msg['Subject'] = _info.get('subject') or \
+                                    f"[원스톱 스케일업] {today_str} 이번 주 맞춤 지원사업 공고 — {_co}"
+                                _msg.attach(MIMEText(_info.get('html') or "재발송", 'html', 'utf-8'))
+                                gmail_send(base64.urlsafe_b64encode(_msg.as_bytes()).decode())
+                                _rlogs.append(f"✅ {_co} → {_info['email']}")
+                                _resent += 1
+                            except Exception as _re2:
+                                _still_failed[_co] = {**_info, 'reason': str(_re2)[:120]}
+                                _rlogs.append(f"❌ {_co} — {str(_re2)[:40]}")
+                            _rlog.text("\n".join(_rlogs))
+                        st.session_state['failed_sends'] = _still_failed
+                        # 재발송 성공분을 이력에 추가
+                        if _resent:
+                            try:
+                                _rec = []
+                                for _co, _info in _failed.items():
+                                    if _co in _still_failed: continue
+                                    for _n in _info.get('notices', []):
+                                        _rec.append({"기업명":_co,"pblancId":_n.get('공고ID',''),
+                                            "공고명":_n.get('공고명',''),"발송일":datetime.today().strftime("%Y-%m-%d"),
+                                            "마감일":_n.get('마감일',''),"공고링크":_n.get('공고링크',''),
+                                            "매칭점수":_n.get('점수',''),"담당자검토":"○",
+                                            "검토의견":"(재발송)","신청여부":"","선정결과":""})
+                                if _rec:
+                                    _dfh = load_excel(drive, HISTORY_FILE)
+                                    _dfn = pd.DataFrame(_rec)
+                                    _dff = pd.concat([_dfh,_dfn],ignore_index=True) if not _dfh.empty else _dfn
+                                    save_excel(drive, _dff, HISTORY_FILE, "발송이력", "375623")
+                            except Exception:
+                                pass
+                        if _still_failed:
+                            st.warning(f"재발송 완료 — 성공 {_resent} / 여전히 실패 {len(_still_failed)}")
+                        else:
+                            st.success(f"재발송 완료 — {_resent}개사 전부 성공. 실패 목록이 비워졌습니다.")
+                with _rc2:
+                    if st.button("🗑️ 실패 목록 지우기", key="clear_failed"):
+                        st.session_state['failed_sends'] = {}
+                        st.rerun()
+            st.divider()
+
         if st.button("📤 발송 실행", type="primary"):
             from email.mime.multipart import MIMEMultipart
             from email.mime.text import MIMEText
@@ -4658,6 +4723,7 @@ elif page == "발송":
                     continue
 
                 recipients = get_test_recipients() if test_mode else [co_email]
+                _send_failed = False
                 for to in recipients:
                     msg = MIMEMultipart('alternative')
                     msg['From']    = "onestop.kipcc@gmail.com"
@@ -4667,8 +4733,25 @@ elif page == "발송":
                     msg['Subject'] = (f"[TEST] " if test_mode else "") + \
                         f"[원스톱 스케일업] {today_str} 이번 주 맞춤 지원사업 공고 — {company}"
                     msg.attach(MIMEText(html,'html','utf-8'))
-                    gmail_send(base64.urlsafe_b64encode(msg.as_bytes()).decode())
-                    logs.append(f"✅ {company} → {to}" + (f" (+Cc {len(cc_list)})" if cc_list and not test_mode else ""))
+                    try:
+                        gmail_send(base64.urlsafe_b64encode(msg.as_bytes()).decode())
+                        logs.append(f"✅ {company} → {to}" + (f" (+Cc {len(cc_list)})" if cc_list and not test_mode else ""))
+                    except Exception as _se:
+                        _send_failed = True
+                        logs.append(f"❌ {company} → {to} — 발송 실패: {str(_se)[:50]}")
+                        if not test_mode:
+                            st.session_state.setdefault('failed_sends', {})[company] = {
+                                'email': to, 'cc': cc_list, 'notices': notices,
+                                'html': html, 'subject': msg['Subject'],
+                                'reason': str(_se)[:120],
+                                'time': datetime.now().strftime('%H:%M:%S'),
+                            }
+                    log.text("\n".join(logs[-8:]))
+
+                # 발송 실패한 기업은 캘린더·이력 기록을 건너뜀
+                if _send_failed and not test_mode:
+                    prog.progress((idx+1)/max(len(grouped),1))
+                    continue
 
                 # 테스트 모드에서는 캘린더 등록을 건너뜀 (실제 캘린더 오염 방지)
                 for n in ([] if test_mode else notices):
@@ -4715,6 +4798,12 @@ elif page == "발송":
                     save_excel(drive, df_fin, HISTORY_FILE, "발송이력", "375623")
                 prog.progress(1.0)
                 st.success(f"발송 완료 — {len(history_records)}건 → send_history.xlsx 저장")
+
+                _failed = st.session_state.get('failed_sends', {})
+                if _failed:
+                    st.error(f"⚠️ 발송 실패 {len(_failed)}개사 — 아래에서 재발송할 수 있습니다.")
+                    for _co, _info in _failed.items():
+                        st.caption(f"• {_co} ({_info['email']}) — {_info['reason']}")
 
                 # ── 공통 캘린더 마감일 이벤트 자동 등록 ──
                 _CAL_ID = "9078a49950a47b46ddb3511040886f3a016b75ca17169ec1113e5692b7327375@group.calendar.google.com"  # 직접 하드코딩
