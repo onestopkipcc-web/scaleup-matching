@@ -81,6 +81,14 @@ LOGO_URL = "https://raw.githubusercontent.com/onestopkipcc-web/scaleup-matching/
 CLICK_TRACK_URL = "https://script.google.com/macros/s/AKfycbyqjB9JmN6BAHSjBHH7Okup4HJZ8l4ToI-6Y0icbSYWKQn8NJAMpjEcuR4pi0tSOpSH/exec"
 CLICK_LOG_SHEET_ID = "1-gYegpHysgSvF1TgQB7Rfh3rs_tNfrE4NS3F1xLef0o"  # 클릭추적_로그 시트
 
+def normalize_company(name):
+    """기업명 정규화 — 서로 다른 소스(신청 회신 vs 명단)를 매칭할 때 사용.
+    (주)/주식회사/㈜/(유) 및 공백 제거 후 비교용 키 반환."""
+    import re as _re
+    s = str(name or "")
+    s = _re.sub(r'\(주\)|\(유\)|주식회사|㈜|\(재\)|\(사\)', '', s)
+    return s.replace(' ', '').strip()
+
 def track_link(dest_url, company, notice_id, notice_name):
     """공고 링크를 클릭 추적 URL로 감싼다. dest_url이 없으면 원본 그대로."""
     import urllib.parse as _up
@@ -5304,7 +5312,8 @@ JSON만 응답 (코드블록 없이):
                 target_group = st.radio(
                     "발송 그룹",
                     ["선정 50개사", "예비 20개사", "전체 70개사",
-                     "리마인더 (선정-교육 미신청)", "직접 선택", "이메일 직접 입력"],
+                     "리마인더 (선정-교육 미신청)", "리마인더 (제외 직접 지정)",
+                     "직접 선택", "이메일 직접 입력"],
                     horizontal=False, key="notice_mail_group"
                 )
             else:
@@ -5327,10 +5336,7 @@ JSON만 응답 (코드블록 없이):
                         return raw if isinstance(raw, list) else []
                     except Exception:
                         return []
-                def _norm_co(s):
-                    s = str(s)
-                    s = re.sub(r'\(주\)|\(유\)|주식회사|㈜', '', s)
-                    return s.replace(' ', '').strip()
+                _norm_co = normalize_company  # 전역 정규화 함수 사용
                 _edu = _load_edu_rem(drive)
                 _rounds = sorted({r.get('교육회차', '') for r in _edu if r.get('교육회차')}, reverse=True)
                 if not _rounds:
@@ -5346,6 +5352,23 @@ JSON만 응답 (코드블록 없이):
                     df_target = _sel_df[_mask]
                     st.caption(f"선정 50개사 중 {_sel_round} 신청 {len(_applied_keys)}개사 제외 "
                                f"→ 발송 대상 {len(df_target)}개사")
+            elif target_group == "리마인더 (제외 직접 지정)":
+                # 명단을 갈아끼우지 않고, 제외할 기업만 그때그때 선택
+                # (CES 참석자, 특정 이벤트 참여자 등 어떤 기준이든 대응)
+                _base = st.radio("기준 그룹", ["선정 50개사", "전체 70개사"],
+                                 horizontal=True, key="rem_manual_base")
+                if _base == "선정 50개사":
+                    _pool = df_active[df_active['선정구분'] == '선정'].copy()
+                else:
+                    _pool = df_active.copy()
+                _exclude = st.multiselect(
+                    "제외할 기업 선택 (이미 참여/신청한 기업)",
+                    _pool['기업명'].tolist(), key="rem_manual_exclude")
+                _ex_keys = {normalize_company(x) for x in _exclude}
+                _mask = ~_pool['기업명'].apply(lambda x: normalize_company(x) in _ex_keys)
+                df_target = _pool[_mask]
+                st.caption(f"{_base} {len(_pool)}개사 중 {len(_exclude)}개사 제외 "
+                           f"→ 발송 대상 {len(df_target)}개사")
             elif target_group == "직접 선택":
                 selected_names = st.multiselect(
                     "기업 직접 선택", df_active['기업명'].tolist(), key="notice_mail_select"
