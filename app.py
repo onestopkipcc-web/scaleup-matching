@@ -637,6 +637,28 @@ def _get_gmail():   return 'gmail'
 def _get_cal():     return 'cal' 
 
 # ── 드라이브 유틸 ─────────────────────────────────────
+def render_html_table(df, max_rows=100):
+    """DataFrame을 다크테마 HTML 표로 렌더링 (캔버스 대신 — CSS가 확실히 먹음)."""
+    if df is None or df.empty:
+        st.caption("데이터 없음")
+        return
+    df = df.head(max_rows)
+    th = ('padding:9px 12px;text-align:left;font-size:12px;font-weight:600;'
+          'color:#E8EFF6;background:#2A3346;border-bottom:2px solid #41485A;'
+          'white-space:nowrap;')
+    td = ('padding:8px 12px;font-size:13px;color:#E8EFF6;'
+          'border-bottom:1px solid #2A3346;')
+    html = ('<div style="overflow-x:auto;border:1px solid #41485A;border-radius:8px;">'
+            '<table style="width:100%;border-collapse:collapse;background:#16293F;">')
+    html += '<thead><tr>' + ''.join(f'<th style="{th}">{c}</th>' for c in df.columns) + '</tr></thead>'
+    html += '<tbody>'
+    for i, (_, row) in enumerate(df.iterrows()):
+        bg = '#16293F' if i % 2 == 0 else '#1B3049'
+        html += '<tr>' + ''.join(
+            f'<td style="{td}background:{bg};">{str(v)}</td>' for v in row) + '</tr>'
+    html += '</tbody></table></div>'
+    st.markdown(html, unsafe_allow_html=True)
+
 def load_click_log(debug=False):
     """클릭추적_로그 시트를 읽어 DataFrame 반환 (시각·기업명·공고ID·공고명)."""
     if not CLICK_LOG_SHEET_ID:
@@ -6970,7 +6992,7 @@ elif page == "클릭 반응":
             "메일 링크 클릭 시 자동 기록 → 이 화면에서 집계")
 
         with st.spinner("클릭 로그 불러오는 중..."):
-            dfc = load_click_log(debug=True)
+            dfc = load_click_log()
 
         if dfc.empty:
             st.info("아직 클릭 데이터가 없습니다. 맞춤공고 메일 발송 후, 기업이 '보기'를 "
@@ -7004,21 +7026,19 @@ elif page == "클릭 반응":
                               관심공고수=('공고ID', 'nunique'))
                          .reset_index()
                          .sort_values('클릭수', ascending=False))
-                st.dataframe(by_co, use_container_width=True, hide_index=True)
+                render_html_table(by_co)
 
                 st.subheader("📋 공고별 클릭 (인기 순)")
                 by_notice = (dfc.groupby(['공고ID', '공고명'])
                              .size().reset_index(name='클릭수')
                              .sort_values('클릭수', ascending=False))
-                st.dataframe(by_notice[['공고명', '클릭수']].head(20),
-                             use_container_width=True, hide_index=True)
+                render_html_table(by_notice[['공고명', '클릭수']].head(20))
 
                 st.subheader("🔍 기업별 관심 공고 상세")
                 _sel_co = st.selectbox("기업 선택", ["(전체)"] + by_co['기업명'].tolist())
                 _view = dfc if _sel_co == "(전체)" else dfc[dfc['기업명'] == _sel_co]
-                st.dataframe(_view[['시각', '기업명', '공고명']]
-                             .sort_values('시각', ascending=False),
-                             use_container_width=True, hide_index=True)
+                render_html_table(_view[['시각', '기업명', '공고명']]
+                                  .sort_values('시각', ascending=False))
 
                 st.caption(f"데이터 기준: 시트에서 실시간 로드 · 총 {len(dfc)}건")
 
