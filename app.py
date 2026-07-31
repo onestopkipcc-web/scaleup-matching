@@ -80,6 +80,36 @@ LOGO_URL = "https://raw.githubusercontent.com/onestopkipcc-web/scaleup-matching/
 # 클릭 추적 (Apps Script 웹앱) — 메일 링크를 이 URL 경유로 감싸 클릭을 기록
 CLICK_TRACK_URL = "https://script.google.com/macros/s/AKfycbyqjB9JmN6BAHSjBHH7Okup4HJZ8l4ToI-6Y0icbSYWKQn8NJAMpjEcuR4pi0tSOpSH/exec"
 CLICK_LOG_SHEET_ID = "1-gYegpHysgSvF1TgQB7Rfh3rs_tNfrE4NS3F1xLef0o"  # 클릭추적_로그 시트
+EVENT_CONFIG_FILE = "event_config.json"  # 교육/행사 설정 (하드코딩 제거용)
+
+DEFAULT_EVENT_CONFIG = {
+    "회차": "2026-08",
+    "주제": "키워드 전략과 로컬·블로그 실전 노하우",
+    "강사": "송윤경",
+    "소속": "인플로잉 대표",
+    "일시": "2026년 8월 27일(수) 14:00 ~ 16:00",
+    "일시_짧게": "8월 27일(수)",
+    "방식": "온라인 (Zoom)",
+    "zoom_link": "",
+    "zoom_id": "",
+    "zoom_pw": "",
+    "신청폼_link": "",
+    "커리큘럼": [
+        "키워드 발굴 및 분석 — 검색량 해석·블루오션 선점",
+        "트렌드 분석 — 네이버 데이터랩·구글 트렌드·경쟁사 모니터링",
+        "플레이스 로직 — 스마트플레이스 순위·리뷰 관리",
+        "블로그 포스팅 — 상위 노출 구조·체류시간·어뷰징 방지",
+    ],
+}
+
+def load_event_config(drive):
+    """교육/행사 설정을 드라이브에서 읽음. 없으면 기본값."""
+    cfg = load_json(drive, EVENT_CONFIG_FILE)
+    if not cfg or not isinstance(cfg, dict):
+        return dict(DEFAULT_EVENT_CONFIG)
+    merged = dict(DEFAULT_EVENT_CONFIG)
+    merged.update(cfg)
+    return merged
 
 def normalize_company(name):
     """기업명 정규화 — 서로 다른 소스(신청 회신 vs 명단)를 매칭할 때 사용.
@@ -4367,7 +4397,16 @@ elif page == "발송":
                 st.info(f"테스트 추출: {len(grouped)}개사 — "
                         + ", ".join(f"{c}({len(n)}건)" for c, n in grouped.items()))
 
+            import time as _snd_time
+            _BATCH_SIZE = 20      # 이 개수마다 잠깐 쉼 (Gmail 대량발송 차단 방지)
+            _BATCH_PAUSE = 5      # 배치 간 대기(초)
+            _sent_count = 0
             for idx,(company,notices) in enumerate(grouped.items()):
+                # 배치 분할: 일정 개수 발송 후 잠깐 대기 (Gmail 한도·평판 보호)
+                if _sent_count > 0 and _sent_count % _BATCH_SIZE == 0:
+                    log.text(f"⏸️ Gmail 한도 보호 — {_BATCH_PAUSE}초 대기 중... "
+                             f"({_sent_count}개사 발송 완료)")
+                    _snd_time.sleep(_BATCH_PAUSE)
                 # 기업 정보 조회
                 co_row = {}
                 if not df_c_cur.empty:
@@ -4858,6 +4897,7 @@ elif page == "발송":
                         "검토의견":n.get('검토의견',''),"신청여부":"","선정결과":""})
 
                 logs.append(f"✅ {company} — {len(notices)}건 발송 완료")
+                _sent_count += 1
                 log.code("\n".join(logs)); prog.progress((idx+1)/len(grouped))
 
             if test_mode:
@@ -7070,9 +7110,10 @@ elif page == "설정":
     st.title("설정")
     st.caption("키워드·매칭 설정 / 드라이브 연동 / 인증 관리")
 
-    tab_s1, tab_s2, tab_s3, tab_s4, tab_s5 = st.tabs([
+    tab_s1, tab_s2, tab_s3, tab_s4, tab_s5, tab_s6 = st.tabs([
         "🎯 축1 — 지원대상", "📋 축2 — 사업성격",
-        "🏢 기업별 키워드", "⚖️ 매칭 가중치", "🔧 시스템 설정"
+        "🏢 기업별 키워드", "⚖️ 매칭 가중치", "🔧 시스템 설정",
+        "📅 교육/행사 설정"
     ])
     kw_data = load_json(drive, KEYWORDS_FILE) or {}
     HIGH_kw, MID_kw = load_keywords(drive)
@@ -7418,7 +7459,54 @@ elif page == "설정":
             else:
                 st.error("초기화 실패 — 드라이브 연결을 확인하세요.")
 
+    # ── 탭6: 교육/행사 설정 ────────────────────────────
+    with tab_s6:
+        st.subheader("📅 교육/행사 정보 설정")
+        st.caption("여기 입력한 값이 교육 안내 메일에 자동 반영됩니다. "
+                   "매달 코드를 고칠 필요 없이, 이 화면에서 회차·강사·일시만 바꾸면 됩니다.")
 
+        _ev = load_event_config(drive)
+        c1, c2 = st.columns(2)
+        with c1:
+            _v_round = st.text_input("회차 (YYYY-MM)", _ev.get("회차", ""), key="ev_round")
+            _v_topic = st.text_input("주제", _ev.get("주제", ""), key="ev_topic")
+            _v_lect  = st.text_input("강사명", _ev.get("강사", ""), key="ev_lect")
+            _v_org   = st.text_input("강사 소속", _ev.get("소속", ""), key="ev_org")
+        with c2:
+            _v_when  = st.text_input("일시 (전체)", _ev.get("일시", ""), key="ev_when")
+            _v_when_s= st.text_input("일시 (짧게, 배지용)", _ev.get("일시_짧게", ""), key="ev_when_s")
+            _v_how   = st.text_input("방식", _ev.get("방식", ""), key="ev_how")
+            _v_form  = st.text_input("신청 폼 링크 (구글폼)", _ev.get("신청폼_link", ""), key="ev_form")
+
+        st.markdown("**Zoom 접속 정보**")
+        z1, z2, z3 = st.columns(3)
+        _v_zlink = z1.text_input("Zoom 링크", _ev.get("zoom_link", ""), key="ev_zlink")
+        _v_zid   = z2.text_input("회의 ID", _ev.get("zoom_id", ""), key="ev_zid")
+        _v_zpw   = z3.text_input("비밀번호", _ev.get("zoom_pw", ""), key="ev_zpw")
+
+        st.markdown("**커리큘럼** (한 줄에 하나씩)")
+        _v_curr = st.text_area("커리큘럼 항목",
+                               "\n".join(_ev.get("커리큘럼", [])),
+                               height=120, key="ev_curr")
+
+        if st.button("💾 교육/행사 설정 저장", type="primary", key="ev_save"):
+            _new = {
+                "회차": _v_round.strip(), "주제": _v_topic.strip(),
+                "강사": _v_lect.strip(), "소속": _v_org.strip(),
+                "일시": _v_when.strip(), "일시_짧게": _v_when_s.strip(),
+                "방식": _v_how.strip(),
+                "zoom_link": _v_zlink.strip(), "zoom_id": _v_zid.strip(),
+                "zoom_pw": _v_zpw.strip(), "신청폼_link": _v_form.strip(),
+                "커리큘럼": [ln.strip() for ln in _v_curr.split("\n") if ln.strip()],
+            }
+            if save_json(drive, _new, EVENT_CONFIG_FILE):
+                st.success("✅ 저장 완료 — 교육 안내 메일에 이 값이 반영됩니다.")
+            else:
+                st.error("저장 실패 — 드라이브 연결을 확인하세요.")
+
+        st.divider()
+        st.caption("💡 이 설정은 안내 메일의 교육 템플릿에서 사용됩니다. "
+                   "다음 교육 회차를 준비할 때 이 값만 바꾸면 코드 수정이 필요 없습니다.")
 
 # ══════════════════════════════════════════════════════
 # 캘린더 관리
