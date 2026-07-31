@@ -637,7 +637,7 @@ def _get_gmail():   return 'gmail'
 def _get_cal():     return 'cal' 
 
 # ── 드라이브 유틸 ─────────────────────────────────────
-def load_click_log():
+def load_click_log(debug=False):
     """클릭추적_로그 시트를 읽어 DataFrame 반환 (시각·기업명·공고ID·공고명)."""
     if not CLICK_LOG_SHEET_ID:
         return pd.DataFrame()
@@ -646,17 +646,22 @@ def load_click_log():
     try:
         resp = gapi("GET", url)
         if not resp.ok:
+            if debug:
+                st.error(f"시트 읽기 실패 [{resp.status_code}]: {resp.text[:300]}")
             return pd.DataFrame()
         vals = resp.json().get("values", [])
+        if debug:
+            st.info(f"시트에서 {len(vals)}행 읽음")
         if len(vals) < 2:
             return pd.DataFrame()
         header = [str(h).strip() for h in vals[0]]
         rows = vals[1:]
-        # 행 길이 보정 (빈 셀로 잘린 행 대응)
         rows = [r + [""] * (len(header) - len(r)) for r in rows]
         df = pd.DataFrame(rows, columns=header).fillna("")
         return df
-    except Exception:
+    except Exception as e:
+        if debug:
+            st.error(f"시트 읽기 예외: {str(e)[:300]}")
         return pd.DataFrame()
 
 def drive_file_id(drive, filename):
@@ -6965,7 +6970,7 @@ elif page == "클릭 반응":
             "메일 링크 클릭 시 자동 기록 → 이 화면에서 집계")
 
         with st.spinner("클릭 로그 불러오는 중..."):
-            dfc = load_click_log()
+            dfc = load_click_log(debug=True)
 
         if dfc.empty:
             st.info("아직 클릭 데이터가 없습니다. 맞춤공고 메일 발송 후, 기업이 '보기'를 "
