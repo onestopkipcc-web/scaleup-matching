@@ -79,6 +79,7 @@ LOGO_URL = "https://raw.githubusercontent.com/onestopkipcc-web/scaleup-matching/
 
 # 클릭 추적 (Apps Script 웹앱) — 메일 링크를 이 URL 경유로 감싸 클릭을 기록
 CLICK_TRACK_URL = "https://script.google.com/macros/s/AKfycbyqjB9JmN6BAHSjBHH7Okup4HJZ8l4ToI-6Y0icbSYWKQn8NJAMpjEcuR4pi0tSOpSH/exec"
+CLICK_LOG_SHEET_ID = "1-gYegpHysgSvF1TgQB7Rfh3rs_tNfrE4NS3F1xLef0o"  # 클릭추적_로그 시트
 
 def track_link(dest_url, company, notice_id, notice_name):
     """공고 링크를 클릭 추적 URL로 감싼다. dest_url이 없으면 원본 그대로."""
@@ -636,6 +637,28 @@ def _get_gmail():   return 'gmail'
 def _get_cal():     return 'cal' 
 
 # ── 드라이브 유틸 ─────────────────────────────────────
+def load_click_log():
+    """클릭추적_로그 시트를 읽어 DataFrame 반환 (시각·기업명·공고ID·공고명)."""
+    if not CLICK_LOG_SHEET_ID:
+        return pd.DataFrame()
+    url = (f"https://sheets.googleapis.com/v4/spreadsheets/"
+           f"{CLICK_LOG_SHEET_ID}/values/A:D")
+    try:
+        resp = gapi("GET", url)
+        if not resp.ok:
+            return pd.DataFrame()
+        vals = resp.json().get("values", [])
+        if len(vals) < 2:
+            return pd.DataFrame()
+        header = [str(h).strip() for h in vals[0]]
+        rows = vals[1:]
+        # 행 길이 보정 (빈 셀로 잘린 행 대응)
+        rows = [r + [""] * (len(header) - len(r)) for r in rows]
+        df = pd.DataFrame(rows, columns=header).fillna("")
+        return df
+    except Exception:
+        return pd.DataFrame()
+
 def drive_file_id(drive, filename):
     files = drive_list_files(filename, DRIVE_FOLDER_ID)
     return files[0]['id'] if files else None
@@ -1803,6 +1826,7 @@ with st.sidebar:
         "안내 메일",
         "교육 신청 집계",
         "발송 이력",
+        "클릭 반응",
         "캘린더",
         "설정",
         "시스템 명세",
@@ -6928,6 +6952,70 @@ elif page == "발송 이력":
                                 st.error("복원 실패 — 드라이브 저장 오류")
                         except Exception as e:
                             st.error(f"복원 실패: {e}")
+
+elif page == "클릭 반응":
+        st.title("📊 클릭 반응 분석")
+        info_box("클릭 반응",
+            """
+    맞춤공고 메일의 '보기' 링크 클릭을 추적합니다.
+
+    **회신 없이도** 어느 기업이 어떤 공고에 관심 있는지 파악할 수 있어요.
+    클릭 = 관심 신호. 활발한 기업에 집중하고, 관심 분야를 읽어냅니다.
+            """,
+            "메일 링크 클릭 시 자동 기록 → 이 화면에서 집계")
+
+        with st.spinner("클릭 로그 불러오는 중..."):
+            dfc = load_click_log()
+
+        if dfc.empty:
+            st.info("아직 클릭 데이터가 없습니다. 맞춤공고 메일 발송 후, 기업이 '보기'를 "
+                    "누르면 여기에 집계됩니다.")
+        else:
+            # 컬럼 정규화 (시각·기업명·공고ID·공고명)
+            colmap = {}
+            for c in dfc.columns:
+                cs = str(c)
+                if '시각' in cs or 'time' in cs.lower(): colmap[c] = '시각'
+                elif '기업' in cs or 'co' in cs.lower(): colmap[c] = '기업명'
+                elif 'ID' in cs or 'notice' in cs.lower(): colmap[c] = '공고ID'
+                elif '공고명' in cs or 'name' in cs.lower(): colmap[c] = '공고명'
+            dfc = dfc.rename(columns=colmap)
+            # 테스트 클릭 제외
+            dfc = dfc[~dfc['기업명'].astype(str).str.contains('테스트', na=False)]
+            dfc = dfc[dfc['기업명'].astype(str).str.strip() != ""]
+
+            if dfc.empty:
+                st.info("실제 기업 클릭이 아직 없습니다. (테스트 클릭은 제외됩니다)")
+            else:
+                c1, c2, c3 = st.columns(3)
+                c1.metric("총 클릭", len(dfc))
+                c2.metric("클릭한 기업 수", dfc['기업명'].nunique())
+                c3.metric("클릭된 공고 수", dfc['공고ID'].nunique())
+                st.divider()
+
+                st.subheader("🏢 기업별 클릭 (관심도 순)")
+                by_co = (dfc.groupby('기업명')
+                         .agg(클릭수=('공고ID', 'size'),
+                              관심공고수=('공고ID', 'nunique'))
+                         .reset_index()
+                         .sort_values('클릭수', ascending=False))
+                st.dataframe(by_co, use_container_width=True, hide_index=True)
+
+                st.subheader("📋 공고별 클릭 (인기 순)")
+                by_notice = (dfc.groupby(['공고ID', '공고명'])
+                             .size().reset_index(name='클릭수')
+                             .sort_values('클릭수', ascending=False))
+                st.dataframe(by_notice[['공고명', '클릭수']].head(20),
+                             use_container_width=True, hide_index=True)
+
+                st.subheader("🔍 기업별 관심 공고 상세")
+                _sel_co = st.selectbox("기업 선택", ["(전체)"] + by_co['기업명'].tolist())
+                _view = dfc if _sel_co == "(전체)" else dfc[dfc['기업명'] == _sel_co]
+                st.dataframe(_view[['시각', '기업명', '공고명']]
+                             .sort_values('시각', ascending=False),
+                             use_container_width=True, hide_index=True)
+
+                st.caption(f"데이터 기준: 시트에서 실시간 로드 · 총 {len(dfc)}건")
 
 elif page == "설정":
     drive = _get_drive()
