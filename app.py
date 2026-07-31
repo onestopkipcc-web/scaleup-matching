@@ -76,6 +76,20 @@ if not check_password():
 # ── 상수 ──────────────────────────────────────────────
 DRIVE_FOLDER_ID  = "1iWGYjaoslqST45ggDlg-IPMLaUHCYmV_"
 LOGO_URL = "https://raw.githubusercontent.com/onestopkipcc-web/scaleup-matching/main/logo.png"
+
+# 클릭 추적 (Apps Script 웹앱) — 메일 링크를 이 URL 경유로 감싸 클릭을 기록
+CLICK_TRACK_URL = "https://script.google.com/macros/s/AKfycbyqjB9JmN6BAHSjBHH7Okup4HJZ8l4ToI-6Y0icbSYWKQn8NJAMpjEcuR4pi0tSOpSH/exec"
+
+def track_link(dest_url, company, notice_id, notice_name):
+    """공고 링크를 클릭 추적 URL로 감싼다. dest_url이 없으면 원본 그대로."""
+    import urllib.parse as _up
+    if not dest_url or dest_url == "#" or not CLICK_TRACK_URL:
+        return dest_url or "#"
+    q = _up.urlencode({
+        "co": company or "", "notice": notice_id or "",
+        "name": (notice_name or "")[:80], "url": dest_url,
+    })
+    return f"{CLICK_TRACK_URL}?{q}"
 API_KEY          = "Nt604D"
 BASE_URL         = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do"
 SELECTED_FILE    = "선정기업_명단.xlsx"   # ← 핵심 변경
@@ -4355,6 +4369,8 @@ elif page == "발송":
                     dl_raw = n.get("마감일","")
                     if not dl_raw and "~" in n.get("접수기간",""):
                         dl_raw = n.get("접수기간","").split("~")[-1].strip()
+                    _track = track_link(n.get("공고링크","#"), company,
+                                        n.get("공고ID",""), n.get("공고명",""))
                     hashtags = reason_to_hashtag(n.get("매칭근거",""))
                     tag_html = ""
                     if hashtags:
@@ -4372,7 +4388,7 @@ elif page == "발송":
                                   box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                       <tr>
                         <td style="padding:12px 16px;">
-                          <a href="{n.get("공고링크","#")}"
+                          <a href="{_track}"
                              style="font-size:14px;font-weight:600;color:#E8EFF6;
                                     text-decoration:none;line-height:1.5;display:block;">
                             {notice_name}
@@ -4384,7 +4400,7 @@ elif page == "발송":
                         </td>
                         <td width="60" align="center" valign="middle"
                             style="padding:14px 12px;border-left:1px solid #24405F;">
-                          <a href="{n.get("공고링크","#")}"
+                          <a href="{_track}"
                              style="display:inline-block;font-size:12px;font-weight:600;
                                     color:#5DCAA5;text-decoration:none;white-space:nowrap;">
                             보기 →
