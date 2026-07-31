@@ -630,8 +630,62 @@ def drive_download(drive, filename):
     fid = drive_file_id(drive, filename)
     return drive_download_file(fid) if fid else None
 
+# 백업 대상 파일 (매번 바뀌고 유실 시 치명적인 것만 — 대용량 공고DB는 제외)
+BACKUP_TARGETS = {
+    "선정기업_명단.xlsx",     # SELECTED_FILE
+    "send_history.xlsx",      # HISTORY_FILE
+    "edu_registration.json",  # 교육 신청
+    "keywords.json",          # KEYWORDS_FILE
+    "ai_analysis.json",       # AI 분석 결과
+}
+BACKUP_KEEP = 5  # 파일당 최근 백업 보관 개수
+
+def _backup_before_overwrite(drive, filename):
+    """덮어쓰기 직전, 드라이브의 기존 파일을 [백업] 이름으로 복제 보관.
+    실패해도 본 저장은 막지 않는다 (백업은 부가 안전장치)."""
+    try:
+        base = filename.rsplit('/', 1)[-1]
+        if base not in BACKUP_TARGETS:
+            return
+        old = drive_download(drive, filename)
+        if not old:
+            return  # 기존 파일 없음 (최초 저장) → 백업 불필요
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        stem, _, ext = base.rpartition('.')
+        bak_name = f"[백업]{stem}_{ts}.{ext}"
+        mime = ("application/json" if ext == "json"
+                else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        drive_upload_file(bak_name, DRIVE_FOLDER_ID, old, mime, None)
+        _prune_backups(stem)
+    except Exception:
+        pass  # 백업 실패는 조용히 넘어감 — 본 저장을 막지 않는다
+
+def _prune_backups(stem):
+    """같은 파일의 오래된 백업을 BACKUP_KEEP개만 남기고 삭제."""
+    try:
+        q = (f"name contains '[백업]{stem}_' and '{DRIVE_FOLDER_ID}' in parents "
+             f"and trashed=false")
+        r = gapi("GET", "https://www.googleapis.com/drive/v3/files",
+                 params={"q": q, "fields": "files(id,name,createdTime)",
+                         "orderBy": "createdTime desc"})
+        files = r.json().get("files", []) if r.ok else []
+        for f in files[BACKUP_KEEP:]:
+            gapi("DELETE", f"https://www.googleapis.com/drive/v3/files/{f['id']}")
+    except Exception:
+        pass
+
+def drive_list_files_prefix(prefix):
+    """이름이 특정 접두사로 시작하는 파일 목록 (백업 복원용)."""
+    q = (f"name contains '{prefix}' and '{DRIVE_FOLDER_ID}' in parents "
+         f"and trashed=false")
+    r = gapi("GET", "https://www.googleapis.com/drive/v3/files",
+             params={"q": q, "fields": "files(id,name,createdTime)",
+                     "orderBy": "createdTime desc"})
+    return r.json().get("files", []) if r.ok else []
+
 def drive_upload(drive, filename, content_bytes, mime):
     try:
+        _backup_before_overwrite(drive, filename)  # 덮어쓰기 전 자동 백업
         fid = drive_file_id(drive, filename)
         result = drive_upload_file(filename, DRIVE_FOLDER_ID, content_bytes, mime, fid)
         return result
@@ -6729,6 +6783,46 @@ elif page == "발송 이력":
             with pd.ExcelWriter(buf, engine='openpyxl') as w: df_h.to_excel(w, index=False)
             st.download_button("📥 엑셀 다운로드", buf.getvalue(), HISTORY_FILE,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+        # ── 자동 백업 복원 ──────────────────────────────
+        st.divider()
+        with st.expander("🛟 자동 백업 · 복원", expanded=False):
+            st.caption("명단·이력·교육신청 등 주요 파일은 저장 직전 자동으로 백업됩니다 "
+                       f"(파일당 최근 {BACKUP_KEEP}개 보관). 잘못 저장했을 때 이전 버전으로 되돌릴 수 있어요.")
+            try:
+                _bak_files = drive_list_files_prefix("[백업]")
+            except Exception:
+                _bak_files = []
+            if not _bak_files:
+                st.info("아직 백업이 없습니다. 주요 파일을 한 번 저장하면 이때부터 백업이 쌓입니다.")
+            else:
+                import re as _re
+                _opts = {}
+                for f in _bak_files:
+                    nm = f['name']
+                    m = _re.match(r'\[백업\](.+)_(\d{8}_\d{6})\.(\w+)$', nm)
+                    if m:
+                        stem, ts, ext = m.groups()
+                        pretty = f"{stem}.{ext}  ·  {ts[:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}:{ts[13:15]}"
+                        _opts[pretty] = (f['id'], f"{stem}.{ext}")
+                _pick = st.selectbox("복원할 백업 선택", ["(선택)"] + list(_opts.keys()),
+                                     key="restore_pick")
+                if _pick != "(선택)":
+                    _fid, _target = _opts[_pick]
+                    st.warning(f"이 백업을 **{_target}** 로 덮어씁니다. 현재 파일은 복원 직전 다시 백업됩니다.")
+                    if st.button("↩️ 이 버전으로 복원", type="primary", key="do_restore"):
+                        try:
+                            _content = drive_download_file(_fid)
+                            _ext = _target.rsplit('.', 1)[-1]
+                            _mime = ("application/json" if _ext == "json"
+                                     else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                            ok = drive_upload(drive, _target, _content, _mime)
+                            if ok:
+                                st.success(f"복원 완료 — {_target}. 페이지를 새로고침하면 반영됩니다.")
+                            else:
+                                st.error("복원 실패 — 드라이브 저장 오류")
+                        except Exception as e:
+                            st.error(f"복원 실패: {e}")
 
 elif page == "설정":
     drive = _get_drive()
