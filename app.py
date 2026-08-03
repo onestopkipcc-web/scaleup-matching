@@ -119,6 +119,107 @@ def normalize_company(name):
     s = _re.sub(r'\(주\)|\(유\)|주식회사|㈜|\(재\)|\(사\)', '', s)
     return s.replace(' ', '').strip()
 
+def build_aug_edu_html(ev, company="", co_kw="", co_area="", co_type="", deadline="2026-08-07"):
+    """8월 교육 신청 안내 메일 HTML. ev=교육설정 / D-day 자동계산 / 기업 키워드 개인화."""
+    from datetime import datetime as _dt
+    _dl_short = "8/7(금)"
+    try:
+        _dl = _dt.strptime(deadline, "%Y-%m-%d")
+        _days = (_dl - _dt.today()).days
+        _dday_txt = "마감" if _days < 0 else ("D-DAY" if _days == 0 else f"D-{_days}")
+        _dl_short = f"{_dl.month}/{_dl.day}({['월','화','수','목','금','토','일'][_dl.weekday()]})"
+    except Exception:
+        _dday_txt = ""
+
+    _curr_html = ""
+    for i, item in enumerate(ev.get("커리큘럼", [])[:6], 1):
+        if "—" in item:      _t, _d = item.split("—", 1)
+        elif " - " in item:  _t, _d = item.split(" - ", 1)
+        else:                _t, _d = item, ""
+        _curr_html += f"""
+      <div style="margin-bottom:10px;padding:14px 16px;background:#FAFBFC;border:1px solid #E8ECF1;border-left:4px solid #03C75A;border-radius:0 8px 8px 0;">
+        <p style="margin:0 0 3px;font-size:14px;font-weight:600;color:#1C2B3A;">{i}. {_t.strip()}</p>
+        <p style="margin:0;font-size:12px;color:#5A6675;line-height:1.6;">{_d.strip()}</p>
+      </div>"""
+
+    _kw_card = ""
+    if co_kw or co_area or co_type:
+        _kw_card = f"""
+      <div style="margin-top:20px;padding-top:18px;border-top:1px dashed #D8DEE6;">
+        <p style="margin:0 0 8px;font-size:11px;font-weight:600;color:#8A96A3;letter-spacing:1px;">📋 저희가 파악한 귀사 정보</p>
+        <div style="background:#F7F9FC;border:1px solid #E4EAF1;border-radius:8px;padding:12px 14px;">
+          <p style="margin:0 0 4px;font-size:12px;color:#5A6675;">기술키워드 · <span style="font-weight:600;color:#1C2B3A;">{co_kw or '—'}</span></p>
+          <p style="margin:0 0 4px;font-size:12px;color:#5A6675;">관심분야 · <span style="font-weight:600;color:#1C2B3A;">{co_area or '—'}</span></p>
+          <p style="margin:0 0 8px;font-size:12px;color:#5A6675;">기업유형 · <span style="font-weight:600;color:#1C2B3A;">{co_type or '—'}</span></p>
+          <p style="margin:0;font-size:11px;color:#6B7684;line-height:1.6;">이 정보가 다르거나 보완하고 싶으시면 신청 회신에 함께 적어주세요. 다음 공고 안내부터 반영됩니다.</p>
+        </div>
+      </div>"""
+
+    _lect = ev.get("강사", "박성식")
+    _when_s = ev.get("일시_짧게", "8/12(수) 14:00~16:00")
+
+    return f"""<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F2F4F7;font-family:'Apple SD Gothic Neo',Arial,sans-serif;">
+<div style="max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:14px;overflow:hidden;border:1px solid #E2E5EA;">
+  <div style="background:#0F1D2E;padding:26px 28px 24px;">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td valign="top">
+        <p style="margin:0 0 3px;font-size:10px;letter-spacing:2px;color:#7A96B2;">원스톱 스케일업 · 8월 무료 교육</p>
+        <p style="margin:8px 0 8px;font-size:23px;font-weight:600;color:#FFFFFF;line-height:1.4;"><span style="color:#03C75A;">네이버</span>·<span style="color:#4285F4;">구</span><span style="color:#EA4335;">글</span> 검색 상위에<br>우리 회사를 올리는 법</p>
+        <p style="margin:0;font-size:13px;color:#A8BDD1;">키워드 발굴 · 플레이스 최적화 · 블로그 상위노출</p>
+      </td>
+      <td width="70" align="right" valign="top">
+        <div style="background:#DC2626;border-radius:10px;padding:9px 10px;text-align:center;min-width:52px;">
+          <p style="margin:0;font-size:19px;font-weight:800;color:#FFFFFF;line-height:1;">{_dday_txt}</p>
+          <p style="margin:3px 0 0;font-size:9px;font-weight:700;color:#FFFFFF;letter-spacing:0.5px;">~{_dl_short}</p>
+        </div>
+      </td>
+    </tr></table>
+    <div style="margin-top:16px;">
+      <span style="display:inline-block;font-size:12px;color:#E0A458;background:#2A2109;border:1px solid #5A4718;padding:5px 12px;border-radius:6px;margin-right:6px;">무료 · 온라인 2시간</span>
+      <span style="display:inline-block;font-size:12px;color:#F0A0A0;background:#2A0F0F;border:1px solid #5A2020;padding:5px 12px;border-radius:6px;">선착순 · 조기 종료 가능</span>
+    </div>
+  </div>
+  <div style="height:4px;background:linear-gradient(to right,#03C75A 0%,#03C75A 33%,#4285F4 33%,#4285F4 55%,#EA4335 55%,#EA4335 73%,#FBBC05 73%,#FBBC05 100%);"></div>
+  <div style="background:#FFFFFF;padding:24px 28px;">
+    <p style="margin:0 0 4px;font-size:14px;color:#1C2B3A;">담당자님, 안녕하세요.</p>
+    <p style="margin:0 0 14px;font-size:13px;color:#5A6675;line-height:1.75;">원스톱 스케일업 8월 교육을 안내드립니다. 이번 교육은 <span style="color:#1C2B3A;font-weight:500;">검색 노출과 온라인 유입</span>에 초점을 맞춰, 우리 회사를 검색 상위에 올리는 실전 노하우를 다룹니다.</p>
+    <div style="margin-bottom:22px;padding:12px 16px;background:#F6FBF8;border:1px solid #D3EDDD;border-radius:8px;">
+      <p style="margin:0;font-size:13px;color:#2C5F48;line-height:1.7;">💻 <span style="font-weight:600;">비대면 Zoom</span>으로 진행되어 사무실이나 자리에서 <span style="font-weight:600;">부담 없이</span> 참여하실 수 있으니 많은 관심과 참여 부탁드립니다.</p>
+    </div>
+    <p style="margin:0 0 14px;font-size:15px;font-weight:600;color:#1C2B3A;">📚 이런 걸 배웁니다</p>
+    {_curr_html}
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0 22px;">
+      <tr>
+        <td width="50%" style="padding:13px 16px;background:#0F1D2E;border-radius:8px 0 0 8px;">
+          <p style="margin:0 0 4px;font-size:11px;color:#7A96B2;">일시</p>
+          <p style="margin:0;font-size:14px;color:#FFFFFF;font-weight:500;">{_when_s}</p>
+        </td>
+        <td width="50%" style="padding:13px 16px;background:#16293F;border-radius:0 8px 8px 0;">
+          <p style="margin:0 0 4px;font-size:11px;color:#7A96B2;">방식 · 강사</p>
+          <p style="margin:0;font-size:14px;color:#FFFFFF;font-weight:500;">비대면 Zoom · {_lect}</p>
+        </td>
+      </tr>
+    </table>
+    <div style="background:#EFF5FB;border:1px solid #CFE0F0;border-radius:10px;padding:16px 18px;">
+      <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0F1D2E;">📩 신청 방법 <span style="color:#DC2626;font-size:12px;">(~{_dl_short} 마감)</span></p>
+      <p style="margin:0 0 6px;font-size:13px;color:#334155;line-height:1.7;">이 메일에 아래 정보를 <span style="color:#185FA5;font-weight:600;">회신</span>해 주세요.</p>
+      <p style="margin:0 0 10px;font-size:13px;color:#334155;line-height:1.9;">· 기업명<br>· 담당자명 / 연락처<br>· 참석 인원 (추가 참석자 있으면 함께)</p>
+      <p style="margin:0;padding-top:10px;border-top:1px solid #D9E5F1;font-size:12px;color:#5A6E85;line-height:1.6;">💡 아래 <span style="font-weight:600;color:#185FA5;">'파악한 귀사 정보'</span>에 보완할 내용이 있으시면, 신청 회신에 함께 적어주세요.</p>
+    </div>
+    <div style="margin-top:12px;padding:12px 14px;background:#FBFAF6;border:1px solid #E8E2CF;border-radius:8px;">
+      <p style="margin:0;font-size:12px;color:#6B6550;line-height:1.7;">📎 <span style="font-weight:600;color:#5A5340;">줌 링크와 교육자료</span>는 접수 종료 후, 신청하신 모든 기업께 <span style="font-weight:600;color:#5A5340;">일괄 발송</span>해 드립니다.</p>
+    </div>
+    {_kw_card}
+  </div>
+  <div style="background:#0A1628;padding:18px 28px;">
+    <p style="margin:0;font-size:12px;color:#A8BDD1;line-height:1.8;">혁신제품지원센터 원스톱 스케일업 운영팀<br><span style="color:#5DCAA5;">onestop.kipcc@gmail.com</span></p>
+    <p style="margin:8px 0 0;font-size:11px;color:#5F7A96;">함께 참석하실 사내 담당자분들께도 공유 부탁드립니다.</p>
+  </div>
+</div>
+</body></html>"""
+
 def track_link(dest_url, company, notice_id, notice_name):
     """공고 링크를 클릭 추적 URL로 감싼다. dest_url이 없으면 원본 그대로."""
     import urllib.parse as _up
@@ -5444,6 +5545,7 @@ JSON만 응답 (코드블록 없이):
                 "첫 안내 메일 (선정 축하 + 회신 요청)",
                 "선정 기업 축하 및 프로그램 안내",
                 "7월 교육 프로그램 신청 안내",
+                "8월 교육 프로그램 신청 안내",
                 "CES 혁신상 밋업 신청 안내",
                 "교육 프로그램 수요조사",
                 "성과집계 조사 요청",
@@ -5455,6 +5557,35 @@ JSON만 응답 (코드블록 없이):
         )
 
         TEMPLATES = {
+            "8월 교육 프로그램 신청 안내": {
+                "subject": "[원스톱 스케일업] 네이버·구글 검색 상위 노하우 — 8월 교육 신청 안내 (~8/7)",
+                "body": """안녕하세요, 원스톱 스케일업 운영팀입니다.
+선정 기업 여러분께 제공되는 8월 교육 프로그램을 안내드립니다.
+이번 교육은 검색 노출과 온라인 유입에 초점을 맞춰, 우리 회사를 검색 상위에 올리는 실전 노하우를 다룹니다.
+비대면 Zoom으로 진행되어 사무실이나 자리에서 부담 없이 참여하실 수 있으니 많은 관심과 참여 부탁드립니다.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📌 8월 정기 교육 | 선정기업 무료 제공 | 비대면 Zoom
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+주  제: 네이버·구글 검색 상위에 우리 회사를 올리는 법
+        키워드 발굴·분석 / 트렌드 분석 / 플레이스 로직 / 블로그 상위노출
+강  사: 박성식
+일  시: 2026년 8월 12일(수) 14:00 ~ 16:00 (질의응답 포함)
+방  식: 비대면 Zoom (링크는 접수 종료 후 교육자료와 함께 안내)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ 신청 방법 | 마감: 8월 7일(금)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+본 메일에 아래 정보를 회신해 주세요.
+· 기업명
+· 담당자명 / 연락처
+· 참석 인원 (추가 참석자 있으면 함께)
+
+※ 줌 링크와 교육자료는 접수 종료 후 신청하신 모든 기업께 일괄 발송해 드립니다.
+""",
+            },
             "7월 교육 프로그램 신청 안내": {
                 "subject": "[원스톱 스케일업] 7월 교육 프로그램 참여 신청 안내 (7/14~17)",
                 "body": """안녕하세요, 원스톱 스케일업 운영팀입니다.
@@ -5760,7 +5891,7 @@ onestop.kipcc@gmail.com""",
 
         if df_target.empty and not direct_input_email:
             st.warning("발송 대상 기업이 없습니다.")
-        elif (not mail_subject or not mail_body) and template_choice not in ("7월 교육 프로그램 신청 안내", "CES 혁신상 밋업 신청 안내"):
+        elif (not mail_subject or not mail_body) and template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 프로그램 신청 안내", "CES 혁신상 밋업 신청 안내"):
             st.info("제목과 본문을 작성하면 미리보기가 표시됩니다.")
         else:
             sample_company = df_target.iloc[0]['기업명'] if not df_target.empty else "샘플기업"
@@ -5779,8 +5910,19 @@ onestop.kipcc@gmail.com""",
 
             body_html = mail_body.replace('\n', '<br>')
 
+            # 8월 교육 템플릿 전용 HTML 미리보기
+            if template_choice == "8월 교육 프로그램 신청 안내":
+                _ev = load_event_config(drive)
+                _co_kw   = df_target.iloc[0].get('기술키워드','') if not df_target.empty else ''
+                _co_area = df_target.iloc[0].get('관심사업분야','') if not df_target.empty else ''
+                _co_type = df_target.iloc[0].get('기업유형','') if not df_target.empty else ''
+                _co_nm   = df_target.iloc[0].get('기업명','') if not df_target.empty else ''
+                sample_html = build_aug_edu_html(_ev, company=_co_nm,
+                    co_kw=_co_kw, co_area=_co_area, co_type=_co_type)
+                st.components.v1.html(sample_html, height=1100, scrolling=True)
+
             # 7월 교육 템플릿 전용 HTML 미리보기
-            if template_choice == "7월 교육 프로그램 신청 안내":
+            elif template_choice == "7월 교육 프로그램 신청 안내":
                 # 미리보기용 - 기업 정보 샘플로 표시
                 _co_kw   = df_target.iloc[0].get('기술키워드','—') if not df_target.empty else '—'
                 _co_area = df_target.iloc[0].get('관심사업분야','—') if not df_target.empty else '—'
@@ -6211,7 +6353,14 @@ onestop.kipcc@gmail.com""",
 
                     # HTML 본문 생성
                     body_html_co = ""
-                    if template_choice == "7월 교육 프로그램 신청 안내":
+                    if template_choice == "8월 교육 프로그램 신청 안내":
+                        _ev = load_event_config(drive)
+                        _co_kw   = str(row.get('기술키워드','') or row.get('키워드보완','') or '')[:40]
+                        _co_area = str(row.get('관심사업분야','') or '')
+                        _co_type = str(row.get('기업유형','') or '')[:30]
+                        html_body = build_aug_edu_html(_ev, company=str(row.get('기업명','')),
+                            co_kw=_co_kw, co_area=_co_area, co_type=_co_type)
+                    elif template_choice == "7월 교육 프로그램 신청 안내":
                         _co_kw   = str(row.get('기술키워드','') or row.get('키워드보완','') or '—')[:40]
                         _co_area = str(row.get('관심사업분야','') or '—')
                         _co_type = str(row.get('기업유형','') or '—')[:30]
@@ -6464,7 +6613,7 @@ onestop.kipcc@gmail.com""",
                           <a href="{form_link}" style="font-size:13px;color:#10B981;">{form_link}</a>
                         </div>"""
 
-                    if template_choice not in ("7월 교육 프로그램 신청 안내", "CES 혁신상 밋업 신청 안내"):
+                    if template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 프로그램 신청 안내", "CES 혁신상 밋업 신청 안내"):
                         html_body = f"""<!DOCTYPE html>
     <html lang="ko"><head><meta charset="UTF-8"></head>
     <body style="margin:0;padding:0;background:#F2F4F7;
@@ -6663,8 +6812,15 @@ elif page == "교육 신청 집계":
         with st.spinner("Gmail 회신 검색 중..."):
             try:
                 after_date = (datetime.today() - timedelta(days=int(search_days))).strftime('%Y/%m/%d')
-                # 발송한 메일 제목으로 정확한 회신만 수집
-                query = f'in:inbox subject:"{mail_subject_input}" after:{after_date}'
+                # 제목에서 핵심 키워드만 추출해 유연하게 검색
+                # (회신은 "Re:" 접두·제목 변형이 잦아 완전일치는 놓침)
+                _subj = mail_subject_input
+                # 대괄호 안 발송자명·괄호 날짜 제거 후 핵심어만
+                _core = re.sub(r'\[[^\]]*\]|\([^)]*\)', '', _subj).strip()
+                _core_words = [w for w in _core.split() if len(w) >= 2][:4]
+                _kw_query = " ".join(_core_words) if _core_words else _subj
+                # 회신함 위주로, 핵심 키워드 매칭
+                query = f'subject:({_kw_query}) after:{after_date}'
                 resp = gapi('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/messages',
                             params={'q': query, 'maxResults': 100})
 
