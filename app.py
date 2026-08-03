@@ -85,11 +85,11 @@ EVENT_CONFIG_FILE = "event_config.json"  # 교육/행사 설정 (하드코딩 �
 DEFAULT_EVENT_CONFIG = {
     "회차": "2026-08",
     "주제": "키워드 전략과 로컬·블로그 실전 노하우",
-    "강사": "송윤경",
-    "소속": "인플로잉 대표",
-    "일시": "2026년 8월 27일(수) 14:00 ~ 16:00",
-    "일시_짧게": "8월 27일(수)",
-    "방식": "온라인 (Zoom)",
+    "강사": "박성식",
+    "소속": "",
+    "일시": "2026년 8월 12일(수) 14:00 ~ 16:00 (질의응답 포함)",
+    "일시_짧게": "8/12(수) 14:00~16:00",
+    "방식": "비대면 Zoom",
     "zoom_link": "",
     "zoom_id": "",
     "zoom_pw": "",
@@ -97,8 +97,8 @@ DEFAULT_EVENT_CONFIG = {
     "커리큘럼": [
         "키워드 발굴 및 분석 — 검색량 해석·블루오션 선점",
         "트렌드 분석 — 네이버 데이터랩·구글 트렌드·경쟁사 모니터링",
-        "플레이스 로직 — 스마트플레이스 순위·리뷰 관리",
-        "블로그 포스팅 — 상위 노출 구조·체류시간·어뷰징 방지",
+        "플레이스 로직 분석 — 스마트플레이스 순위·리뷰 관리",
+        "블로그 포스팅 전략 — 상위 노출 구조·체류시간·어뷰징 방지",
     ],
 }
 
@@ -214,7 +214,7 @@ def build_aug_edu_html(ev, company="", co_kw="", co_area="", co_type="", deadlin
     {_kw_card}
   </div>
   <div style="background:#0A1628;padding:18px 28px;">
-    <p style="margin:0;font-size:12px;color:#A8BDD1;line-height:1.8;">혁신제품지원센터 원스톱 스케일업 운영팀<br><span style="color:#5DCAA5;">onestop.kipcc@gmail.com</span></p>
+    <p style="margin:0;font-size:12px;color:#A8BDD1;line-height:1.8;">혁신제품지원센터 원스톱 스케일업 운영팀<br><a href="mailto:onestop.kipcc@gmail.com" style="color:#6EE7B7 !important;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
     <p style="margin:8px 0 0;font-size:11px;color:#5F7A96;">함께 참석하실 사내 담당자분들께도 공유 부탁드립니다.</p>
   </div>
 </div>
