@@ -6880,8 +6880,8 @@ elif page == "교육 신청 집계":
                 _core = re.sub(r'\[[^\]]*\]|\([^)]*\)', '', _subj).strip()
                 _core_words = [w for w in _core.split() if len(w) >= 2][:4]
                 _kw_query = " ".join(_core_words) if _core_words else _subj
-                # 회신함 위주로, 핵심 키워드 매칭
-                query = f'subject:({_kw_query}) after:{after_date}'
+                # 받은 회신만 (내가 보낸 원본 안내는 제외)
+                query = f'subject:({_kw_query}) after:{after_date} in:inbox -from:onestop.kipcc@gmail.com'
                 resp = gapi('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/messages',
                             params={'q': query, 'maxResults': 100})
 
@@ -6910,6 +6910,11 @@ elif page == "교육 신청 집계":
                             headers_list = detail.get('payload', {}).get('headers', [])
                             sender = next((h['value'] for h in headers_list if h['name']=='From'), '')
                             subject = next((h['value'] for h in headers_list if h['name']=='Subject'), '')
+
+                            # 내가 보낸 원본 안내 메일은 스킵 (신청 회신이 아님)
+                            if 'onestop.kipcc@gmail.com' in sender.lower():
+                                prog.progress((i+1)/len(msgs))
+                                continue
 
                             # 본문 추출
                             import base64
