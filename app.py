@@ -801,7 +801,11 @@ def render_html_table(df, max_rows=100):
     if df is None or df.empty:
         st.caption("데이터 없음")
         return
-    df = df.head(max_rows)
+    import html as _html
+    df = df.head(max_rows).fillna("")
+    def _esc(v):
+        s = str(v)
+        return _html.escape(s) if s not in ("nan", "None", "NaT") else ""
     th = ('padding:9px 12px;text-align:left;font-size:12px;font-weight:600;'
           'color:#E8EFF6;background:#2A3346;border-bottom:2px solid #41485A;'
           'white-space:nowrap;')
@@ -809,12 +813,12 @@ def render_html_table(df, max_rows=100):
           'border-bottom:1px solid #2A3346;')
     html = ('<div style="overflow-x:auto;border:1px solid #41485A;border-radius:8px;">'
             '<table style="width:100%;border-collapse:collapse;background:#16293F;">')
-    html += '<thead><tr>' + ''.join(f'<th style="{th}">{c}</th>' for c in df.columns) + '</tr></thead>'
+    html += '<thead><tr>' + ''.join(f'<th style="{th}">{_esc(c)}</th>' for c in df.columns) + '</tr></thead>'
     html += '<tbody>'
     for i, (_, row) in enumerate(df.iterrows()):
         bg = '#16293F' if i % 2 == 0 else '#1B3049'
         html += '<tr>' + ''.join(
-            f'<td style="{td}background:{bg};">{str(v)}</td>' for v in row) + '</tr>'
+            f'<td style="{td}background:{bg};">{_esc(v)}</td>' for v in row) + '</tr>'
     html += '</tbody></table></div>'
     st.markdown(html, unsafe_allow_html=True)
 
@@ -6992,16 +6996,23 @@ elif page == "교육 신청 집계":
         display_cols = ['기업명','담당자명','연락처','인원','교육회차','수신일','비고']
         df_edu_show = df_edu[[c for c in display_cols if c in df_edu.columns]]
 
-        edited_edu = st.data_editor(
-            df_edu_show,
-            use_container_width=True,
-            hide_index=True,
-            num_rows="dynamic",
-            column_config={
-                "인원": st.column_config.NumberColumn("인원", min_value=1),
-                "비고": st.column_config.TextColumn("비고"),
-            }
-        )
+        _edit_mode = st.toggle("✏️ 편집 모드", value=False, key="edu_edit_toggle",
+                               help="켜면 인원·비고를 직접 수정할 수 있습니다")
+
+        if _edit_mode:
+            edited_edu = st.data_editor(
+                df_edu_show,
+                use_container_width=True,
+                hide_index=True,
+                num_rows="dynamic",
+                column_config={
+                    "인원": st.column_config.NumberColumn("인원", min_value=1),
+                    "비고": st.column_config.TextColumn("비고"),
+                }
+            )
+        else:
+            render_html_table(df_edu_show)
+            edited_edu = df_edu_show
 
         col1, col2 = st.columns(2)
         with col1:
@@ -7112,17 +7123,21 @@ elif page == "발송 이력":
             if len(df_h) > 200:
                 st.caption(f"※ 최근 200건만 표시 (전체 {len(df_h)}건)")
 
-            edited = st.data_editor(df_show_h, use_container_width=True, hide_index=True,
-                column_config={
-                    "신청여부":st.column_config.SelectboxColumn("신청여부",options=["","Y","N"]),
-                    "선정결과":st.column_config.SelectboxColumn("선정결과",options=["","선정","미선정","대기"]),
-                })
-            if st.button("💾 드라이브 저장"):
-                with st.spinner("저장 중..."):
-                    # 편집된 부분을 전체 df_h에 반영
-                    df_h.iloc[-len(edited):] = edited.values
-                    save_excel(drive, df_h, HISTORY_FILE, "발송이력", "375623")
-                st.success("저장 완료")
+            _edit_h = st.toggle("✏️ 편집 모드", value=False, key="hist_edit_toggle",
+                                help="켜면 신청여부·선정결과를 직접 입력할 수 있습니다")
+            if _edit_h:
+                edited = st.data_editor(df_show_h, use_container_width=True, hide_index=True,
+                    column_config={
+                        "신청여부":st.column_config.SelectboxColumn("신청여부",options=["","Y","N"]),
+                        "선정결과":st.column_config.SelectboxColumn("선정결과",options=["","선정","미선정","대기"]),
+                    })
+                if st.button("💾 드라이브 저장"):
+                    with st.spinner("저장 중..."):
+                        df_h.iloc[-len(edited):] = edited.values
+                        save_excel(drive, df_h, HISTORY_FILE, "발송이력", "375623")
+                    st.success("저장 완료")
+            else:
+                render_html_table(df_show_h, max_rows=200)
 
             st.divider()
             st.markdown("**📅 공통 캘린더 일괄 등록**")
