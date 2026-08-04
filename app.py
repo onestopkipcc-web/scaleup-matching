@@ -1423,7 +1423,7 @@ def claude_call_raw(prompt, max_tokens=1000):
         "anthropic-version": "2023-06-01"
     }
     payload = {
-        "model": "claude-sonnet-4-6",
+        "model": "claude-sonnet-4-5",
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}]
     }
@@ -6963,17 +6963,20 @@ JSON으로만 응답하세요 (설명 없이).
                                     headers={'x-api-key': st.secrets.get('ANTHROPIC_API_KEY',''),
                                              'anthropic-version': '2023-06-01',
                                              'content-type': 'application/json'},
-                                    json={'model': 'claude-sonnet-4-6',
+                                    json={'model': 'claude-sonnet-4-5',
                                           'max_tokens': 500,
                                           'messages': [{'role':'user','content': ai_prompt}]}
                                 )
-                                ai_text = ai_resp.json().get('content',[{}])[0].get('text','{}')
-                                # 코드펜스 안전 제거 (lstrip은 문자단위라 위험)
+                                _raw = ai_resp.json()
+                                # 진단: API가 에러를 반환하는지 확인
+                                if 'error' in _raw:
+                                    st.error(f"AI API 오류: {_raw['error'].get('message','')[:150]}")
+                                ai_text = _raw.get('content',[{}])[0].get('text','{}')
+                                # 코드펜스 안전 제거
                                 ai_text = ai_text.strip()
                                 if ai_text.startswith('```'):
                                     ai_text = re.sub(r'^```(?:json)?\s*', '', ai_text)
                                     ai_text = re.sub(r'\s*```$', '', ai_text)
-                                # 중괄호 범위만 추출 (앞뒤 설명 제거)
                                 _m = re.search(r'\{.*\}', ai_text, re.DOTALL)
                                 if _m:
                                     ai_text = _m.group()
