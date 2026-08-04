@@ -6878,10 +6878,13 @@ elif page == "교육 신청 집계":
                 _subj = mail_subject_input
                 # 대괄호 안 발송자명·괄호 날짜 제거 후 핵심어만
                 _core = re.sub(r'\[[^\]]*\]|\([^)]*\)', '', _subj).strip()
-                _core_words = [w for w in _core.split() if len(w) >= 2][:4]
+                # 특수문자 제거 (·, —, 등이 검색 방해)
+                _core = re.sub(r'[·—\-–…\|]', ' ', _core)
+                _core_words = [w for w in _core.split() if len(w) >= 2][:3]
                 _kw_query = " ".join(_core_words) if _core_words else _subj
-                # 받은 회신만 (내가 보낸 원본 안내는 제외)
-                query = f'subject:({_kw_query}) after:{after_date} in:inbox -from:onestop.kipcc@gmail.com'
+                # 받은 회신만 (내가 보낸 원본 제외) — in:inbox 빼서 라벨 무관하게
+                query = f'subject:({_kw_query}) after:{after_date} -from:onestop.kipcc@gmail.com'
+                st.caption(f"🔍 검색어: `{query}`")
                 resp = gapi('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/messages',
                             params={'q': query, 'maxResults': 100})
 
@@ -6890,7 +6893,8 @@ elif page == "교육 신청 집계":
                 else:
                     msgs = resp.json().get('messages', [])
                     if not msgs:
-                        st.info(f"최근 {search_days}일 내 관련 회신이 없습니다.")
+                        st.warning(f"검색 결과 0건 — 위 검색어로 회신을 못 찾았습니다. "
+                                   f"제목 키워드를 줄이거나 검색 기간을 늘려보세요.")
                     else:
                         st.success(f"회신 {len(msgs)}건 발견 — AI 파싱 중...")
                         prog = st.progress(0)
