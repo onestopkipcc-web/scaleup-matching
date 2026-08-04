@@ -776,6 +776,26 @@ def _get_gmail():   return 'gmail'
 def _get_cal():     return 'cal' 
 
 # ── 드라이브 유틸 ─────────────────────────────────────
+def _metric_card(label, value, unit, sub, accent="#5DCAA5"):
+    """대시보드용 HTML 지표 카드."""
+    return f"""
+    <div style="flex:1;min-width:150px;background:#141922;border:1px solid #2A3140;border-top:3px solid {accent};border-radius:12px;padding:16px 18px;">
+      <p style="margin:0 0 8px;font-size:12px;color:#8A96A3;font-weight:500;">{label}</p>
+      <p style="margin:0 0 4px;font-size:28px;font-weight:700;color:#FFFFFF;line-height:1;">{value}<span style="font-size:14px;font-weight:500;color:#A8BDD1;margin-left:2px;">{unit}</span></p>
+      <p style="margin:0;font-size:11px;color:{accent};">{sub}</p>
+    </div>"""
+
+def _funnel_step(label, value, unit, accent, pct):
+    """대시보드용 퍼널 단계 바."""
+    return f"""
+    <div style="flex:1;background:#0F141C;border:1px solid #242B38;border-radius:10px;padding:14px 16px;">
+      <p style="margin:0 0 6px;font-size:12px;color:#8A96A3;">{label}</p>
+      <p style="margin:0 0 10px;font-size:24px;font-weight:700;color:#E8EFF6;line-height:1;">{value}<span style="font-size:12px;font-weight:500;color:#7A8699;margin-left:2px;">{unit}</span></p>
+      <div style="height:5px;background:#1E2530;border-radius:3px;overflow:hidden;">
+        <div style="height:100%;width:{max(pct,3)}%;background:{accent};border-radius:3px;"></div>
+      </div>
+    </div>"""
+
 def render_html_table(df, max_rows=100):
     """DataFrame을 다크테마 HTML 표로 렌더링 (캔버스 대신 — CSS가 확실히 먹음)."""
     if df is None or df.empty:
@@ -2054,51 +2074,88 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════
 if page == "대시보드":
     drive = _get_drive()
-    st.title("📊 운영 대시보드")
 
     with st.spinner("데이터 로딩 중..."):
         df_c  = load_excel(drive, SELECTED_FILE)
         df_n  = load_excel(drive, NOTICES_FILE)
         df_h  = load_excel(drive, HISTORY_FILE)
         df_det = load_excel(drive, DETAIL_FILE)
+        try:
+            df_click = load_click_log()
+        except Exception:
+            df_click = pd.DataFrame()
 
-    # ── 상단 핵심 지표 4개 ─────────────────────────────
-    m1, m2, m3, m4 = st.columns(4)
-
-    # 선정 기업
+    # ── 지표 계산 ──────────────────────────────────────
     total_co = len(df_c)
     sel_co   = (df_c['선정구분']=='선정').sum() if '선정구분' in df_c.columns else total_co
     res_co   = (df_c['선정구분']=='예비').sum() if '선정구분' in df_c.columns else 0
-    m1.metric("선정 기업", f"{sel_co}개사", f"예비 {res_co}개사")
 
-    # 공고 DB
     active_n = 0
     if not df_n.empty and '마감일' in df_n.columns:
         today_str = datetime.today().strftime('%Y-%m-%d')
         active_n = (df_n['마감일'] >= today_str).sum()
-    m2.metric("활성 공고", f"{active_n:,}건", f"전체 {len(df_n):,}건")
 
-    # 전문 크롤링
     crawl_ok = 0
-    crawl_fail = 0
     if not df_det.empty and '크롤링성공' in df_det.columns:
-        crawl_ok   = (df_det['크롤링성공']=='Y').sum()
-        crawl_fail = (df_det['크롤링성공']!='Y').sum()
-    m3.metric("전문 수집", f"{crawl_ok}건", f"실패 {crawl_fail}건")
+        crawl_ok = (df_det['크롤링성공']=='Y').sum()
 
-    # 발송 이력
     this_month_h = 0
     if not df_h.empty and '발송일' in df_h.columns:
         this_month = datetime.today().strftime('%Y-%m')
         this_month_h = df_h['발송일'].astype(str).str.startswith(this_month).sum()
-    m4.metric("이번 달 발송", f"{this_month_h}건", f"누적 {len(df_h)}건")
+
+    # 클릭 지표 (테스트 제외)
+    click_total = 0; click_co = 0
+    if not df_click.empty:
+        _dfk = df_click.copy()
+        _cocol = next((c for c in _dfk.columns if '기업' in str(c) or 'co' in str(c).lower()), None)
+        if _cocol:
+            _dfk = _dfk[~_dfk[_cocol].astype(str).str.contains('테스트', na=False)]
+            _dfk = _dfk[_dfk[_cocol].astype(str).str.strip() != ""]
+            click_total = len(_dfk)
+            click_co = _dfk[_cocol].nunique()
+
+    _today_kr = f"{datetime.today().year}년 {datetime.today().month}월 {datetime.today().day}일"
+
+    # ── HTML 히어로 + 지표 카드 ────────────────────────
+    _hero = f"""
+    <div style="font-family:'Apple SD Gothic Neo',sans-serif;">
+      <div style="background:linear-gradient(135deg,#0F2A20 0%,#16382A 100%);border-radius:16px;padding:32px 34px;margin-bottom:18px;position:relative;overflow:hidden;">
+        <p style="margin:0 0 6px;font-size:11px;letter-spacing:2px;color:#5DCAA5;font-weight:600;">ONESTOP SCALE-UP · 운영 현황</p>
+        <p style="margin:0 0 10px;font-size:28px;font-weight:700;color:#FFFFFF;line-height:1.35;">공고 수집부터 발송·반응까지<br>한 흐름으로 관리합니다</p>
+        <p style="margin:0;font-size:13px;color:#A8BDD1;">{_today_kr} 기준 · 드라이브 데이터 실시간 집계</p>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px;">
+        {_metric_card('선정 기업', f'{sel_co}', '개사', f'예비 {res_co}개사', '#5DCAA5')}
+        {_metric_card('활성 공고', f'{active_n:,}', '건', f'전체 {len(df_n):,}건', '#4285F4')}
+        {_metric_card('전문 수집', f'{crawl_ok:,}', '건', '크롤링 완료', '#A78BFA')}
+        {_metric_card('이번 달 발송', f'{this_month_h}', '건', f'누적 {len(df_h)}건', '#E0A458')}
+        {_metric_card('총 클릭 반응', f'{click_total}', '회', f'{click_co}개사 관심', '#EC6A9C')}
+      </div>
+    </div>
+    """
+    st.markdown(_hero, unsafe_allow_html=True)
+
+    # ── 발송 → 반응 퍼널 ───────────────────────────────
+    _sent_total = len(df_h)
+    _funnel = f"""
+    <div style="font-family:'Apple SD Gothic Neo',sans-serif;background:#141922;border:1px solid #2A3140;border-radius:14px;padding:22px 24px;margin-bottom:20px;">
+      <p style="margin:0 0 4px;font-size:10px;letter-spacing:1.5px;color:#7A8699;font-weight:600;">ENGAGEMENT FUNNEL</p>
+      <p style="margin:0 0 18px;font-size:16px;font-weight:600;color:#E8EFF6;">발송 → 반응 흐름</p>
+      <div style="display:flex;gap:10px;">
+        {_funnel_step('누적 발송', _sent_total, '건', '#4285F4', 100)}
+        {_funnel_step('클릭 반응', click_total, '회', '#5DCAA5', min(100, int(click_total/max(_sent_total,1)*100)) if _sent_total else 0)}
+        {_funnel_step('관심 기업', click_co, '개사', '#E0A458', min(100, int(click_co/max(sel_co,1)*100)) if sel_co else 0)}
+      </div>
+    </div>
+    """
+    st.markdown(_funnel, unsafe_allow_html=True)
 
     st.divider()
 
     # ── 이번 주 할 일 체크리스트 ───────────────────────
     st.subheader("🗂 이번 주 운영 체크리스트")
 
-    # 각 단계 상태 자동 판단
     last_collect = "—"
     if not df_n.empty and '수정일' in df_n.columns:
         last_collect = df_n['수정일'].max()[:10] if df_n['수정일'].max() else "—"
@@ -2696,7 +2753,7 @@ elif page == "공고·매칭":
             st.divider()
             st.subheader("공고 DB 미리보기 (최근 20건)")
             cols = [c for c in ["공고명","주관기관","분야","접수기간","마감일"] if c in df_n.columns]
-            st.dataframe(df_n[cols].head(20), use_container_width=True, hide_index=True)
+            render_html_table(df_n[cols].head(20))
 
     with tab_cm1b:
         st.subheader("📄 공고 전문 크롤링")
