@@ -6964,7 +6964,15 @@ elif page == "교육 신청 집계":
                                           'messages': [{'role':'user','content': ai_prompt}]}
                                 )
                                 ai_text = ai_resp.json().get('content',[{}])[0].get('text','{}')
-                                ai_text = ai_text.strip().lstrip('```json').rstrip('```').strip()
+                                # 코드펜스 안전 제거 (lstrip은 문자단위라 위험)
+                                ai_text = ai_text.strip()
+                                if ai_text.startswith('```'):
+                                    ai_text = re.sub(r'^```(?:json)?\s*', '', ai_text)
+                                    ai_text = re.sub(r'\s*```$', '', ai_text)
+                                # 중괄호 범위만 추출 (앞뒤 설명 제거)
+                                _m = re.search(r'\{.*\}', ai_text, re.DOTALL)
+                                if _m:
+                                    ai_text = _m.group()
                                 parsed = json.loads(ai_text)
 
                                 if parsed.get('교육신청여부'):
@@ -6977,13 +6985,14 @@ elif page == "교육 신청 집계":
                                         '추가참석자': parsed.get('추가참석자', []),
                                         '발신자': sender,
                                         '수신일': datetime.today().strftime('%Y-%m-%d'),
-                                        # 개별 회신 제목 우선, 없으면 검색어 제목에서 회차 추출
                                         '교육회차': extract_edu_round(subject) or extract_edu_round(mail_subject_input),
                                         '비고': ''
                                     })
                                     new_count += 1
-                            except:
-                                pass
+                                else:
+                                    st.caption(f"⊘ {sender[:30]} — AI가 신청 아님으로 판정 (기업명: {parsed.get('기업명','?')})")
+                            except Exception as _pe:
+                                st.caption(f"⚠️ {sender[:30]} — 파싱 실패: {str(_pe)[:60]}")
 
                             prog.progress((i+1)/len(msgs))
 
