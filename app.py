@@ -3754,8 +3754,8 @@ elif page == "공고·매칭":
                             if caution and caution not in ['없음','','nan']:
                                 _caution_html = (
                                     f"<div style='margin-top:8px;padding:8px 12px;"
-                                    f"background:rgba(0,0,0,0.04);border-radius:6px;"
-                                    f"font-size:12px;color:{txt};'>⚠️ {_caution_esc}</div>"
+                                    f"background:#FEF3C7;border:1px solid #FCD34D;border-radius:6px;"
+                                    f"font-size:12px;color:#78350F;font-weight:500;'>⚠️ {_caution_esc}</div>"
                                 )
                             st.markdown(
                                 f"<div style='background:{bg};border:1px solid {bdr};"
