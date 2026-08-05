@@ -76,6 +76,21 @@ if not check_password():
 # ── 상수 ──────────────────────────────────────────────
 DRIVE_FOLDER_ID  = "1iWGYjaoslqST45ggDlg-IPMLaUHCYmV_"
 LOGO_URL = "https://raw.githubusercontent.com/onestopkipcc-web/scaleup-matching/main/logo.png"
+
+# 클릭 추적 (Apps Script 웹앱) — 메일 링크를 이 URL 경유로 감싸 클릭을 기록
+CLICK_TRACK_URL = "https://script.google.com/macros/s/AKfycbyqjB9JmN6BAHSjBHH7Okup4HJZ8l4ToI-6Y0icbSYWKQn8NJAMpjEcuR4pi0tSOpSH/exec"
+CLICK_LOG_SHEET_ID = "1-gYegpHysgSvF1TgQB7Rfh3rs_tNfrE4NS3F1xLef0o"  # 클릭추적_로그 시트
+
+def track_link(dest_url, company, notice_id, notice_name):
+    """공고 링크를 클릭 추적 URL로 감싼다. dest_url이 없으면 원본 그대로."""
+    import urllib.parse as _up
+    if not dest_url or dest_url == "#" or not CLICK_TRACK_URL:
+        return dest_url or "#"
+    q = _up.urlencode({
+        "co": company or "", "notice": notice_id or "",
+        "name": (notice_name or "")[:80], "url": dest_url,
+    })
+    return f"{CLICK_TRACK_URL}?{q}"
 API_KEY          = "Nt604D"
 BASE_URL         = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do"
 SELECTED_FILE    = "선정기업_명단.xlsx"   # ← 핵심 변경
@@ -518,6 +533,52 @@ def gapi(method, url, **kwargs):
     headers = kwargs.pop('headers', {})
     headers['Authorization'] = f'Bearer {creds.token}'
     return requests.request(method, url, headers=headers, **kwargs)
+
+def render_html_table(df, max_rows=100):
+    """DataFrame을 다크테마 HTML 표로 렌더링 (캔버스 대신 — CSS가 확실히 먹음)."""
+    if df is None or df.empty:
+        st.caption("데이터 없음")
+        return
+    import html as _html
+    df = df.head(max_rows).fillna("")
+    def _esc(v):
+        s = str(v)
+        return _html.escape(s) if s not in ("nan", "None", "NaT") else ""
+    th = ('padding:9px 12px;text-align:left;font-size:12px;font-weight:600;'
+          'color:#E8EFF6;background:#2A3346;border-bottom:2px solid #41485A;'
+          'white-space:nowrap;')
+    td = ('padding:8px 12px;font-size:13px;color:#E8EFF6;'
+          'border-bottom:1px solid #2A3346;')
+    _h = ('<div style="overflow-x:auto;border:1px solid #41485A;border-radius:8px;">'
+          '<table style="width:100%;border-collapse:collapse;background:#16293F;">')
+    _h += '<thead><tr>' + ''.join(f'<th style="{th}">{_esc(c)}</th>' for c in df.columns) + '</tr></thead>'
+    _h += '<tbody>'
+    for i, (_, row) in enumerate(df.iterrows()):
+        bg = '#16293F' if i % 2 == 0 else '#1B3049'
+        _h += '<tr>' + ''.join(
+            f'<td style="{td}background:{bg};">{_esc(v)}</td>' for v in row) + '</tr>'
+    _h += '</tbody></table></div>'
+    st.markdown(_h, unsafe_allow_html=True)
+
+def load_click_log(debug=False):
+    """클릭추적_로그 시트를 Sheets API로 읽어 DataFrame 반환."""
+    try:
+        url = (f"https://sheets.googleapis.com/v4/spreadsheets/"
+               f"{CLICK_LOG_SHEET_ID}/values/A:D")
+        resp = gapi('GET', url)
+        if not resp.ok:
+            if debug: st.warning(f"클릭 로그 읽기 실패: {resp.status_code} {resp.text[:120]}")
+            return pd.DataFrame()
+        values = resp.json().get('values', [])
+        if not values or len(values) < 2:
+            return pd.DataFrame()
+        header = values[0]
+        data = [row + ['']*(len(header)-len(row)) for row in values[1:]]
+        df = pd.DataFrame(data, columns=header)
+        return df
+    except Exception as e:
+        if debug: st.warning(f"클릭 로그 오류: {e}")
+        return pd.DataFrame()
 
 # ── gmail API (requests 기반) ──────────────────────────
 def gmail_send(raw_b64):
@@ -1735,6 +1796,7 @@ with st.sidebar:
         "안내 메일",
         "교육 신청 집계",
         "발송 이력",
+        "클릭 반응",
         "캘린더",
         "설정",
         "시스템 명세",
@@ -4211,6 +4273,8 @@ elif page == "발송":
                     dl_raw = n.get('마감일','')
                     if not dl_raw and '~' in n.get('접수기간',''):
                         dl_raw = n.get('접수기간','').split('~')[-1].strip()
+                    _trk = track_link(n.get('공고링크','#'), company,
+                                      n.get('공고ID',''), n.get('공고명',''))
                     return f"""
                     <table width="100%" cellpadding="0" cellspacing="0"
                            style="margin-bottom:6px;">
@@ -4219,7 +4283,7 @@ elif page == "발송":
                                    background:rgba(255,255,255,0.02);
                                    border:1px solid rgba(255,255,255,0.05);
                                    border-radius:6px;">
-                          <a href="{n.get('공고링크','#')}"
+                          <a href="{_trk}"
                              style="font-size:13px;font-weight:500;color:rgba(255,255,255,0.6);
                                     text-decoration:none;display:block;">
                             {n.get('공고명','')}
@@ -4245,6 +4309,8 @@ elif page == "발송":
                             tag_html += f"<span style=\'font-size:11px;{_tc};padding:3px 8px;border-radius:20px;\'>{tag}</span>"
                         tag_html += "</div>"
                     notice_name = n.get("공고명","")
+                    _trk = track_link(n.get("공고링크","#"), company,
+                                      n.get("공고ID",""), notice_name)
                     return f"""
                     <table width="100%" cellpadding="0" cellspacing="0"
                            style="margin-bottom:8px;background:#16293F;
@@ -4252,7 +4318,7 @@ elif page == "발송":
                                   box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                       <tr>
                         <td style="padding:12px 16px;">
-                          <a href="{n.get("공고링크","#")}"
+                          <a href="{_trk}"
                              style="font-size:14px;font-weight:600;color:#E8EFF6;
                                     text-decoration:none;line-height:1.5;display:block;">
                             {notice_name}
@@ -4264,7 +4330,7 @@ elif page == "발송":
                         </td>
                         <td width="60" align="center" valign="middle"
                             style="padding:14px 12px;border-left:1px solid #24405F;">
-                          <a href="{n.get("공고링크","#")}"
+                          <a href="{_trk}"
                              style="display:inline-block;font-size:12px;font-weight:600;
                                     color:#5DCAA5;text-decoration:none;white-space:nowrap;">
                             보기 →
@@ -7082,6 +7148,65 @@ elif page == "설정":
             else:
                 st.error("초기화 실패 — 드라이브 연결을 확인하세요.")
 
+
+
+# ══════════════════════════════════════════════════════
+# 클릭 반응 대시보드
+# ══════════════════════════════════════════════════════
+elif page == "클릭 반응":
+    drive = _get_drive()
+    st.title("🖱 클릭 반응")
+    st.caption("발송 메일의 공고 링크 클릭을 집계합니다 (Apps Script 경유 기록)")
+
+    if st.button("🔄 새로고침"):
+        st.rerun()
+
+    df_click = load_click_log(debug=True)
+
+    if df_click.empty:
+        st.info("아직 클릭 기록이 없습니다. 발송된 메일에서 공고 링크가 클릭되면 여기 집계됩니다.")
+    else:
+        # 컬럼 자동 인식
+        cols = list(df_click.columns)
+        co_col = next((c for c in cols if '기업' in str(c)), cols[1] if len(cols)>1 else cols[0])
+        nm_col = next((c for c in cols if '공고명' in str(c) or 'name' in str(c).lower()), None)
+        tm_col = next((c for c in cols if '시각' in str(c) or 'time' in str(c).lower() or '시간' in str(c)), cols[0])
+
+        # 테스트 클릭 제외
+        _df = df_click.copy()
+        _df = _df[~_df[co_col].astype(str).str.contains('테스트|test', case=False, na=False)]
+        _df = _df[_df[co_col].astype(str).str.strip() != ""]
+
+        total_clicks = len(_df)
+        uniq_co = _df[co_col].nunique()
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("총 클릭", f"{total_clicks}회")
+        c2.metric("클릭한 기업", f"{uniq_co}개사")
+        if nm_col:
+            c3.metric("클릭된 공고", f"{_df[nm_col].nunique()}건")
+
+        st.divider()
+
+        # 기업별 클릭
+        st.subheader("기업별 클릭 수")
+        by_co = _df.groupby(co_col).size().reset_index(name='클릭수')
+        by_co = by_co.sort_values('클릭수', ascending=False)
+        by_co.columns = ['기업명', '클릭수']
+        render_html_table(by_co, max_rows=50)
+
+        # 공고별 클릭
+        if nm_col:
+            st.subheader("공고별 클릭 수")
+            by_nt = _df.groupby(nm_col).size().reset_index(name='클릭수')
+            by_nt = by_nt.sort_values('클릭수', ascending=False)
+            by_nt.columns = ['공고명', '클릭수']
+            render_html_table(by_nt, max_rows=50)
+
+        # 최근 클릭 로그
+        st.subheader("최근 클릭 기록")
+        _recent = _df.sort_values(tm_col, ascending=False).head(30)
+        render_html_table(_recent, max_rows=30)
 
 
 # ══════════════════════════════════════════════════════
