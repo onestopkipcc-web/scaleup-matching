@@ -80,6 +80,41 @@ LOGO_URL = "https://raw.githubusercontent.com/onestopkipcc-web/scaleup-matching/
 # 클릭 추적 (Apps Script 웹앱) — 메일 링크를 이 URL 경유로 감싸 클릭을 기록
 CLICK_TRACK_URL = "https://script.google.com/macros/s/AKfycbyqjB9JmN6BAHSjBHH7Okup4HJZ8l4ToI-6Y0icbSYWKQn8NJAMpjEcuR4pi0tSOpSH/exec"
 CLICK_LOG_SHEET_ID = "1-gYegpHysgSvF1TgQB7Rfh3rs_tNfrE4NS3F1xLef0o"  # 클릭추적_로그 시트
+MATCH_STATE_FILE = "match_state.json"  # 매칭 결과·AI판정·승인상태 자동 저장
+
+def save_match_state(drive):
+    """매칭 결과·AI판정·승인상태를 드라이브에 자동 저장 (재부팅 후 복원용)."""
+    try:
+        import json as _json
+        payload = {
+            'match_results': st.session_state.get('match_results', []),
+            'ai_analysis':   st.session_state.get('ai_analysis', {}),
+            'review_state':  st.session_state.get('review_state', {}),
+            'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M'),
+        }
+        drive_upload(drive, MATCH_STATE_FILE,
+                     _json.dumps(payload, ensure_ascii=False, default=str).encode('utf-8'),
+                     "application/json")
+        return True
+    except Exception:
+        return False
+
+def load_match_state(drive):
+    """앱 시작 시 매칭 상태 자동 복원. 세션에 없을 때만 드라이브에서 로드."""
+    if st.session_state.get('_match_state_loaded'):
+        return
+    try:
+        saved = load_json(drive, MATCH_STATE_FILE)
+        if saved:
+            if not st.session_state.get('match_results'):
+                st.session_state['match_results'] = saved.get('match_results', [])
+            if not st.session_state.get('ai_analysis'):
+                st.session_state['ai_analysis'] = saved.get('ai_analysis', {})
+            if not st.session_state.get('review_state'):
+                st.session_state['review_state'] = saved.get('review_state', {})
+        st.session_state['_match_state_loaded'] = True
+    except Exception:
+        st.session_state['_match_state_loaded'] = True
 
 def track_link(dest_url, company, notice_id, notice_name):
     """공고 링크를 클릭 추적 URL로 감싼다. dest_url이 없으면 원본 그대로."""
@@ -1370,6 +1405,13 @@ if 'ai_analysis_loaded' not in st.session_state:
             pass  # 조용히 복원 (배너 표시 안 함)
     except Exception:
         st.session_state['ai_analysis_loaded'] = True  # 실패해도 반복 시도 안 함
+
+# ── 앱 초기화 — 매칭 결과·승인상태 자동 복원 ──────────
+if not st.session_state.get('_match_state_loaded'):
+    try:
+        load_match_state(_get_drive())
+    except Exception:
+        st.session_state['_match_state_loaded'] = True
 
 # ── CSS ──────────────────────────────────────────────
 st.markdown("""
@@ -3002,6 +3044,7 @@ elif page == "공고·매칭":
                 enriched_count = len(detail_map)
                 st.session_state['match_results'] = all_results
                 st.session_state['df_companies_cache'] = df_c
+                save_match_state(_get_drive())  # 매칭 직후 자동 저장
                 # 매칭 실행 정보 저장 — session_state + 드라이브 JSON (앱 재시작 후에도 유지)
                 match_info = {
                     'date':         datetime.today().strftime('%Y-%m-%d'),
@@ -3271,6 +3314,7 @@ elif page == "공고·매칭":
                                 rec  = st.session_state.get('ai_analysis', {}).get(gkey, {}).get('추천여부','')
                                 if rec == '추천':
                                     st.session_state['review_state'][gkey] = '○'
+                            save_match_state(_get_drive())  # 일괄 승인 후 자동 저장
                             st.success(f"✅ AI 추천 공고 일괄 승인 완료")
                             st.rerun()
 
@@ -3726,6 +3770,7 @@ elif page == "공고·매칭":
                             r['담당자검토'] = st.session_state['review_state'].get(
                                 f"{r['기업명']}_{r.get('공고ID','')}", "")
                         st.session_state['match_results'] = results
+                        save_match_state(_get_drive())
                         st.success(f"저장 완료 — 승인 {ap}건 → '발송 관리' 메뉴로 이동")
                 with c2:
                     if st.button("📥 매칭결과 엑셀 저장"):
