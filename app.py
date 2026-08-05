@@ -3611,7 +3611,7 @@ elif page == "공고·매칭":
                         if is_deadline_warn:
                             st.markdown(
                                 f"<div style='background:#FEF2F2;border:1px solid #FECACA;border-radius:6px;"
-                                f"padding:6px 12px;margin-bottom:6px;font-size:12px;color:#991B1B;'>"
+                                f"padding:6px 12px;margin-bottom:6px;font-size:12px;color:#991B1B !important;'>"
                                 f"⚠️ 마감일이 지났거나 오늘까지입니다 — 발송 전 신청 가능 여부를 확인하세요.</div>",
                                 unsafe_allow_html=True
                             )
@@ -3755,17 +3755,17 @@ elif page == "공고·매칭":
                                 _caution_html = (
                                     f"<div style='margin-top:8px;padding:8px 12px;"
                                     f"background:#FEF3C7;border:1px solid #FCD34D;border-radius:6px;"
-                                    f"font-size:12px;color:#78350F;font-weight:500;'>⚠️ {_caution_esc}</div>"
+                                    f"font-size:12px;color:#78350F !important;font-weight:500;'>⚠️ {_caution_esc}</div>"
                                 )
                             st.markdown(
                                 f"<div style='background:{bg};border:1px solid {bdr};"
                                 f"border-left:4px solid {bdr};border-radius:8px;"
                                 f"padding:14px 16px;margin:6px 0;'>"
                                 f"<div style='display:flex;align-items:center;gap:8px;margin-bottom:6px;'>"
-                                f"<span style='font-size:14px;font-weight:700;color:{txt};'>{rec_icon} {rec}</span>"
-                                f"<span style='font-size:12px;color:{txt};opacity:0.7;'>· 적합도 {fit}</span>"
+                                f"<span style='font-size:14px;font-weight:700;color:{txt} !important;'>{rec_icon} {rec}</span>"
+                                f"<span style='font-size:12px;color:{txt} !important;opacity:0.7;'>· 적합도 {fit}</span>"
                                 f"</div>"
-                                f"<div style='font-size:13px;line-height:1.6;color:{txt};'>{_reason_esc}</div>"
+                                f"<div style='font-size:13px;line-height:1.6;color:{txt} !important;'>{_reason_esc}</div>"
                                 f"{_caution_html}"
                                 f"</div>",
                                 unsafe_allow_html=True
