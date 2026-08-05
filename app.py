@@ -4317,11 +4317,18 @@ elif page == "발송":
                 notices_ss     = [n for n in notices if n.get('관련도','')=='★★']
                 notices_common = []
 
-                # 승인 공고가 없는 기업 → 그 기업의 ★★ 검토 공고 상위 3건을 참고 공고로
+                # 참고 공고: 승인 공고가 3건 미만이면 그 기업의 ★★ 검토 공고로 부족분 채움
+                # (최소 3건 보장 — 딸랑 1건만 나가는 허전함 방지)
                 _ref_map = st.session_state.get('_ref_notices_by_co', {})
                 notices_review = []
-                if not notices_sss and not notices_ss:
-                    notices_review = list(_ref_map.get(company, []))[:3]
+                _approved_cnt = len(notices_sss) + len(notices_ss)
+                if _approved_cnt < 3:
+                    _need = 3 - _approved_cnt
+                    # 이미 승인된 공고와 중복 제거
+                    _approved_ids = {n.get('공고ID','') for n in notices_sss + notices_ss}
+                    _cand = [r for r in _ref_map.get(company, [])
+                             if r.get('공고ID','') not in _approved_ids]
+                    notices_review = _cand[:_need]
 
                 def notice_card_simple(n, idx):
                     """공통 공고용 심플 카드 (작고 간결하게)"""
@@ -4437,9 +4444,13 @@ elif page == "발송":
                         rows_html += notice_card_simple(n, i)
                     rows_html += "</div>"
 
-                # ── 📎 참고 공고 (승인 공고 없는 기업의 ★★ 검토분) ──
+                # ── 📎 참고 공고 (승인 공고 3건 미만 시 부족분 채움) ──
                 if notices_review:
-                    rows_html += """
+                    _has_approved = bool(notices_sss or notices_ss)
+                    _ref_desc = ("위 공고와 함께 참고하실 만한 공고입니다."
+                                 if _has_approved else
+                                 "이번 주 딱 맞는 공고는 없었지만, 귀사와 연관성이 있어 참고용으로 안내드립니다.")
+                    rows_html += f"""
                     <div style="border-top:1px solid rgba(255,255,255,0.08);
                                 padding-top:16px;margin-top:8px;">
                       <p style="margin:0 0 6px;font-size:10px;font-weight:700;
@@ -4448,7 +4459,7 @@ elif page == "발송":
                         📎 &nbsp;참고해보실 만한 공고
                       </p>
                       <p style="margin:0 0 10px;font-size:11px;color:rgba(255,255,255,0.35);">
-                        이번 주 딱 맞는 공고는 없었지만, 귀사와 연관성이 있어 참고용으로 안내드립니다.
+                        {_ref_desc}
                       </p>"""
                     for i, n in enumerate(notices_review[:3]):
                         rows_html += notice_card_simple(n, i)
