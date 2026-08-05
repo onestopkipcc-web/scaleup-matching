@@ -3742,24 +3742,34 @@ elif page == "공고·매칭":
                             rec_icon  = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
                             rec_color_map = {"추천":"#ECFDF5","검토":"#FFFBEB","비추천":"#FEF2F2"}
                             rec_border_map = {"추천":"#10B981","검토":"#F59E0B","비추천":"#EF4444"}
+                            rec_text_map = {"추천":"#065F46","검토":"#92400E","비추천":"#991B1B"}
                             bg    = rec_color_map.get(rec, "#F8FAFC")
                             bdr   = rec_border_map.get(rec, "#E2E8F0")
+                            txt   = rec_text_map.get(rec, "#1E293B")
 
+                            import html as _html_ai
+                            _reason_esc = _html_ai.escape(str(reason_ai or ''))
+                            _caution_esc = _html_ai.escape(str(caution or ''))
+                            _caution_html = ""
+                            if caution and caution not in ['없음','','nan']:
+                                _caution_html = (
+                                    f"<div style='margin-top:8px;padding:8px 12px;"
+                                    f"background:rgba(0,0,0,0.04);border-radius:6px;"
+                                    f"font-size:12px;color:{txt};'>⚠️ {_caution_esc}</div>"
+                                )
                             st.markdown(
                                 f"<div style='background:{bg};border:1px solid {bdr};"
                                 f"border-left:4px solid {bdr};border-radius:8px;"
-                                f"padding:12px 16px;margin:6px 0;'>",
+                                f"padding:14px 16px;margin:6px 0;'>"
+                                f"<div style='display:flex;align-items:center;gap:8px;margin-bottom:6px;'>"
+                                f"<span style='font-size:14px;font-weight:700;color:{txt};'>{rec_icon} {rec}</span>"
+                                f"<span style='font-size:12px;color:{txt};opacity:0.7;'>· 적합도 {fit}</span>"
+                                f"</div>"
+                                f"<div style='font-size:13px;line-height:1.6;color:{txt};'>{_reason_esc}</div>"
+                                f"{_caution_html}"
+                                f"</div>",
                                 unsafe_allow_html=True
                             )
-                            ai_top, ai_body = st.columns([1, 6])
-                            with ai_top:
-                                st.markdown(f"**{rec_icon} {rec}**")
-                                st.caption(f"적합도 {fit}")
-                            with ai_body:
-                                st.write(reason_ai)
-                                if caution and caution not in ['없음','','nan']:
-                                    st.warning(f"⚠️ {caution}")
-                            st.markdown("</div>", unsafe_allow_html=True)
 
                         st.divider()
 
