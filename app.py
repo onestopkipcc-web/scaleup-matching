@@ -3740,12 +3740,13 @@ elif page == "공고·매칭":
                             reason_ai = ai_res.get('판단근거', ai_res.get('적합이유',''))
                             caution   = ai_res.get('주의사항','')
                             rec_icon  = {"추천":"🟢","검토":"🟡","비추천":"🔴"}.get(rec,"⚪")
-                            rec_color_map = {"추천":"#ECFDF5","검토":"#FFFBEB","비추천":"#FEF2F2"}
-                            rec_border_map = {"추천":"#10B981","검토":"#F59E0B","비추천":"#EF4444"}
-                            rec_text_map = {"추천":"#065F46","검토":"#92400E","비추천":"#991B1B"}
-                            bg    = rec_color_map.get(rec, "#F8FAFC")
-                            bdr   = rec_border_map.get(rec, "#E2E8F0")
-                            txt   = rec_text_map.get(rec, "#1E293B")
+                            # 다크 배경 + 밝은 글자 (전역 CSS와 조화 — 밝은배경 싸움 회피)
+                            rec_bg_map  = {"추천":"#0F2E1F","검토":"#2E2410","비추천":"#2E1515"}
+                            rec_bdr_map = {"추천":"#10B981","검토":"#F59E0B","비추천":"#EF4444"}
+                            rec_txt_map = {"추천":"#6EE7B7","검토":"#FCD34D","비추천":"#FCA5A5"}
+                            bg    = rec_bg_map.get(rec, "#1A1A1A")
+                            bdr   = rec_bdr_map.get(rec, "#333333")
+                            txt   = rec_txt_map.get(rec, "#CCCCCC")
 
                             import html as _html_ai
                             _reason_esc = _html_ai.escape(str(reason_ai or ''))
@@ -3754,8 +3755,8 @@ elif page == "공고·매칭":
                             if caution and caution not in ['없음','','nan']:
                                 _caution_html = (
                                     f"<div style='margin-top:8px;padding:8px 12px;"
-                                    f"background:#FEF3C7;border:1px solid #FCD34D;border-radius:6px;"
-                                    f"font-size:12px;color:#78350F !important;font-weight:500;'>⚠️ {_caution_esc}</div>"
+                                    f"background:rgba(245,158,11,0.12);border:1px solid {bdr};border-radius:6px;"
+                                    f"font-size:12px;color:#FCD34D !important;font-weight:500;'>⚠️ {_caution_esc}</div>"
                                 )
                             st.markdown(
                                 f"<div style='background:{bg};border:1px solid {bdr};"
@@ -3763,9 +3764,9 @@ elif page == "공고·매칭":
                                 f"padding:14px 16px;margin:6px 0;'>"
                                 f"<div style='display:flex;align-items:center;gap:8px;margin-bottom:6px;'>"
                                 f"<span style='font-size:14px;font-weight:700;color:{txt} !important;'>{rec_icon} {rec}</span>"
-                                f"<span style='font-size:12px;color:{txt} !important;opacity:0.7;'>· 적합도 {fit}</span>"
+                                f"<span style='font-size:12px;color:{txt} !important;opacity:0.8;'>· 적합도 {fit}</span>"
                                 f"</div>"
-                                f"<div style='font-size:13px;line-height:1.6;color:{txt} !important;'>{_reason_esc}</div>"
+                                f"<div style='font-size:13px;line-height:1.6;color:#E8EFF6 !important;'>{_reason_esc}</div>"
                                 f"{_caution_html}"
                                 f"</div>",
                                 unsafe_allow_html=True
@@ -4313,22 +4314,40 @@ elif page == "발송":
                         co_row = _mx.iloc[0].to_dict()
 
                 # 별점 기준으로 분류 (공고유형 무관)
-                notices_sss    = [n for n in notices if n.get('관련도','')=='★★★']
-                notices_ss     = [n for n in notices if n.get('관련도','')=='★★']
+                _sss_raw = [n for n in notices if n.get('관련도','')=='★★★']
+                _ss_raw  = [n for n in notices if n.get('관련도','')=='★★']
+
+                # 방향1: AI 업종일치가 △/X인 공고는 '맞춤'에서 제외 → 참고로 강등
+                # (업종 안 맞는 걸 맞춤이라 내보내면 신뢰도 하락)
+                _ai_an = st.session_state.get('ai_analysis', {})
+                def _ind_ok(n):
+                    _k = f"{company}_{n.get('공고ID','')}"
+                    _ind = _ai_an.get(_k, {}).get('업종일치', '')
+                    return _ind != '△' and _ind != 'X'  # O이거나 미판정('')은 통과
+                notices_sss    = [n for n in _sss_raw if _ind_ok(n)]
+                notices_ss     = [n for n in _ss_raw if _ind_ok(n)]
+                _demoted       = [n for n in (_sss_raw + _ss_raw) if not _ind_ok(n)]  # 업종△/X → 참고행
                 notices_common = []
 
                 # 참고 공고: 승인 공고가 3건 미만이면 그 기업의 ★★ 검토 공고로 부족분 채움
                 # (최소 3건 보장 — 딸랑 1건만 나가는 허전함 방지)
+                # 업종 불일치로 강등된 공고(_demoted)도 참고 후보에 포함
                 _ref_map = st.session_state.get('_ref_notices_by_co', {})
                 notices_review = []
                 _approved_cnt = len(notices_sss) + len(notices_ss)
                 if _approved_cnt < 3:
                     _need = 3 - _approved_cnt
-                    # 이미 승인된 공고와 중복 제거
                     _approved_ids = {n.get('공고ID','') for n in notices_sss + notices_ss}
-                    _cand = [r for r in _ref_map.get(company, [])
+                    # 강등된 것 우선, 그다음 검토 공고
+                    _cand = _demoted + [r for r in _ref_map.get(company, [])
                              if r.get('공고ID','') not in _approved_ids]
-                    notices_review = _cand[:_need]
+                    _seen_r = set()
+                    _cand_uniq = []
+                    for r in _cand:
+                        _rid = r.get('공고ID','')
+                        if _rid not in _approved_ids and _rid not in _seen_r:
+                            _cand_uniq.append(r); _seen_r.add(_rid)
+                    notices_review = _cand_uniq[:_need]
 
                 def notice_card_simple(n, idx):
                     """공통 공고용 심플 카드 (작고 간결하게)"""
