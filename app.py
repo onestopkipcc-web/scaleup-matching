@@ -76,160 +76,6 @@ if not check_password():
 # ── 상수 ──────────────────────────────────────────────
 DRIVE_FOLDER_ID  = "1iWGYjaoslqST45ggDlg-IPMLaUHCYmV_"
 LOGO_URL = "https://raw.githubusercontent.com/onestopkipcc-web/scaleup-matching/main/logo.png"
-
-# 클릭 추적 (Apps Script 웹앱) — 메일 링크를 이 URL 경유로 감싸 클릭을 기록
-CLICK_TRACK_URL = "https://script.google.com/macros/s/AKfycbyqjB9JmN6BAHSjBHH7Okup4HJZ8l4ToI-6Y0icbSYWKQn8NJAMpjEcuR4pi0tSOpSH/exec"
-CLICK_LOG_SHEET_ID = "1-gYegpHysgSvF1TgQB7Rfh3rs_tNfrE4NS3F1xLef0o"  # 클릭추적_로그 시트
-EVENT_CONFIG_FILE = "event_config.json"  # 교육/행사 설정 (하드코딩 제거용)
-
-DEFAULT_EVENT_CONFIG = {
-    "회차": "2026-08",
-    "주제": "키워드 전략과 로컬·블로그 실전 노하우",
-    "강사": "박성식",
-    "소속": "",
-    "일시": "2026년 8월 12일(수) 14:00 ~ 16:00 (질의응답 포함)",
-    "일시_짧게": "8/12(수) 14:00~16:00",
-    "방식": "비대면 Zoom",
-    "zoom_link": "",
-    "zoom_id": "",
-    "zoom_pw": "",
-    "신청폼_link": "",
-    "커리큘럼": [
-        "키워드 발굴 및 분석 — 검색량 해석·블루오션 선점",
-        "트렌드 분석 — 네이버 데이터랩·구글 트렌드·경쟁사 모니터링",
-        "플레이스 로직 분석 — 스마트플레이스 순위·리뷰 관리",
-        "블로그 포스팅 전략 — 상위 노출 구조·체류시간·어뷰징 방지",
-    ],
-}
-
-def load_event_config(drive):
-    """교육/행사 설정을 드라이브에서 읽음. 없으면 기본값."""
-    cfg = load_json(drive, EVENT_CONFIG_FILE)
-    if not cfg or not isinstance(cfg, dict):
-        return dict(DEFAULT_EVENT_CONFIG)
-    merged = dict(DEFAULT_EVENT_CONFIG)
-    merged.update(cfg)
-    return merged
-
-def normalize_company(name):
-    """기업명 정규화 — 서로 다른 소스(신청 회신 vs 명단)를 매칭할 때 사용.
-    (주)/주식회사/㈜/(유) 및 공백 제거 후 비교용 키 반환."""
-    import re as _re
-    s = str(name or "")
-    s = _re.sub(r'\(주\)|\(유\)|주식회사|㈜|\(재\)|\(사\)', '', s)
-    return s.replace(' ', '').strip()
-
-def build_aug_edu_html(ev, company="", co_kw="", co_area="", co_type="", deadline="2026-08-07"):
-    """8월 교육 신청 안내 메일 HTML. ev=교육설정 / D-day 자동계산 / 기업 키워드 개인화."""
-    from datetime import datetime as _dt
-    _dl_short = "8/7(금)"
-    try:
-        _dl = _dt.strptime(deadline, "%Y-%m-%d")
-        _days = (_dl - _dt.today()).days
-        _dday_txt = "마감" if _days < 0 else ("D-DAY" if _days == 0 else f"D-{_days}")
-        _dl_short = f"{_dl.month}/{_dl.day}({['월','화','수','목','금','토','일'][_dl.weekday()]})"
-    except Exception:
-        _dday_txt = ""
-
-    _curr_html = ""
-    for i, item in enumerate(ev.get("커리큘럼", [])[:6], 1):
-        if "—" in item:      _t, _d = item.split("—", 1)
-        elif " - " in item:  _t, _d = item.split(" - ", 1)
-        else:                _t, _d = item, ""
-        _curr_html += f"""
-      <div style="margin-bottom:10px;padding:14px 16px;background:#FAFBFC;border:1px solid #E8ECF1;border-left:4px solid #03C75A;border-radius:0 8px 8px 0;">
-        <p style="margin:0 0 3px;font-size:14px;font-weight:600;color:#1C2B3A;">{i}. {_t.strip()}</p>
-        <p style="margin:0;font-size:12px;color:#5A6675;line-height:1.6;">{_d.strip()}</p>
-      </div>"""
-
-    _kw_card = ""
-    if co_kw or co_area or co_type:
-        _kw_card = f"""
-      <div style="margin-top:20px;padding-top:18px;border-top:1px dashed #D8DEE6;">
-        <p style="margin:0 0 8px;font-size:11px;font-weight:600;color:#8A96A3;letter-spacing:1px;">📋 저희가 파악한 귀사 정보</p>
-        <div style="background:#F7F9FC;border:1px solid #E4EAF1;border-radius:8px;padding:12px 14px;">
-          <p style="margin:0 0 4px;font-size:12px;color:#5A6675;">기술키워드 · <span style="font-weight:600;color:#1C2B3A;">{co_kw or '—'}</span></p>
-          <p style="margin:0 0 4px;font-size:12px;color:#5A6675;">관심분야 · <span style="font-weight:600;color:#1C2B3A;">{co_area or '—'}</span></p>
-          <p style="margin:0 0 8px;font-size:12px;color:#5A6675;">기업유형 · <span style="font-weight:600;color:#1C2B3A;">{co_type or '—'}</span></p>
-          <p style="margin:0;font-size:11px;color:#6B7684;line-height:1.6;">이 정보가 다르거나 보완하고 싶으시면 신청 회신에 함께 적어주세요. 다음 공고 안내부터 반영됩니다.</p>
-        </div>
-      </div>"""
-
-    _lect = ev.get("강사", "박성식")
-    _when_s = ev.get("일시_짧게", "8/12(수) 14:00~16:00")
-
-    return f"""<!DOCTYPE html>
-<html lang="ko"><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#F2F4F7;font-family:'Apple SD Gothic Neo',Arial,sans-serif;">
-<div style="max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:14px;overflow:hidden;border:1px solid #E2E5EA;">
-  <div style="background:#0F1D2E;padding:26px 28px 24px;">
-    <table width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td valign="top">
-        <p style="margin:0 0 3px;font-size:10px;letter-spacing:2px;color:#7A96B2;">원스톱 스케일업 · 8월 무료 교육</p>
-        <p style="margin:8px 0 8px;font-size:23px;font-weight:600;color:#FFFFFF;line-height:1.4;"><span style="color:#03C75A;">네이버</span>·<span style="color:#4285F4;">구</span><span style="color:#EA4335;">글</span> 검색 상위에<br>우리 회사를 올리는 법</p>
-        <p style="margin:0;font-size:13px;color:#A8BDD1;">키워드 발굴 · 플레이스 최적화 · 블로그 상위노출</p>
-      </td>
-      <td width="70" align="right" valign="top">
-        <div style="background:#DC2626;border-radius:10px;padding:9px 10px;text-align:center;min-width:52px;">
-          <p style="margin:0;font-size:19px;font-weight:800;color:#FFFFFF;line-height:1;">{_dday_txt}</p>
-          <p style="margin:3px 0 0;font-size:9px;font-weight:700;color:#FFFFFF;letter-spacing:0.5px;">~{_dl_short}</p>
-        </div>
-      </td>
-    </tr></table>
-    <div style="margin-top:16px;">
-      <span style="display:inline-block;font-size:12px;color:#E0A458;background:#2A2109;border:1px solid #5A4718;padding:5px 12px;border-radius:6px;margin-right:6px;">무료 · 온라인 2시간</span>
-      <span style="display:inline-block;font-size:12px;color:#F0A0A0;background:#2A0F0F;border:1px solid #5A2020;padding:5px 12px;border-radius:6px;">선착순 · 조기 종료 가능</span>
-    </div>
-  </div>
-  <div style="height:4px;background:linear-gradient(to right,#03C75A 0%,#03C75A 33%,#4285F4 33%,#4285F4 55%,#EA4335 55%,#EA4335 73%,#FBBC05 73%,#FBBC05 100%);"></div>
-  <div style="background:#FFFFFF;padding:24px 28px;">
-    <p style="margin:0 0 4px;font-size:14px;color:#1C2B3A;">담당자님, 안녕하세요.</p>
-    <p style="margin:0 0 14px;font-size:13px;color:#5A6675;line-height:1.75;">원스톱 스케일업 8월 교육을 안내드립니다. 이번 교육은 <span style="color:#1C2B3A;font-weight:500;">검색 노출과 온라인 유입</span>에 초점을 맞춰, 우리 회사를 검색 상위에 올리는 실전 노하우를 다룹니다.</p>
-    <div style="margin-bottom:22px;padding:12px 16px;background:#F6FBF8;border:1px solid #D3EDDD;border-radius:8px;">
-      <p style="margin:0;font-size:13px;color:#2C5F48;line-height:1.7;">💻 <span style="font-weight:600;">비대면 Zoom</span>으로 진행되어 사무실이나 자리에서 <span style="font-weight:600;">부담 없이</span> 참여하실 수 있으니 많은 관심과 참여 부탁드립니다.</p>
-    </div>
-    <p style="margin:0 0 14px;font-size:15px;font-weight:600;color:#1C2B3A;">📚 이런 걸 배웁니다</p>
-    {_curr_html}
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0 22px;">
-      <tr>
-        <td width="50%" style="padding:13px 16px;background:#0F1D2E;border-radius:8px 0 0 8px;">
-          <p style="margin:0 0 4px;font-size:11px;color:#7A96B2;">일시</p>
-          <p style="margin:0;font-size:14px;color:#FFFFFF;font-weight:500;">{_when_s}</p>
-        </td>
-        <td width="50%" style="padding:13px 16px;background:#16293F;border-radius:0 8px 8px 0;">
-          <p style="margin:0 0 4px;font-size:11px;color:#7A96B2;">방식 · 강사</p>
-          <p style="margin:0;font-size:14px;color:#FFFFFF;font-weight:500;">비대면 Zoom · {_lect}</p>
-        </td>
-      </tr>
-    </table>
-    <div style="background:#EFF5FB;border:1px solid #CFE0F0;border-radius:10px;padding:16px 18px;">
-      <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0F1D2E;">📩 신청 방법 <span style="color:#DC2626;font-size:12px;">(~{_dl_short} 마감)</span></p>
-      <p style="margin:0 0 6px;font-size:13px;color:#334155;line-height:1.7;">이 메일에 아래 정보를 <span style="color:#185FA5;font-weight:600;">회신</span>해 주세요.</p>
-      <p style="margin:0 0 10px;font-size:13px;color:#334155;line-height:1.9;">· 기업명<br>· 담당자명 / 연락처<br>· 참석 인원 (추가 참석자 있으면 함께)</p>
-      <p style="margin:0;padding-top:10px;border-top:1px solid #D9E5F1;font-size:12px;color:#5A6E85;line-height:1.6;">💡 아래 <span style="font-weight:600;color:#185FA5;">'파악한 귀사 정보'</span>에 보완할 내용이 있으시면, 신청 회신에 함께 적어주세요.</p>
-    </div>
-    <div style="margin-top:12px;padding:12px 14px;background:#FBFAF6;border:1px solid #E8E2CF;border-radius:8px;">
-      <p style="margin:0;font-size:12px;color:#6B6550;line-height:1.7;">📎 <span style="font-weight:600;color:#5A5340;">줌 링크와 교육자료</span>는 접수 종료 후, 신청하신 모든 기업께 <span style="font-weight:600;color:#5A5340;">일괄 발송</span>해 드립니다.</p>
-    </div>
-    {_kw_card}
-  </div>
-  <div style="background:#0A1628;padding:18px 28px;">
-    <p style="margin:0;font-size:12px;color:#A8BDD1;line-height:1.8;">혁신제품지원센터 원스톱 스케일업 운영팀<br><a href="mailto:onestop.kipcc@gmail.com" style="color:#6EE7B7 !important;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
-    <p style="margin:8px 0 0;font-size:11px;color:#5F7A96;">함께 참석하실 사내 담당자분들께도 공유 부탁드립니다.</p>
-  </div>
-</div>
-</body></html>"""
-
-def track_link(dest_url, company, notice_id, notice_name):
-    """공고 링크를 클릭 추적 URL로 감싼다. dest_url이 없으면 원본 그대로."""
-    import urllib.parse as _up
-    if not dest_url or dest_url == "#" or not CLICK_TRACK_URL:
-        return dest_url or "#"
-    q = _up.urlencode({
-        "co": company or "", "notice": notice_id or "",
-        "name": (notice_name or "")[:80], "url": dest_url,
-    })
-    return f"{CLICK_TRACK_URL}?{q}"
 API_KEY          = "Nt604D"
 BASE_URL         = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do"
 SELECTED_FILE    = "선정기업_명단.xlsx"   # ← 핵심 변경
@@ -776,79 +622,6 @@ def _get_gmail():   return 'gmail'
 def _get_cal():     return 'cal' 
 
 # ── 드라이브 유틸 ─────────────────────────────────────
-def _metric_card(label, value, unit, sub, accent="#5DCAA5"):
-    """대시보드용 HTML 지표 카드."""
-    return f"""
-    <div style="flex:1;min-width:150px;background:#141922;border:1px solid #2A3140;border-top:3px solid {accent};border-radius:12px;padding:16px 18px;">
-      <p style="margin:0 0 8px;font-size:12px;color:#8A96A3;font-weight:500;">{label}</p>
-      <p style="margin:0 0 4px;font-size:28px;font-weight:700;color:#FFFFFF;line-height:1;">{value}<span style="font-size:14px;font-weight:500;color:#A8BDD1;margin-left:2px;">{unit}</span></p>
-      <p style="margin:0;font-size:11px;color:{accent};">{sub}</p>
-    </div>"""
-
-def _funnel_step(label, value, unit, accent, pct):
-    """대시보드용 퍼널 단계 바."""
-    return f"""
-    <div style="flex:1;background:#0F141C;border:1px solid #242B38;border-radius:10px;padding:14px 16px;">
-      <p style="margin:0 0 6px;font-size:12px;color:#8A96A3;">{label}</p>
-      <p style="margin:0 0 10px;font-size:24px;font-weight:700;color:#E8EFF6;line-height:1;">{value}<span style="font-size:12px;font-weight:500;color:#7A8699;margin-left:2px;">{unit}</span></p>
-      <div style="height:5px;background:#1E2530;border-radius:3px;overflow:hidden;">
-        <div style="height:100%;width:{max(pct,3)}%;background:{accent};border-radius:3px;"></div>
-      </div>
-    </div>"""
-
-def render_html_table(df, max_rows=100):
-    """DataFrame을 다크테마 HTML 표로 렌더링 (캔버스 대신 — CSS가 확실히 먹음)."""
-    if df is None or df.empty:
-        st.caption("데이터 없음")
-        return
-    import html as _html
-    df = df.head(max_rows).fillna("")
-    def _esc(v):
-        s = str(v)
-        return _html.escape(s) if s not in ("nan", "None", "NaT") else ""
-    th = ('padding:9px 12px;text-align:left;font-size:12px;font-weight:600;'
-          'color:#E8EFF6;background:#2A3346;border-bottom:2px solid #41485A;'
-          'white-space:nowrap;')
-    td = ('padding:8px 12px;font-size:13px;color:#E8EFF6;'
-          'border-bottom:1px solid #2A3346;')
-    html = ('<div style="overflow-x:auto;border:1px solid #41485A;border-radius:8px;">'
-            '<table style="width:100%;border-collapse:collapse;background:#16293F;">')
-    html += '<thead><tr>' + ''.join(f'<th style="{th}">{_esc(c)}</th>' for c in df.columns) + '</tr></thead>'
-    html += '<tbody>'
-    for i, (_, row) in enumerate(df.iterrows()):
-        bg = '#16293F' if i % 2 == 0 else '#1B3049'
-        html += '<tr>' + ''.join(
-            f'<td style="{td}background:{bg};">{_esc(v)}</td>' for v in row) + '</tr>'
-    html += '</tbody></table></div>'
-    st.markdown(html, unsafe_allow_html=True)
-
-def load_click_log(debug=False):
-    """클릭추적_로그 시트를 읽어 DataFrame 반환 (시각·기업명·공고ID·공고명)."""
-    if not CLICK_LOG_SHEET_ID:
-        return pd.DataFrame()
-    url = (f"https://sheets.googleapis.com/v4/spreadsheets/"
-           f"{CLICK_LOG_SHEET_ID}/values/A:D")
-    try:
-        resp = gapi("GET", url)
-        if not resp.ok:
-            if debug:
-                st.error(f"시트 읽기 실패 [{resp.status_code}]: {resp.text[:300]}")
-            return pd.DataFrame()
-        vals = resp.json().get("values", [])
-        if debug:
-            st.info(f"시트에서 {len(vals)}행 읽음")
-        if len(vals) < 2:
-            return pd.DataFrame()
-        header = [str(h).strip() for h in vals[0]]
-        rows = vals[1:]
-        rows = [r + [""] * (len(header) - len(r)) for r in rows]
-        df = pd.DataFrame(rows, columns=header).fillna("")
-        return df
-    except Exception as e:
-        if debug:
-            st.error(f"시트 읽기 예외: {str(e)[:300]}")
-        return pd.DataFrame()
-
 def drive_file_id(drive, filename):
     files = drive_list_files(filename, DRIVE_FOLDER_ID)
     return files[0]['id'] if files else None
@@ -857,62 +630,8 @@ def drive_download(drive, filename):
     fid = drive_file_id(drive, filename)
     return drive_download_file(fid) if fid else None
 
-# 백업 대상 파일 (매번 바뀌고 유실 시 치명적인 것만 — 대용량 공고DB는 제외)
-BACKUP_TARGETS = {
-    "선정기업_명단.xlsx",     # SELECTED_FILE
-    "send_history.xlsx",      # HISTORY_FILE
-    "edu_registration.json",  # 교육 신청
-    "keywords.json",          # KEYWORDS_FILE
-    "ai_analysis.json",       # AI 분석 결과
-}
-BACKUP_KEEP = 5  # 파일당 최근 백업 보관 개수
-
-def _backup_before_overwrite(drive, filename):
-    """덮어쓰기 직전, 드라이브의 기존 파일을 [백업] 이름으로 복제 보관.
-    실패해도 본 저장은 막지 않는다 (백업은 부가 안전장치)."""
-    try:
-        base = filename.rsplit('/', 1)[-1]
-        if base not in BACKUP_TARGETS:
-            return
-        old = drive_download(drive, filename)
-        if not old:
-            return  # 기존 파일 없음 (최초 저장) → 백업 불필요
-        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-        stem, _, ext = base.rpartition('.')
-        bak_name = f"[백업]{stem}_{ts}.{ext}"
-        mime = ("application/json" if ext == "json"
-                else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        drive_upload_file(bak_name, DRIVE_FOLDER_ID, old, mime, None)
-        _prune_backups(stem)
-    except Exception:
-        pass  # 백업 실패는 조용히 넘어감 — 본 저장을 막지 않는다
-
-def _prune_backups(stem):
-    """같은 파일의 오래된 백업을 BACKUP_KEEP개만 남기고 삭제."""
-    try:
-        q = (f"name contains '[백업]{stem}_' and '{DRIVE_FOLDER_ID}' in parents "
-             f"and trashed=false")
-        r = gapi("GET", "https://www.googleapis.com/drive/v3/files",
-                 params={"q": q, "fields": "files(id,name,createdTime)",
-                         "orderBy": "createdTime desc"})
-        files = r.json().get("files", []) if r.ok else []
-        for f in files[BACKUP_KEEP:]:
-            gapi("DELETE", f"https://www.googleapis.com/drive/v3/files/{f['id']}")
-    except Exception:
-        pass
-
-def drive_list_files_prefix(prefix):
-    """이름이 특정 접두사로 시작하는 파일 목록 (백업 복원용)."""
-    q = (f"name contains '{prefix}' and '{DRIVE_FOLDER_ID}' in parents "
-         f"and trashed=false")
-    r = gapi("GET", "https://www.googleapis.com/drive/v3/files",
-             params={"q": q, "fields": "files(id,name,createdTime)",
-                     "orderBy": "createdTime desc"})
-    return r.json().get("files", []) if r.ok else []
-
 def drive_upload(drive, filename, content_bytes, mime):
     try:
-        _backup_before_overwrite(drive, filename)  # 덮어쓰기 전 자동 백업
         fid = drive_file_id(drive, filename)
         result = drive_upload_file(filename, DRIVE_FOLDER_ID, content_bytes, mime, fid)
         return result
@@ -1423,7 +1142,7 @@ def claude_call_raw(prompt, max_tokens=1000):
         "anthropic-version": "2023-06-01"
     }
     payload = {
-        "model": "claude-sonnet-4-5",
+        "model": "claude-sonnet-4-6",
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}]
     }
@@ -2016,7 +1735,6 @@ with st.sidebar:
         "안내 메일",
         "교육 신청 집계",
         "발송 이력",
-        "클릭 반응",
         "캘린더",
         "설정",
         "시스템 명세",
@@ -2078,88 +1796,51 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════
 if page == "대시보드":
     drive = _get_drive()
+    st.title("📊 운영 대시보드")
 
     with st.spinner("데이터 로딩 중..."):
         df_c  = load_excel(drive, SELECTED_FILE)
         df_n  = load_excel(drive, NOTICES_FILE)
         df_h  = load_excel(drive, HISTORY_FILE)
         df_det = load_excel(drive, DETAIL_FILE)
-        try:
-            df_click = load_click_log()
-        except Exception:
-            df_click = pd.DataFrame()
 
-    # ── 지표 계산 ──────────────────────────────────────
+    # ── 상단 핵심 지표 4개 ─────────────────────────────
+    m1, m2, m3, m4 = st.columns(4)
+
+    # 선정 기업
     total_co = len(df_c)
     sel_co   = (df_c['선정구분']=='선정').sum() if '선정구분' in df_c.columns else total_co
     res_co   = (df_c['선정구분']=='예비').sum() if '선정구분' in df_c.columns else 0
+    m1.metric("선정 기업", f"{sel_co}개사", f"예비 {res_co}개사")
 
+    # 공고 DB
     active_n = 0
     if not df_n.empty and '마감일' in df_n.columns:
         today_str = datetime.today().strftime('%Y-%m-%d')
         active_n = (df_n['마감일'] >= today_str).sum()
+    m2.metric("활성 공고", f"{active_n:,}건", f"전체 {len(df_n):,}건")
 
+    # 전문 크롤링
     crawl_ok = 0
+    crawl_fail = 0
     if not df_det.empty and '크롤링성공' in df_det.columns:
-        crawl_ok = (df_det['크롤링성공']=='Y').sum()
+        crawl_ok   = (df_det['크롤링성공']=='Y').sum()
+        crawl_fail = (df_det['크롤링성공']!='Y').sum()
+    m3.metric("전문 수집", f"{crawl_ok}건", f"실패 {crawl_fail}건")
 
+    # 발송 이력
     this_month_h = 0
     if not df_h.empty and '발송일' in df_h.columns:
         this_month = datetime.today().strftime('%Y-%m')
         this_month_h = df_h['발송일'].astype(str).str.startswith(this_month).sum()
-
-    # 클릭 지표 (테스트 제외)
-    click_total = 0; click_co = 0
-    if not df_click.empty:
-        _dfk = df_click.copy()
-        _cocol = next((c for c in _dfk.columns if '기업' in str(c) or 'co' in str(c).lower()), None)
-        if _cocol:
-            _dfk = _dfk[~_dfk[_cocol].astype(str).str.contains('테스트', na=False)]
-            _dfk = _dfk[_dfk[_cocol].astype(str).str.strip() != ""]
-            click_total = len(_dfk)
-            click_co = _dfk[_cocol].nunique()
-
-    _today_kr = f"{datetime.today().year}년 {datetime.today().month}월 {datetime.today().day}일"
-
-    # ── HTML 히어로 + 지표 카드 ────────────────────────
-    _hero = f"""
-    <div style="font-family:'Apple SD Gothic Neo',sans-serif;">
-      <div style="background:linear-gradient(135deg,#0F2A20 0%,#16382A 100%);border-radius:16px;padding:32px 34px;margin-bottom:18px;position:relative;overflow:hidden;">
-        <p style="margin:0 0 6px;font-size:11px;letter-spacing:2px;color:#5DCAA5;font-weight:600;">ONESTOP SCALE-UP · 운영 현황</p>
-        <p style="margin:0 0 10px;font-size:28px;font-weight:700;color:#FFFFFF;line-height:1.35;">공고 수집부터 발송·반응까지<br>한 흐름으로 관리합니다</p>
-        <p style="margin:0;font-size:13px;color:#A8BDD1;">{_today_kr} 기준 · 드라이브 데이터 실시간 집계</p>
-      </div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px;">
-        {_metric_card('선정 기업', f'{sel_co}', '개사', f'예비 {res_co}개사', '#5DCAA5')}
-        {_metric_card('활성 공고', f'{active_n:,}', '건', f'전체 {len(df_n):,}건', '#4285F4')}
-        {_metric_card('전문 수집', f'{crawl_ok:,}', '건', '크롤링 완료', '#A78BFA')}
-        {_metric_card('이번 달 발송', f'{this_month_h}', '건', f'누적 {len(df_h)}건', '#E0A458')}
-        {_metric_card('총 클릭 반응', f'{click_total}', '회', f'{click_co}개사 관심', '#EC6A9C')}
-      </div>
-    </div>
-    """
-    st.markdown(_hero, unsafe_allow_html=True)
-
-    # ── 발송 → 반응 퍼널 ───────────────────────────────
-    _sent_total = len(df_h)
-    _funnel = f"""
-    <div style="font-family:'Apple SD Gothic Neo',sans-serif;background:#141922;border:1px solid #2A3140;border-radius:14px;padding:22px 24px;margin-bottom:20px;">
-      <p style="margin:0 0 4px;font-size:10px;letter-spacing:1.5px;color:#7A8699;font-weight:600;">ENGAGEMENT FUNNEL</p>
-      <p style="margin:0 0 18px;font-size:16px;font-weight:600;color:#E8EFF6;">발송 → 반응 흐름</p>
-      <div style="display:flex;gap:10px;">
-        {_funnel_step('누적 발송', _sent_total, '건', '#4285F4', 100)}
-        {_funnel_step('클릭 반응', click_total, '회', '#5DCAA5', min(100, int(click_total/max(_sent_total,1)*100)) if _sent_total else 0)}
-        {_funnel_step('관심 기업', click_co, '개사', '#E0A458', min(100, int(click_co/max(sel_co,1)*100)) if sel_co else 0)}
-      </div>
-    </div>
-    """
-    st.markdown(_funnel, unsafe_allow_html=True)
+    m4.metric("이번 달 발송", f"{this_month_h}건", f"누적 {len(df_h)}건")
 
     st.divider()
 
     # ── 이번 주 할 일 체크리스트 ───────────────────────
     st.subheader("🗂 이번 주 운영 체크리스트")
 
+    # 각 단계 상태 자동 판단
     last_collect = "—"
     if not df_n.empty and '수정일' in df_n.columns:
         last_collect = df_n['수정일'].max()[:10] if df_n['수정일'].max() else "—"
@@ -2757,7 +2438,7 @@ elif page == "공고·매칭":
             st.divider()
             st.subheader("공고 DB 미리보기 (최근 20건)")
             cols = [c for c in ["공고명","주관기관","분야","접수기간","마감일"] if c in df_n.columns]
-            render_html_table(df_n[cols].head(20))
+            st.dataframe(df_n[cols].head(20), use_container_width=True, hide_index=True)
 
     with tab_cm1b:
         st.subheader("📄 공고 전문 크롤링")
@@ -4121,6 +3802,18 @@ elif page == "발송":
         if review_state.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", '') == ''
         and ai_cache.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", {}).get('추천여부','') == '검토'
     ]
+
+    # 참고 공고: 승인 0건 기업용 — 그 기업의 ★★ 검토 공고 상위 3건 (제외 여부 무관)
+    # AI가 '검토'로 판정한 것 중 점수 높은 순. 승인 공고 없는 기업의 빈자리를 채움.
+    _ref_by_co = {}
+    for r in _results_live:
+        _rec = ai_cache.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", {}).get('추천여부','')
+        if _rec == '검토':
+            _ref_by_co.setdefault(r.get('기업명',''), []).append(r)
+    for _co in _ref_by_co:
+        _ref_by_co[_co] = sorted(_ref_by_co[_co],
+                                 key=lambda x: x.get('점수', 0), reverse=True)[:3]
+    st.session_state['_ref_notices_by_co'] = _ref_by_co
     matched_group = st.session_state.get('match_target_group', '미확인')
 
     if not approved:
@@ -4438,71 +4131,6 @@ elif page == "발송":
         st.components.v1.html(_preview_html, height=900, scrolling=True)
 
         st.divider()
-
-        # ── 직전 발송 실패분 재발송 ──────────────────────
-        _failed = st.session_state.get('failed_sends', {})
-        if _failed:
-            with st.container():
-                st.error(f"📮 이전 발송에서 실패한 {len(_failed)}개사가 있습니다.")
-                for _co, _info in _failed.items():
-                    st.caption(f"• {_co} ({_info['email']}) — {_info['reason']} [{_info['time']}]")
-                _rc1, _rc2 = st.columns([1, 3])
-                with _rc1:
-                    if st.button("🔁 실패분만 재발송", type="primary", key="resend_failed"):
-                        from email.mime.multipart import MIMEMultipart
-                        from email.mime.text import MIMEText
-                        import base64
-                        _still_failed = {}
-                        _resent = 0
-                        _rlog = st.empty()
-                        _rlogs = []
-                        for _co, _info in list(_failed.items()):
-                            try:
-                                _msg = MIMEMultipart('alternative')
-                                _msg['From'] = "onestop.kipcc@gmail.com"
-                                _msg['To']   = _info['email']
-                                if _info.get('cc'):
-                                    _msg['Cc'] = ", ".join(_info['cc'])
-                                _msg['Subject'] = _info.get('subject') or \
-                                    f"[원스톱 스케일업] {today_str} 이번 주 맞춤 지원사업 공고 — {_co}"
-                                _msg.attach(MIMEText(_info.get('html') or "재발송", 'html', 'utf-8'))
-                                gmail_send(base64.urlsafe_b64encode(_msg.as_bytes()).decode())
-                                _rlogs.append(f"✅ {_co} → {_info['email']}")
-                                _resent += 1
-                            except Exception as _re2:
-                                _still_failed[_co] = {**_info, 'reason': str(_re2)[:120]}
-                                _rlogs.append(f"❌ {_co} — {str(_re2)[:40]}")
-                            _rlog.text("\n".join(_rlogs))
-                        st.session_state['failed_sends'] = _still_failed
-                        # 재발송 성공분을 이력에 추가
-                        if _resent:
-                            try:
-                                _rec = []
-                                for _co, _info in _failed.items():
-                                    if _co in _still_failed: continue
-                                    for _n in _info.get('notices', []):
-                                        _rec.append({"기업명":_co,"pblancId":_n.get('공고ID',''),
-                                            "공고명":_n.get('공고명',''),"발송일":datetime.today().strftime("%Y-%m-%d"),
-                                            "마감일":_n.get('마감일',''),"공고링크":_n.get('공고링크',''),
-                                            "매칭점수":_n.get('점수',''),"담당자검토":"○",
-                                            "검토의견":"(재발송)","신청여부":"","선정결과":""})
-                                if _rec:
-                                    _dfh = load_excel(drive, HISTORY_FILE)
-                                    _dfn = pd.DataFrame(_rec)
-                                    _dff = pd.concat([_dfh,_dfn],ignore_index=True) if not _dfh.empty else _dfn
-                                    save_excel(drive, _dff, HISTORY_FILE, "발송이력", "375623")
-                            except Exception:
-                                pass
-                        if _still_failed:
-                            st.warning(f"재발송 완료 — 성공 {_resent} / 여전히 실패 {len(_still_failed)}")
-                        else:
-                            st.success(f"재발송 완료 — {_resent}개사 전부 성공. 실패 목록이 비워졌습니다.")
-                with _rc2:
-                    if st.button("🗑️ 실패 목록 지우기", key="clear_failed"):
-                        st.session_state['failed_sends'] = {}
-                        st.rerun()
-            st.divider()
-
         if st.button("📤 발송 실행", type="primary"):
             from email.mime.multipart import MIMEMultipart
             from email.mime.text import MIMEText
@@ -4559,16 +4187,7 @@ elif page == "발송":
                 st.info(f"테스트 추출: {len(grouped)}개사 — "
                         + ", ".join(f"{c}({len(n)}건)" for c, n in grouped.items()))
 
-            import time as _snd_time
-            _BATCH_SIZE = 20      # 이 개수마다 잠깐 쉼 (Gmail 대량발송 차단 방지)
-            _BATCH_PAUSE = 5      # 배치 간 대기(초)
-            _sent_count = 0
             for idx,(company,notices) in enumerate(grouped.items()):
-                # 배치 분할: 일정 개수 발송 후 잠깐 대기 (Gmail 한도·평판 보호)
-                if _sent_count > 0 and _sent_count % _BATCH_SIZE == 0:
-                    log.text(f"⏸️ Gmail 한도 보호 — {_BATCH_PAUSE}초 대기 중... "
-                             f"({_sent_count}개사 발송 완료)")
-                    _snd_time.sleep(_BATCH_PAUSE)
                 # 기업 정보 조회
                 co_row = {}
                 if not df_c_cur.empty:
@@ -4581,24 +4200,11 @@ elif page == "발송":
                 notices_ss     = [n for n in notices if n.get('관련도','')=='★★']
                 notices_common = []
 
-                # AI 검토 등급 공고 (이 기업 해당분만)
-                notices_review = [
-                    r for r in review_grade
-                    if r.get('기업명','') == company
-                ]
-
-                # 📢 섹션이 비어있으면 전체 review_grade에서 많이 겹치는 공고 보완
-                if not notices_review and not notices_sss and not notices_ss:
-                    from collections import Counter
-                    notice_count = Counter(r.get('공고명','') for r in review_grade)
-                    top_notices  = [n for n, _ in notice_count.most_common(5)]
-                    seen = set()
-                    for r in review_grade:
-                        if r.get('공고명','') in top_notices and r.get('공고명','') not in seen:
-                            notices_review.append(r)
-                            seen.add(r.get('공고명',''))
-                        if len(notices_review) >= 3:
-                            break
+                # 승인 공고가 없는 기업 → 그 기업의 ★★ 검토 공고 상위 3건을 참고 공고로
+                _ref_map = st.session_state.get('_ref_notices_by_co', {})
+                notices_review = []
+                if not notices_sss and not notices_ss:
+                    notices_review = list(_ref_map.get(company, []))[:3]
 
                 def notice_card_simple(n, idx):
                     """공통 공고용 심플 카드 (작고 간결하게)"""
@@ -4629,8 +4235,6 @@ elif page == "발송":
                     dl_raw = n.get("마감일","")
                     if not dl_raw and "~" in n.get("접수기간",""):
                         dl_raw = n.get("접수기간","").split("~")[-1].strip()
-                    _track = track_link(n.get("공고링크","#"), company,
-                                        n.get("공고ID",""), n.get("공고명",""))
                     hashtags = reason_to_hashtag(n.get("매칭근거",""))
                     tag_html = ""
                     if hashtags:
@@ -4648,7 +4252,7 @@ elif page == "발송":
                                   box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                       <tr>
                         <td style="padding:12px 16px;">
-                          <a href="{_track}"
+                          <a href="{n.get("공고링크","#")}"
                              style="font-size:14px;font-weight:600;color:#E8EFF6;
                                     text-decoration:none;line-height:1.5;display:block;">
                             {notice_name}
@@ -4660,7 +4264,7 @@ elif page == "발송":
                         </td>
                         <td width="60" align="center" valign="middle"
                             style="padding:14px 12px;border-left:1px solid #24405F;">
-                          <a href="{_track}"
+                          <a href="{n.get("공고링크","#")}"
                              style="display:inline-block;font-size:12px;font-weight:600;
                                     color:#5DCAA5;text-decoration:none;white-space:nowrap;">
                             보기 →
@@ -4712,7 +4316,7 @@ elif page == "발송":
                         rows_html += notice_card_simple(n, i)
                     rows_html += "</div>"
 
-                # ── 📢 다른 기업들이 관심 가진 공고 ──────
+                # ── 📎 참고 공고 (승인 공고 없는 기업의 ★★ 검토분) ──
                 if notices_review:
                     rows_html += """
                     <div style="border-top:1px solid rgba(255,255,255,0.08);
@@ -4720,10 +4324,10 @@ elif page == "발송":
                       <p style="margin:0 0 6px;font-size:10px;font-weight:700;
                                  color:#F59E0B;letter-spacing:2px;
                                  text-transform:uppercase;">
-                        📢 &nbsp;다른 기업들이 관심 가진 공고
+                        📎 &nbsp;참고해보실 만한 공고
                       </p>
                       <p style="margin:0 0 10px;font-size:11px;color:rgba(255,255,255,0.35);">
-                        비슷한 업종·분야의 기업들이 추천받은 공고입니다. 참고해보세요.
+                        이번 주 딱 맞는 공고는 없었지만, 귀사와 연관성이 있어 참고용으로 안내드립니다.
                       </p>"""
                     for i, n in enumerate(notices_review[:3]):
                         rows_html += notice_card_simple(n, i)
@@ -4999,7 +4603,6 @@ elif page == "발송":
                     continue
 
                 recipients = get_test_recipients() if test_mode else [co_email]
-                _send_failed = False
                 for to in recipients:
                     msg = MIMEMultipart('alternative')
                     msg['From']    = "onestop.kipcc@gmail.com"
@@ -5009,25 +4612,8 @@ elif page == "발송":
                     msg['Subject'] = (f"[TEST] " if test_mode else "") + \
                         f"[원스톱 스케일업] {today_str} 이번 주 맞춤 지원사업 공고 — {company}"
                     msg.attach(MIMEText(html,'html','utf-8'))
-                    try:
-                        gmail_send(base64.urlsafe_b64encode(msg.as_bytes()).decode())
-                        logs.append(f"✅ {company} → {to}" + (f" (+Cc {len(cc_list)})" if cc_list and not test_mode else ""))
-                    except Exception as _se:
-                        _send_failed = True
-                        logs.append(f"❌ {company} → {to} — 발송 실패: {str(_se)[:50]}")
-                        if not test_mode:
-                            st.session_state.setdefault('failed_sends', {})[company] = {
-                                'email': to, 'cc': cc_list, 'notices': notices,
-                                'html': html, 'subject': msg['Subject'],
-                                'reason': str(_se)[:120],
-                                'time': datetime.now().strftime('%H:%M:%S'),
-                            }
-                    log.text("\n".join(logs[-8:]))
-
-                # 발송 실패한 기업은 캘린더·이력 기록을 건너뜀
-                if _send_failed and not test_mode:
-                    prog.progress((idx+1)/max(len(grouped),1))
-                    continue
+                    gmail_send(base64.urlsafe_b64encode(msg.as_bytes()).decode())
+                    logs.append(f"✅ {company} → {to}" + (f" (+Cc {len(cc_list)})" if cc_list and not test_mode else ""))
 
                 # 테스트 모드에서는 캘린더 등록을 건너뜀 (실제 캘린더 오염 방지)
                 for n in ([] if test_mode else notices):
@@ -5059,7 +4645,6 @@ elif page == "발송":
                         "검토의견":n.get('검토의견',''),"신청여부":"","선정결과":""})
 
                 logs.append(f"✅ {company} — {len(notices)}건 발송 완료")
-                _sent_count += 1
                 log.code("\n".join(logs)); prog.progress((idx+1)/len(grouped))
 
             if test_mode:
@@ -5075,12 +4660,6 @@ elif page == "발송":
                     save_excel(drive, df_fin, HISTORY_FILE, "발송이력", "375623")
                 prog.progress(1.0)
                 st.success(f"발송 완료 — {len(history_records)}건 → send_history.xlsx 저장")
-
-                _failed = st.session_state.get('failed_sends', {})
-                if _failed:
-                    st.error(f"⚠️ 발송 실패 {len(_failed)}개사 — 아래에서 재발송할 수 있습니다.")
-                    for _co, _info in _failed.items():
-                        st.caption(f"• {_co} ({_info['email']}) — {_info['reason']}")
 
                 # ── 공통 캘린더 마감일 이벤트 자동 등록 ──
                 _CAL_ID = "9078a49950a47b46ddb3511040886f3a016b75ca17169ec1113e5692b7327375@group.calendar.google.com"  # 직접 하드코딩
@@ -5514,8 +5093,7 @@ JSON만 응답 (코드블록 없이):
                 target_group = st.radio(
                     "발송 그룹",
                     ["선정 50개사", "예비 20개사", "전체 70개사",
-                     "리마인더 (선정-교육 미신청)", "리마인더 (제외 직접 지정)",
-                     "직접 선택", "이메일 직접 입력"],
+                     "리마인더 (선정-교육 미신청)", "직접 선택", "이메일 직접 입력"],
                     horizontal=False, key="notice_mail_group"
                 )
             else:
@@ -5538,7 +5116,10 @@ JSON만 응답 (코드블록 없이):
                         return raw if isinstance(raw, list) else []
                     except Exception:
                         return []
-                _norm_co = normalize_company  # 전역 정규화 함수 사용
+                def _norm_co(s):
+                    s = str(s)
+                    s = re.sub(r'\(주\)|\(유\)|주식회사|㈜', '', s)
+                    return s.replace(' ', '').strip()
                 _edu = _load_edu_rem(drive)
                 _rounds = sorted({r.get('교육회차', '') for r in _edu if r.get('교육회차')}, reverse=True)
                 if not _rounds:
@@ -5554,23 +5135,6 @@ JSON만 응답 (코드블록 없이):
                     df_target = _sel_df[_mask]
                     st.caption(f"선정 50개사 중 {_sel_round} 신청 {len(_applied_keys)}개사 제외 "
                                f"→ 발송 대상 {len(df_target)}개사")
-            elif target_group == "리마인더 (제외 직접 지정)":
-                # 명단을 갈아끼우지 않고, 제외할 기업만 그때그때 선택
-                # (CES 참석자, 특정 이벤트 참여자 등 어떤 기준이든 대응)
-                _base = st.radio("기준 그룹", ["선정 50개사", "전체 70개사"],
-                                 horizontal=True, key="rem_manual_base")
-                if _base == "선정 50개사":
-                    _pool = df_active[df_active['선정구분'] == '선정'].copy()
-                else:
-                    _pool = df_active.copy()
-                _exclude = st.multiselect(
-                    "제외할 기업 선택 (이미 참여/신청한 기업)",
-                    _pool['기업명'].tolist(), key="rem_manual_exclude")
-                _ex_keys = {normalize_company(x) for x in _exclude}
-                _mask = ~_pool['기업명'].apply(lambda x: normalize_company(x) in _ex_keys)
-                df_target = _pool[_mask]
-                st.caption(f"{_base} {len(_pool)}개사 중 {len(_exclude)}개사 제외 "
-                           f"→ 발송 대상 {len(df_target)}개사")
             elif target_group == "직접 선택":
                 selected_names = st.multiselect(
                     "기업 직접 선택", df_active['기업명'].tolist(), key="notice_mail_select"
@@ -5606,7 +5170,6 @@ JSON만 응답 (코드블록 없이):
                 "첫 안내 메일 (선정 축하 + 회신 요청)",
                 "선정 기업 축하 및 프로그램 안내",
                 "7월 교육 프로그램 신청 안내",
-                "8월 교육 프로그램 신청 안내",
                 "CES 혁신상 밋업 신청 안내",
                 "교육 프로그램 수요조사",
                 "성과집계 조사 요청",
@@ -5618,35 +5181,6 @@ JSON만 응답 (코드블록 없이):
         )
 
         TEMPLATES = {
-            "8월 교육 프로그램 신청 안내": {
-                "subject": "[원스톱 스케일업] 네이버·구글 검색 상위 노하우 — 8월 교육 신청 안내 (~8/7)",
-                "body": """안녕하세요, 원스톱 스케일업 운영팀입니다.
-선정 기업 여러분께 제공되는 8월 교육 프로그램을 안내드립니다.
-이번 교육은 검색 노출과 온라인 유입에 초점을 맞춰, 우리 회사를 검색 상위에 올리는 실전 노하우를 다룹니다.
-비대면 Zoom으로 진행되어 사무실이나 자리에서 부담 없이 참여하실 수 있으니 많은 관심과 참여 부탁드립니다.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📌 8월 정기 교육 | 선정기업 무료 제공 | 비대면 Zoom
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-주  제: 네이버·구글 검색 상위에 우리 회사를 올리는 법
-        키워드 발굴·분석 / 트렌드 분석 / 플레이스 로직 / 블로그 상위노출
-강  사: 박성식
-일  시: 2026년 8월 12일(수) 14:00 ~ 16:00 (질의응답 포함)
-방  식: 비대면 Zoom (링크는 접수 종료 후 교육자료와 함께 안내)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ 신청 방법 | 마감: 8월 7일(금)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-본 메일에 아래 정보를 회신해 주세요.
-· 기업명
-· 담당자명 / 연락처
-· 참석 인원 (추가 참석자 있으면 함께)
-
-※ 줌 링크와 교육자료는 접수 종료 후 신청하신 모든 기업께 일괄 발송해 드립니다.
-""",
-            },
             "7월 교육 프로그램 신청 안내": {
                 "subject": "[원스톱 스케일업] 7월 교육 프로그램 참여 신청 안내 (7/14~17)",
                 "body": """안녕하세요, 원스톱 스케일업 운영팀입니다.
@@ -5952,7 +5486,7 @@ onestop.kipcc@gmail.com""",
 
         if df_target.empty and not direct_input_email:
             st.warning("발송 대상 기업이 없습니다.")
-        elif (not mail_subject or not mail_body) and template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 프로그램 신청 안내", "CES 혁신상 밋업 신청 안내"):
+        elif (not mail_subject or not mail_body) and template_choice not in ("7월 교육 프로그램 신청 안내", "CES 혁신상 밋업 신청 안내"):
             st.info("제목과 본문을 작성하면 미리보기가 표시됩니다.")
         else:
             sample_company = df_target.iloc[0]['기업명'] if not df_target.empty else "샘플기업"
@@ -5971,19 +5505,8 @@ onestop.kipcc@gmail.com""",
 
             body_html = mail_body.replace('\n', '<br>')
 
-            # 8월 교육 템플릿 전용 HTML 미리보기
-            if template_choice == "8월 교육 프로그램 신청 안내":
-                _ev = load_event_config(drive)
-                _co_kw   = df_target.iloc[0].get('기술키워드','') if not df_target.empty else ''
-                _co_area = df_target.iloc[0].get('관심사업분야','') if not df_target.empty else ''
-                _co_type = df_target.iloc[0].get('기업유형','') if not df_target.empty else ''
-                _co_nm   = df_target.iloc[0].get('기업명','') if not df_target.empty else ''
-                sample_html = build_aug_edu_html(_ev, company=_co_nm,
-                    co_kw=_co_kw, co_area=_co_area, co_type=_co_type)
-                st.components.v1.html(sample_html, height=1100, scrolling=True)
-
             # 7월 교육 템플릿 전용 HTML 미리보기
-            elif template_choice == "7월 교육 프로그램 신청 안내":
+            if template_choice == "7월 교육 프로그램 신청 안내":
                 # 미리보기용 - 기업 정보 샘플로 표시
                 _co_kw   = df_target.iloc[0].get('기술키워드','—') if not df_target.empty else '—'
                 _co_area = df_target.iloc[0].get('관심사업분야','—') if not df_target.empty else '—'
@@ -6414,14 +5937,7 @@ onestop.kipcc@gmail.com""",
 
                     # HTML 본문 생성
                     body_html_co = ""
-                    if template_choice == "8월 교육 프로그램 신청 안내":
-                        _ev = load_event_config(drive)
-                        _co_kw   = str(row.get('기술키워드','') or row.get('키워드보완','') or '')[:40]
-                        _co_area = str(row.get('관심사업분야','') or '')
-                        _co_type = str(row.get('기업유형','') or '')[:30]
-                        html_body = build_aug_edu_html(_ev, company=str(row.get('기업명','')),
-                            co_kw=_co_kw, co_area=_co_area, co_type=_co_type)
-                    elif template_choice == "7월 교육 프로그램 신청 안내":
+                    if template_choice == "7월 교육 프로그램 신청 안내":
                         _co_kw   = str(row.get('기술키워드','') or row.get('키워드보완','') or '—')[:40]
                         _co_area = str(row.get('관심사업분야','') or '—')
                         _co_type = str(row.get('기업유형','') or '—')[:30]
@@ -6674,7 +6190,7 @@ onestop.kipcc@gmail.com""",
                           <a href="{form_link}" style="font-size:13px;color:#10B981;">{form_link}</a>
                         </div>"""
 
-                    if template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 프로그램 신청 안내", "CES 혁신상 밋업 신청 안내"):
+                    if template_choice not in ("7월 교육 프로그램 신청 안내", "CES 혁신상 밋업 신청 안내"):
                         html_body = f"""<!DOCTYPE html>
     <html lang="ko"><head><meta charset="UTF-8"></head>
     <body style="margin:0;padding:0;background:#F2F4F7;
@@ -6873,18 +6389,8 @@ elif page == "교육 신청 집계":
         with st.spinner("Gmail 회신 검색 중..."):
             try:
                 after_date = (datetime.today() - timedelta(days=int(search_days))).strftime('%Y/%m/%d')
-                # 제목에서 핵심 키워드만 추출해 유연하게 검색
-                # (회신은 "Re:" 접두·제목 변형이 잦아 완전일치는 놓침)
-                _subj = mail_subject_input
-                # 대괄호 안 발송자명·괄호 날짜 제거 후 핵심어만
-                _core = re.sub(r'\[[^\]]*\]|\([^)]*\)', '', _subj).strip()
-                # 특수문자 제거 (·, —, 등이 검색 방해)
-                _core = re.sub(r'[·—\-–…\|]', ' ', _core)
-                _core_words = [w for w in _core.split() if len(w) >= 2][:3]
-                _kw_query = " ".join(_core_words) if _core_words else _subj
-                # 받은 회신만 (내가 보낸 원본 제외) — in:inbox 빼서 라벨 무관하게
-                query = f'subject:({_kw_query}) after:{after_date} -from:onestop.kipcc@gmail.com'
-                st.caption(f"🔍 검색어: `{query}`")
+                # 발송한 메일 제목으로 정확한 회신만 수집
+                query = f'in:inbox subject:"{mail_subject_input}" after:{after_date}'
                 resp = gapi('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/messages',
                             params={'q': query, 'maxResults': 100})
 
@@ -6893,8 +6399,7 @@ elif page == "교육 신청 집계":
                 else:
                     msgs = resp.json().get('messages', [])
                     if not msgs:
-                        st.warning(f"검색 결과 0건 — 위 검색어로 회신을 못 찾았습니다. "
-                                   f"제목 키워드를 줄이거나 검색 기간을 늘려보세요.")
+                        st.info(f"최근 {search_days}일 내 관련 회신이 없습니다.")
                     else:
                         st.success(f"회신 {len(msgs)}건 발견 — AI 파싱 중...")
                         prog = st.progress(0)
@@ -6915,11 +6420,6 @@ elif page == "교육 신청 집계":
                             sender = next((h['value'] for h in headers_list if h['name']=='From'), '')
                             subject = next((h['value'] for h in headers_list if h['name']=='Subject'), '')
 
-                            # 내가 보낸 원본 안내 메일은 스킵 (신청 회신이 아님)
-                            if 'onestop.kipcc@gmail.com' in sender.lower():
-                                prog.progress((i+1)/len(msgs))
-                                continue
-
                             # 본문 추출
                             import base64
                             def extract_body(payload):
@@ -6934,28 +6434,24 @@ elif page == "교육 신청 집계":
                             body = extract_body(detail.get('payload', {}))[:2000]
 
                             # AI로 신청 정보 파싱
-                            ai_prompt = f"""아래는 "8월 교육 신청 안내" 메일에 대한 회신입니다.
-이 회신은 교육 신청 안내를 받고 답장한 것이므로, 명백한 거절·문의가 아니라면 신청으로 간주합니다.
-JSON으로만 응답하세요 (설명 없이).
+                            ai_prompt = f"""아래는 교육 신청 회신 메일입니다. JSON으로만 응답하세요.
 
 제목: {subject}
 발신자: {sender}
 본문:
 {body}
 
-추출 규칙:
-- 기업명: 본문/서명에 없으면 발신자 이메일 도메인에서 추론 (예: @tamtus.co.kr → 탐투스). 그래도 모르면 null.
-- 담당자명: 발신자 이름 또는 본문 서명에서
-- 연락처: 본문의 전화번호 (없으면 null)
-- 인원: 참석 인원 (명시 없으면 1)
-- 추가참석자: 함께 참석한다고 적힌 사람들 (없으면 [])
-- 교육신청여부: 참석/신청 의사가 있으면 true. 단순 인사·감사 회신이라도 참석 맥락이면 true.
-  명백한 거절("불참", "어렵습니다")이나 무관한 내용일 때만 false.
-
+추출할 정보:
 {{
-  "기업명": "...", "담당자명": "...", "연락처": "...",
-  "인원": 1, "추가참석자": [], "교육신청여부": true
-}}"""
+  "기업명": "기업명 (없으면 null)",
+  "담당자명": "담당자명 (없으면 null)",
+  "연락처": "연락처 (없으면 null)",
+  "인원": 참여 인원 수 (숫자, 기본 1),
+  "추가참석자": ["추가 참석자 정보 목록"],
+  "교육신청여부": true/false
+}}
+
+교육신청여부는 신청 의사가 명확할 때만 true."""
 
                             try:
                                 ai_resp = requests.post(
@@ -6963,23 +6459,12 @@ JSON으로만 응답하세요 (설명 없이).
                                     headers={'x-api-key': st.secrets.get('ANTHROPIC_API_KEY',''),
                                              'anthropic-version': '2023-06-01',
                                              'content-type': 'application/json'},
-                                    json={'model': 'claude-sonnet-4-5',
+                                    json={'model': 'claude-sonnet-4-6',
                                           'max_tokens': 500,
                                           'messages': [{'role':'user','content': ai_prompt}]}
                                 )
-                                _raw = ai_resp.json()
-                                # 진단: API가 에러를 반환하는지 확인
-                                if 'error' in _raw:
-                                    st.error(f"AI API 오류: {_raw['error'].get('message','')[:150]}")
-                                ai_text = _raw.get('content',[{}])[0].get('text','{}')
-                                # 코드펜스 안전 제거
-                                ai_text = ai_text.strip()
-                                if ai_text.startswith('```'):
-                                    ai_text = re.sub(r'^```(?:json)?\s*', '', ai_text)
-                                    ai_text = re.sub(r'\s*```$', '', ai_text)
-                                _m = re.search(r'\{.*\}', ai_text, re.DOTALL)
-                                if _m:
-                                    ai_text = _m.group()
+                                ai_text = ai_resp.json().get('content',[{}])[0].get('text','{}')
+                                ai_text = ai_text.strip().lstrip('```json').rstrip('```').strip()
                                 parsed = json.loads(ai_text)
 
                                 if parsed.get('교육신청여부'):
@@ -6992,14 +6477,13 @@ JSON으로만 응답하세요 (설명 없이).
                                         '추가참석자': parsed.get('추가참석자', []),
                                         '발신자': sender,
                                         '수신일': datetime.today().strftime('%Y-%m-%d'),
+                                        # 개별 회신 제목 우선, 없으면 검색어 제목에서 회차 추출
                                         '교육회차': extract_edu_round(subject) or extract_edu_round(mail_subject_input),
                                         '비고': ''
                                     })
                                     new_count += 1
-                                else:
-                                    st.caption(f"⊘ {sender[:30]} — AI가 신청 아님으로 판정 (기업명: {parsed.get('기업명','?')})")
-                            except Exception as _pe:
-                                st.caption(f"⚠️ {sender[:30]} — 파싱 실패: {str(_pe)[:60]}")
+                            except:
+                                pass
 
                             prog.progress((i+1)/len(msgs))
 
@@ -7021,23 +6505,16 @@ JSON으로만 응답하세요 (설명 없이).
         display_cols = ['기업명','담당자명','연락처','인원','교육회차','수신일','비고']
         df_edu_show = df_edu[[c for c in display_cols if c in df_edu.columns]]
 
-        _edit_mode = st.toggle("✏️ 편집 모드", value=False, key="edu_edit_toggle",
-                               help="켜면 인원·비고를 직접 수정할 수 있습니다")
-
-        if _edit_mode:
-            edited_edu = st.data_editor(
-                df_edu_show,
-                use_container_width=True,
-                hide_index=True,
-                num_rows="dynamic",
-                column_config={
-                    "인원": st.column_config.NumberColumn("인원", min_value=1),
-                    "비고": st.column_config.TextColumn("비고"),
-                }
-            )
-        else:
-            render_html_table(df_edu_show)
-            edited_edu = df_edu_show
+        edited_edu = st.data_editor(
+            df_edu_show,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="dynamic",
+            column_config={
+                "인원": st.column_config.NumberColumn("인원", min_value=1),
+                "비고": st.column_config.TextColumn("비고"),
+            }
+        )
 
         col1, col2 = st.columns(2)
         with col1:
@@ -7148,21 +6625,17 @@ elif page == "발송 이력":
             if len(df_h) > 200:
                 st.caption(f"※ 최근 200건만 표시 (전체 {len(df_h)}건)")
 
-            _edit_h = st.toggle("✏️ 편집 모드", value=False, key="hist_edit_toggle",
-                                help="켜면 신청여부·선정결과를 직접 입력할 수 있습니다")
-            if _edit_h:
-                edited = st.data_editor(df_show_h, use_container_width=True, hide_index=True,
-                    column_config={
-                        "신청여부":st.column_config.SelectboxColumn("신청여부",options=["","Y","N"]),
-                        "선정결과":st.column_config.SelectboxColumn("선정결과",options=["","선정","미선정","대기"]),
-                    })
-                if st.button("💾 드라이브 저장"):
-                    with st.spinner("저장 중..."):
-                        df_h.iloc[-len(edited):] = edited.values
-                        save_excel(drive, df_h, HISTORY_FILE, "발송이력", "375623")
-                    st.success("저장 완료")
-            else:
-                render_html_table(df_show_h, max_rows=200)
+            edited = st.data_editor(df_show_h, use_container_width=True, hide_index=True,
+                column_config={
+                    "신청여부":st.column_config.SelectboxColumn("신청여부",options=["","Y","N"]),
+                    "선정결과":st.column_config.SelectboxColumn("선정결과",options=["","선정","미선정","대기"]),
+                })
+            if st.button("💾 드라이브 저장"):
+                with st.spinner("저장 중..."):
+                    # 편집된 부분을 전체 df_h에 반영
+                    df_h.iloc[-len(edited):] = edited.values
+                    save_excel(drive, df_h, HISTORY_FILE, "발송이력", "375623")
+                st.success("저장 완료")
 
             st.divider()
             st.markdown("**📅 공통 캘린더 일괄 등록**")
@@ -7256,117 +6729,14 @@ elif page == "발송 이력":
             st.download_button("📥 엑셀 다운로드", buf.getvalue(), HISTORY_FILE,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-        # ── 자동 백업 복원 ──────────────────────────────
-        st.divider()
-        with st.expander("🛟 자동 백업 · 복원", expanded=False):
-            st.caption("명단·이력·교육신청 등 주요 파일은 저장 직전 자동으로 백업됩니다 "
-                       f"(파일당 최근 {BACKUP_KEEP}개 보관). 잘못 저장했을 때 이전 버전으로 되돌릴 수 있어요.")
-            try:
-                _bak_files = drive_list_files_prefix("[백업]")
-            except Exception:
-                _bak_files = []
-            if not _bak_files:
-                st.info("아직 백업이 없습니다. 주요 파일을 한 번 저장하면 이때부터 백업이 쌓입니다.")
-            else:
-                import re as _re
-                _opts = {}
-                for f in _bak_files:
-                    nm = f['name']
-                    m = _re.match(r'\[백업\](.+)_(\d{8}_\d{6})\.(\w+)$', nm)
-                    if m:
-                        stem, ts, ext = m.groups()
-                        pretty = f"{stem}.{ext}  ·  {ts[:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}:{ts[13:15]}"
-                        _opts[pretty] = (f['id'], f"{stem}.{ext}")
-                _pick = st.selectbox("복원할 백업 선택", ["(선택)"] + list(_opts.keys()),
-                                     key="restore_pick")
-                if _pick != "(선택)":
-                    _fid, _target = _opts[_pick]
-                    st.warning(f"이 백업을 **{_target}** 로 덮어씁니다. 현재 파일은 복원 직전 다시 백업됩니다.")
-                    if st.button("↩️ 이 버전으로 복원", type="primary", key="do_restore"):
-                        try:
-                            _content = drive_download_file(_fid)
-                            _ext = _target.rsplit('.', 1)[-1]
-                            _mime = ("application/json" if _ext == "json"
-                                     else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                            ok = drive_upload(drive, _target, _content, _mime)
-                            if ok:
-                                st.success(f"복원 완료 — {_target}. 페이지를 새로고침하면 반영됩니다.")
-                            else:
-                                st.error("복원 실패 — 드라이브 저장 오류")
-                        except Exception as e:
-                            st.error(f"복원 실패: {e}")
-
-elif page == "클릭 반응":
-        st.title("📊 클릭 반응 분석")
-        info_box("클릭 반응",
-            """
-    맞춤공고 메일의 '보기' 링크 클릭을 추적합니다.
-
-    **회신 없이도** 어느 기업이 어떤 공고에 관심 있는지 파악할 수 있어요.
-    클릭 = 관심 신호. 활발한 기업에 집중하고, 관심 분야를 읽어냅니다.
-            """,
-            "메일 링크 클릭 시 자동 기록 → 이 화면에서 집계")
-
-        with st.spinner("클릭 로그 불러오는 중..."):
-            dfc = load_click_log()
-
-        if dfc.empty:
-            st.info("아직 클릭 데이터가 없습니다. 맞춤공고 메일 발송 후, 기업이 '보기'를 "
-                    "누르면 여기에 집계됩니다.")
-        else:
-            # 컬럼 정규화 (시각·기업명·공고ID·공고명)
-            colmap = {}
-            for c in dfc.columns:
-                cs = str(c)
-                if '시각' in cs or 'time' in cs.lower(): colmap[c] = '시각'
-                elif '기업' in cs or 'co' in cs.lower(): colmap[c] = '기업명'
-                elif 'ID' in cs or 'notice' in cs.lower(): colmap[c] = '공고ID'
-                elif '공고명' in cs or 'name' in cs.lower(): colmap[c] = '공고명'
-            dfc = dfc.rename(columns=colmap)
-            # 테스트 클릭 제외
-            dfc = dfc[~dfc['기업명'].astype(str).str.contains('테스트', na=False)]
-            dfc = dfc[dfc['기업명'].astype(str).str.strip() != ""]
-
-            if dfc.empty:
-                st.info("실제 기업 클릭이 아직 없습니다. (테스트 클릭은 제외됩니다)")
-            else:
-                c1, c2, c3 = st.columns(3)
-                c1.metric("총 클릭", len(dfc))
-                c2.metric("클릭한 기업 수", dfc['기업명'].nunique())
-                c3.metric("클릭된 공고 수", dfc['공고ID'].nunique())
-                st.divider()
-
-                st.subheader("🏢 기업별 클릭 (관심도 순)")
-                by_co = (dfc.groupby('기업명')
-                         .agg(클릭수=('공고ID', 'size'),
-                              관심공고수=('공고ID', 'nunique'))
-                         .reset_index()
-                         .sort_values('클릭수', ascending=False))
-                render_html_table(by_co)
-
-                st.subheader("📋 공고별 클릭 (인기 순)")
-                by_notice = (dfc.groupby(['공고ID', '공고명'])
-                             .size().reset_index(name='클릭수')
-                             .sort_values('클릭수', ascending=False))
-                render_html_table(by_notice[['공고명', '클릭수']].head(20))
-
-                st.subheader("🔍 기업별 관심 공고 상세")
-                _sel_co = st.selectbox("기업 선택", ["(전체)"] + by_co['기업명'].tolist())
-                _view = dfc if _sel_co == "(전체)" else dfc[dfc['기업명'] == _sel_co]
-                render_html_table(_view[['시각', '기업명', '공고명']]
-                                  .sort_values('시각', ascending=False))
-
-                st.caption(f"데이터 기준: 시트에서 실시간 로드 · 총 {len(dfc)}건")
-
 elif page == "설정":
     drive = _get_drive()
     st.title("설정")
     st.caption("키워드·매칭 설정 / 드라이브 연동 / 인증 관리")
 
-    tab_s1, tab_s2, tab_s3, tab_s4, tab_s5, tab_s6 = st.tabs([
+    tab_s1, tab_s2, tab_s3, tab_s4, tab_s5 = st.tabs([
         "🎯 축1 — 지원대상", "📋 축2 — 사업성격",
-        "🏢 기업별 키워드", "⚖️ 매칭 가중치", "🔧 시스템 설정",
-        "📅 교육/행사 설정"
+        "🏢 기업별 키워드", "⚖️ 매칭 가중치", "🔧 시스템 설정"
     ])
     kw_data = load_json(drive, KEYWORDS_FILE) or {}
     HIGH_kw, MID_kw = load_keywords(drive)
@@ -7712,54 +7082,7 @@ elif page == "설정":
             else:
                 st.error("초기화 실패 — 드라이브 연결을 확인하세요.")
 
-    # ── 탭6: 교육/행사 설정 ────────────────────────────
-    with tab_s6:
-        st.subheader("📅 교육/행사 정보 설정")
-        st.caption("여기 입력한 값이 교육 안내 메일에 자동 반영됩니다. "
-                   "매달 코드를 고칠 필요 없이, 이 화면에서 회차·강사·일시만 바꾸면 됩니다.")
 
-        _ev = load_event_config(drive)
-        c1, c2 = st.columns(2)
-        with c1:
-            _v_round = st.text_input("회차 (YYYY-MM)", _ev.get("회차", ""), key="ev_round")
-            _v_topic = st.text_input("주제", _ev.get("주제", ""), key="ev_topic")
-            _v_lect  = st.text_input("강사명", _ev.get("강사", ""), key="ev_lect")
-            _v_org   = st.text_input("강사 소속", _ev.get("소속", ""), key="ev_org")
-        with c2:
-            _v_when  = st.text_input("일시 (전체)", _ev.get("일시", ""), key="ev_when")
-            _v_when_s= st.text_input("일시 (짧게, 배지용)", _ev.get("일시_짧게", ""), key="ev_when_s")
-            _v_how   = st.text_input("방식", _ev.get("방식", ""), key="ev_how")
-            _v_form  = st.text_input("신청 폼 링크 (구글폼)", _ev.get("신청폼_link", ""), key="ev_form")
-
-        st.markdown("**Zoom 접속 정보**")
-        z1, z2, z3 = st.columns(3)
-        _v_zlink = z1.text_input("Zoom 링크", _ev.get("zoom_link", ""), key="ev_zlink")
-        _v_zid   = z2.text_input("회의 ID", _ev.get("zoom_id", ""), key="ev_zid")
-        _v_zpw   = z3.text_input("비밀번호", _ev.get("zoom_pw", ""), key="ev_zpw")
-
-        st.markdown("**커리큘럼** (한 줄에 하나씩)")
-        _v_curr = st.text_area("커리큘럼 항목",
-                               "\n".join(_ev.get("커리큘럼", [])),
-                               height=120, key="ev_curr")
-
-        if st.button("💾 교육/행사 설정 저장", type="primary", key="ev_save"):
-            _new = {
-                "회차": _v_round.strip(), "주제": _v_topic.strip(),
-                "강사": _v_lect.strip(), "소속": _v_org.strip(),
-                "일시": _v_when.strip(), "일시_짧게": _v_when_s.strip(),
-                "방식": _v_how.strip(),
-                "zoom_link": _v_zlink.strip(), "zoom_id": _v_zid.strip(),
-                "zoom_pw": _v_zpw.strip(), "신청폼_link": _v_form.strip(),
-                "커리큘럼": [ln.strip() for ln in _v_curr.split("\n") if ln.strip()],
-            }
-            if save_json(drive, _new, EVENT_CONFIG_FILE):
-                st.success("✅ 저장 완료 — 교육 안내 메일에 이 값이 반영됩니다.")
-            else:
-                st.error("저장 실패 — 드라이브 연결을 확인하세요.")
-
-        st.divider()
-        st.caption("💡 이 설정은 안내 메일의 교육 템플릿에서 사용됩니다. "
-                   "다음 교육 회차를 준비할 때 이 값만 바꾸면 코드 수정이 필요 없습니다.")
 
 # ══════════════════════════════════════════════════════
 # 캘린더 관리
