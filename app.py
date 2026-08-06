@@ -131,11 +131,11 @@ def build_aug_edu_html(company="", co_kw="", co_area="", co_type="",
                        deadline="2026-08-07", is_reminder=True):
     """8월 교육 신청 안내/리마인더 메일 HTML.
     is_reminder=True면 마감 임박 톤, D-day 자동계산, 기업 키워드 카드 포함."""
-    from datetime import datetime as _dt
+    from datetime import datetime as _dt, date as _date
     _dl_short = "8/7(금)"
     try:
-        _dl = _dt.strptime(deadline, "%Y-%m-%d")
-        _days = (_dl - _dt.today()).days
+        _dl = _dt.strptime(deadline, "%Y-%m-%d").date()
+        _days = (_dl - _date.today()).days  # 시각 무시, 날짜 차이만
         _dday_txt = "마감" if _days < 0 else ("D-DAY" if _days == 0 else f"D-{_days}")
         _wd = ['월','화','수','목','금','토','일'][_dl.weekday()]
         _dl_short = f"{_dl.month}/{_dl.day}({_wd})"
