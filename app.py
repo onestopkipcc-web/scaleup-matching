@@ -539,6 +539,76 @@ REALM_CODE   = {
 _DEFAULT_TEST_RECIPIENTS = ["fbwlgns819@naver.com","fbwlgns819@kip.re.kr"]
 
 
+def build_together_html(company="", 담당자=""):
+    """함께하기 회원소개 가입 독려 메일 HTML (선정기업 대상)."""
+    _hi = f"{담당자} 담당자님" if 담당자 else "담당자님"
+    return f"""<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F2F4F7;font-family:'Apple SD Gothic Neo',Arial,sans-serif;">
+<div style="max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:14px;overflow:hidden;border:1px solid #E2E5EA;">
+  <div style="background:#0F1D2E;padding:28px 28px 26px;">
+    <p style="margin:0 0 3px;font-size:10px;letter-spacing:2px;color:#7A96B2;">원스톱 스케일업 · 함께하기</p>
+    <p style="margin:8px 0 10px;font-size:23px;font-weight:600;color:#FFFFFF;line-height:1.4;">기업 회원소개 페이지에<br><span style="color:#5DCAA5;">귀사를 등록</span>해 주세요</p>
+    <p style="margin:0;font-size:13px;color:#A8BDD1;">참여 기업을 소개하고, 협력의 접점을 만드는 공간입니다</p>
+  </div>
+  <div style="height:4px;background:linear-gradient(to right,#5DCAA5 0%,#4285F4 100%);"></div>
+  <div style="background:#FFFFFF;padding:24px 28px;">
+    <p style="margin:0 0 4px;font-size:14px;color:#1C2B3A;">{_hi}, 안녕하세요.</p>
+    <p style="margin:0 0 16px;font-size:13px;color:#5A6675;line-height:1.75;">원스톱 스케일업 운영팀입니다. 참여 기업을 소개하고 기업 간 협력의 접점을 만들기 위해 <span style="color:#1C2B3A;font-weight:500;">'함께하기' 회원소개 페이지</span>를 준비했습니다. 페이지 오픈을 앞두고, 먼저 귀사의 정보를 등록해 주시면 감사하겠습니다.</p>
+    <div style="margin-bottom:20px;padding:13px 16px;background:#FBFAF6;border:1px solid #E8E2CF;border-radius:8px;">
+      <p style="margin:0;font-size:12px;color:#6B6550;line-height:1.75;">💡 선정 당시에는 회원소개 페이지가 준비되기 전이라 설문으로 정보를 받았습니다. 이제 페이지가 마련되어, <span style="font-weight:600;color:#5A5340;">직접 등록하는 방식</span>으로 다시 안내드립니다.</p>
+    </div>
+    <div style="margin-bottom:20px;padding:14px 16px;background:#F5F9FE;border:1px solid #D6E3F5;border-radius:10px;">
+      <p style="margin:0;font-size:12px;color:#5A6675;line-height:1.8;">등록하신 기업 소개와 협력 희망 분야는, 다른 기업·기관이 귀사를 찾아보고 협력을 제안하는 데 활용됩니다.</p>
+    </div>
+    <p style="margin:0 0 14px;font-size:14px;font-weight:600;color:#1C2B3A;">📌 등록은 3단계면 됩니다</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px;">
+      <tr>
+        <td width="30%" align="center" valign="top" style="padding:0 4px;">
+          <div style="background:#0F1D2E;border-radius:10px;padding:16px 8px;">
+            <p style="margin:0 0 6px;font-size:22px;">🔗</p>
+            <p style="margin:0;font-size:12px;font-weight:600;color:#FFFFFF;">1. 접속·가입</p>
+            <p style="margin:4px 0 0;font-size:10px;color:#A8BDD1;line-height:1.4;">링크에서<br>회원가입</p>
+          </div>
+        </td>
+        <td width="5%" align="center" style="font-size:16px;color:#B0BCC9;">›</td>
+        <td width="30%" align="center" valign="top" style="padding:0 4px;">
+          <div style="background:#16293F;border-radius:10px;padding:16px 8px;">
+            <p style="margin:0 0 6px;font-size:22px;">✏️</p>
+            <p style="margin:0;font-size:12px;font-weight:600;color:#FFFFFF;">2. 정보 입력</p>
+            <p style="margin:4px 0 0;font-size:10px;color:#A8BDD1;line-height:1.4;">기업 소개·<br>협력 분야</p>
+          </div>
+        </td>
+        <td width="5%" align="center" style="font-size:16px;color:#B0BCC9;">›</td>
+        <td width="30%" align="center" valign="top" style="padding:0 4px;">
+          <div style="background:#1F6F52;border-radius:10px;padding:16px 8px;">
+            <p style="margin:0 0 6px;font-size:22px;">✅</p>
+            <p style="margin:0;font-size:12px;font-weight:600;color:#FFFFFF;">3. 등록 완료</p>
+            <p style="margin:4px 0 0;font-size:10px;color:#C3E8D5;line-height:1.4;">회원소개<br>노출</p>
+          </div>
+        </td>
+      </tr>
+    </table>
+    <div style="text-align:center;margin:22px 0;">
+      <a href="http://kipcc.eumsvr.com" style="display:inline-block;background:#185FA5;color:#FFFFFF !important;font-size:15px;font-weight:600;text-decoration:none;padding:14px 40px;border-radius:8px;">회원 가입하러 가기 →</a>
+      <p style="margin:10px 0 0;font-size:11px;color:#8A96A3;">http://kipcc.eumsvr.com</p>
+    </div>
+    <div style="background:#FAFBFC;border:1px solid #E8ECF1;border-radius:8px;padding:14px 16px;margin-bottom:14px;">
+      <p style="margin:0 0 6px;font-size:12px;font-weight:600;color:#1C2B3A;">📝 입력하실 내용</p>
+      <p style="margin:0;font-size:12px;color:#5A6675;line-height:1.8;">· 기업 소개, 제품·기술 분야<br>· 협력 희망 분야 · 진출 국가 등</p>
+    </div>
+    <div style="padding:12px 16px;background:#F7F9FC;border:1px solid #E4EAF1;border-radius:8px;">
+      <p style="margin:0;font-size:12px;color:#5A6675;line-height:1.75;">🔒 공개를 원하지 않는 정보가 있으시면, 운영팀(<a href="mailto:onestop.kipcc@gmail.com" style="color:#185FA5 !important;text-decoration:none;">onestop.kipcc@gmail.com</a>)으로 말씀해 주시면 비공개로 처리해 드립니다.</p>
+    </div>
+  </div>
+  <div style="background:#0A1628;padding:18px 28px;">
+    <p style="margin:0;font-size:12px;color:#A8BDD1;line-height:1.8;">원스톱 스케일업 운영팀<br><a href="mailto:onestop.kipcc@gmail.com" style="color:#6EE7B7 !important;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
+    <p style="margin:8px 0 0;font-size:11px;color:#5F7A96;">가입이나 입력 중 궁금하신 점은 이 메일로 편하게 문의해 주세요.</p>
+  </div>
+</div>
+</body></html>"""
+
+
 def save_ai_analysis(drive):
     """ai_analysis session_state를 드라이브에 영구 저장"""
     data = st.session_state.get('ai_analysis', {})
@@ -5432,6 +5502,7 @@ JSON만 응답 (코드블록 없이):
                 "선정 기업 축하 및 프로그램 안내",
                 "7월 교육 프로그램 신청 안내",
                 "8월 교육 리마인더 (미신청 대상)",
+                "함께하기 회원소개 가입 안내",
                 "CES 혁신상 밋업 신청 안내",
                 "교육 프로그램 수요조사",
                 "성과집계 조사 요청",
@@ -5446,6 +5517,10 @@ JSON만 응답 (코드블록 없이):
             "8월 교육 리마인더 (미신청 대상)": {
                 "subject": "[원스톱 스케일업] 8월 교육 신청 마감 안내 (~8/7) — 아직 신청 안 하셨나요?",
                 "body": "8월 교육 신청 마감이 다가와 다시 안내드립니다. 마감 전에 꼭 신청해 주세요.",
+            },
+            "함께하기 회원소개 가입 안내": {
+                "subject": "[원스톱 스케일업] 함께하기(기업 회원소개) 등록 안내",
+                "body": "함께하기 회원소개 페이지를 준비했습니다. 귀사 정보를 등록해 주세요.",
             },
             "7월 교육 프로그램 신청 안내": {
                 "subject": "[원스톱 스케일업] 7월 교육 프로그램 참여 신청 안내 (7/14~17)",
@@ -5752,7 +5827,7 @@ onestop.kipcc@gmail.com""",
 
         if df_target.empty and not direct_input_email:
             st.warning("발송 대상 기업이 없습니다.")
-        elif (not mail_subject or not mail_body) and template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 리마인더 (미신청 대상)", "CES 혁신상 밋업 신청 안내"):
+        elif (not mail_subject or not mail_body) and template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 리마인더 (미신청 대상)", "함께하기 회원소개 가입 안내", "CES 혁신상 밋업 신청 안내"):
             st.info("제목과 본문을 작성하면 미리보기가 표시됩니다.")
         else:
             sample_company = df_target.iloc[0]['기업명'] if not df_target.empty else "샘플기업"
@@ -5771,8 +5846,14 @@ onestop.kipcc@gmail.com""",
 
             body_html = mail_body.replace('\n', '<br>')
 
+            # 함께하기 가입 안내 HTML 미리보기
+            if template_choice == "함께하기 회원소개 가입 안내":
+                _nm = df_target.iloc[0].get('기업명','') if not df_target.empty else ''
+                sample_html = build_together_html(company=_nm, 담당자='')
+                st.components.v1.html(sample_html, height=1400, scrolling=True)
+
             # 8월 교육 리마인더 전용 HTML 미리보기
-            if template_choice == "8월 교육 리마인더 (미신청 대상)":
+            elif template_choice == "8월 교육 리마인더 (미신청 대상)":
                 _co_kw   = df_target.iloc[0].get('기술키워드','') if not df_target.empty else ''
                 _co_area = df_target.iloc[0].get('관심사업분야','') if not df_target.empty else ''
                 _co_type = df_target.iloc[0].get('기업유형','') if not df_target.empty else ''
@@ -6213,7 +6294,10 @@ onestop.kipcc@gmail.com""",
 
                     # HTML 본문 생성
                     body_html_co = ""
-                    if template_choice == "8월 교육 리마인더 (미신청 대상)":
+                    if template_choice == "함께하기 회원소개 가입 안내":
+                        html_body = build_together_html(
+                            company=str(row.get('기업명','')), 담당자='')
+                    elif template_choice == "8월 교육 리마인더 (미신청 대상)":
                         _co_kw   = str(row.get('기술키워드','') or row.get('키워드보완','') or '')[:40]
                         _co_area = str(row.get('관심사업분야','') or '')
                         _co_type = str(row.get('기업유형','') or '')[:30]
@@ -6472,7 +6556,7 @@ onestop.kipcc@gmail.com""",
                           <a href="{form_link}" style="font-size:13px;color:#10B981;">{form_link}</a>
                         </div>"""
 
-                    if template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 리마인더 (미신청 대상)", "CES 혁신상 밋업 신청 안내"):
+                    if template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 리마인더 (미신청 대상)", "함께하기 회원소개 가입 안내", "CES 혁신상 밋업 신청 안내"):
                         html_body = f"""<!DOCTYPE html>
     <html lang="ko"><head><meta charset="UTF-8"></head>
     <body style="margin:0;padding:0;background:#F2F4F7;
