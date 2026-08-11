@@ -547,6 +547,7 @@ def build_together_html(company="", 담당자=""):
 <body style="margin:0;padding:0;background:#F2F4F7;font-family:'Apple SD Gothic Neo',Arial,sans-serif;">
 <div style="max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:14px;overflow:hidden;border:1px solid #E2E5EA;">
   <div style="background:#0F1D2E;padding:28px 28px 26px;">
+    <img src="{LOGO_URL}" alt="혁신제품지원센터" style="height:28px;margin-bottom:14px;" />
     <p style="margin:0 0 3px;font-size:10px;letter-spacing:2px;color:#7A96B2;">원스톱 스케일업 · 함께하기</p>
     <p style="margin:8px 0 10px;font-size:23px;font-weight:600;color:#FFFFFF;line-height:1.4;">기업 회원소개 페이지에<br><span style="color:#5DCAA5;">귀사를 등록</span>해 주세요</p>
     <p style="margin:0;font-size:13px;color:#A8BDD1;">참여 기업을 소개하고, 협력의 접점을 만드는 공간입니다</p>
@@ -598,7 +599,7 @@ def build_together_html(company="", 담당자=""):
       <p style="margin:0;font-size:12px;color:#5A6675;line-height:1.8;">· 기업 소개, 제품·기술 분야<br>· 협력 희망 분야 · 진출 국가 등</p>
     </div>
     <div style="padding:12px 16px;background:#F7F9FC;border:1px solid #E4EAF1;border-radius:8px;">
-      <p style="margin:0;font-size:12px;color:#5A6675;line-height:1.75;">🔒 공개를 원하지 않는 정보가 있으시면, 운영팀(<a href="mailto:onestop.kipcc@gmail.com" style="color:#185FA5 !important;text-decoration:none;">onestop.kipcc@gmail.com</a>)으로 말씀해 주시면 비공개로 처리해 드립니다.</p>
+      <p style="margin:0;font-size:12px;color:#5A6675;line-height:1.75;">🔒 가입 이후 공개를 원하지 않을 경우 비공개 처리도 가능하니, 운영팀(<a href="mailto:onestop.kipcc@gmail.com" style="color:#185FA5 !important;text-decoration:none;">onestop.kipcc@gmail.com</a>)으로 연락 부탁드립니다.</p>
     </div>
   </div>
   <div style="background:#0A1628;padding:18px 28px;">
