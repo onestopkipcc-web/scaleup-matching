@@ -2571,162 +2571,81 @@ elif page == "공고·매칭":
     drive = _get_drive()
     st.title("공고·매칭")
 
-    tab_cm1, tab_cm1b, tab_cm2 = st.tabs(["📥 공고 수집", "🔍 전문 크롤링", "🎯 매칭 실행·검토"])
+    tab_cm1, tab_cm1b, tab_cm2 = st.tabs(["📊 공고 현황", "🔍 전문 크롤링", "🎯 매칭 실행·검토"])
 
     with tab_cm1:
-        info_box("공고 수집",
+        info_box("공고 현황 (읽기 전용)",
             """
-기업마당 API → 전체 공고 수집 → `notices_db.xlsx` 누적 저장
+공고 수집은 **로컬 PC에서 실행**하고, 앱은 드라이브에 저장된 공고를 **읽기만** 합니다.
 
-**수집 방식**
-- 금융·기술개발·인력·수출·내수·창업·경영·기타 **8개 분야 전체** 수집
-- `pblancId` 기준 **중복 저장 방지** (기존 공고 스킵)
-- 내용 수정된 공고 **자동 업데이트**
-- 마감일 자동 파싱 (비정형 마감일은 공란 처리)
+**왜 이렇게 바뀌었나요?**
+- 기업마당 API가 해외 서버(앱 호스팅)의 접근을 차단하여, 앱에서 직접 수집 시 연결 타임아웃이 발생합니다.
+- 로컬 PC(국내)에서는 정상 수집되므로, 수집은 로컬에서 하고 앱은 그 결과를 읽습니다.
 
-**권장 수집 주기** — 주 1회 (매주 월요일)
+**수집 방법 (주 1회 권장)**
+1. 로컬 폴더에서 `python crawl_notices.py` 실행
+2. 기업마당 전체 공고 수집 + 전문 크롤링 → 드라이브 자동 업로드
+3. 앱은 아래 현황이 갱신되며, 바로 '매칭 실행' 탭에서 매칭 가능
             """,
-            "수집 분야 변경 → 화면의 '수집 분야 선택' 옵션에서 체크박스로 선택")
+            "수집은 로컬 crawl_notices.py로 — 앱에서는 매칭만 실행")
+
         with st.spinner("드라이브에서 공고 DB 로딩 중..."):
             df_n = load_excel(drive, NOTICES_FILE)
 
         if not df_n.empty:
-            c1,c2,c3 = st.columns(3)
-            # 방금 수집한 경우 세션 값 우선 표시
-            db_count = st.session_state.get('notices_count', len(df_n))
-            c1.metric("현재 DB", f"{db_count:,}건")
+            c1, c2, c3 = st.columns(3)
+            db_count = len(df_n)
+            c1.metric("현재 공고 DB", f"{db_count:,}건")
             c2.metric("마지막 수집일", df_n['수집일'].max() if '수집일' in df_n.columns else "—")
-            c3.metric("마감일 파싱 성공",
-                      f"{(df_n['마감일']!='').sum()}건" if '마감일' in df_n.columns else "—")
+            _active = (df_n['마감일'] >= datetime.today().strftime("%Y-%m-%d")).sum() if '마감일' in df_n.columns else 0
+            c3.metric("마감 유효 공고", f"{_active:,}건")
+
+            # 최신성 안내
+            _last = df_n['수집일'].max() if '수집일' in df_n.columns else ""
+            if _last:
+                try:
+                    _days_ago = (datetime.today().date() - datetime.strptime(_last, "%Y-%m-%d").date()).days
+                    if _days_ago == 0:
+                        st.success(f"✅ 오늘 수집된 최신 공고입니다 ({db_count:,}건)")
+                    elif _days_ago <= 7:
+                        st.info(f"📅 마지막 수집: {_days_ago}일 전 ({_last}) — 매칭에 사용 가능합니다")
+                    else:
+                        st.warning(f"⚠️ 마지막 수집이 {_days_ago}일 전({_last})입니다 — 로컬에서 `crawl_notices.py` 재실행을 권장합니다")
+                except Exception:
+                    pass
+        else:
+            st.warning("공고 DB가 비어 있습니다 — 로컬에서 `crawl_notices.py`를 실행해 공고를 수집해 주세요.")
 
         st.divider()
 
-        # 분야 선택 옵션
-        REALM_OPTIONS = {
-            "금융":     "01",
-            "기술개발": "02",
-            "인력":     "03",
-            "수출":     "04",
-            "내수":     "05",
-            "창업":     "06",
-            "경영":     "07",
-            "기타":     "09",
-        }
+        # 로컬 수집 명령 안내 (복사용)
+        with st.expander("💻 로컬 수집 명령어 (복사용)", expanded=False):
+            st.code(
+                'cd "C:\\\\Users\\\\fbwlg\\\\Desktop\\\\26년도\\\\2. 원스톱\\\\7. 정보 전달 체계 구축"\n'
+                'python crawl_notices.py',
+                language="powershell")
+            st.caption("실행하면 기업마당 전체 공고 수집 + 전문 크롤링 후 드라이브에 자동 업로드됩니다. "
+                       "완료 후 이 화면을 새로고침하면 현황이 갱신됩니다.")
 
-        with st.expander("⚙️ 수집 분야 선택 (기본: 전체)", expanded=False):
-            st.caption("원칙은 전체 수집 — 특정 분야만 빠르게 확인할 때 선택")
-            col1, col2, col3, col4 = st.columns(4)
-            selected_realms = {}
-            for i, (name, code) in enumerate(REALM_OPTIONS.items()):
-                col = [col1, col2, col3, col4][i % 4]
-                selected_realms[code] = col.checkbox(name, value=True, key=f"realm_{code}")
-
-            selected_codes = [code for code, checked in selected_realms.items() if checked]
-            if not selected_codes:
-                st.warning("최소 1개 이상 선택 필요")
-                selected_codes = list(REALM_OPTIONS.values())
-
-            st.caption(f"선택된 분야: **{len(selected_codes)}개** / {', '.join([k for k,v in REALM_OPTIONS.items() if v in selected_codes])}")
-
-        if st.button("🔄 지금 수집 실행", type="primary"):
-            REALM_CODES = selected_codes
-            all_items, seen = [], set()
-            prog = st.progress(0); log_area = st.empty(); logs = []
-            realm_name_map = {v:k for k,v in REALM_OPTIONS.items()}
-
-            import time as _time
-            for idx, code in enumerate(REALM_CODES):
-                params = {"crtfcKey":API_KEY,"dataType":"json","searchCnt":"0","searchLclasId":code}
-                realm_name = realm_name_map.get(code, code)
-                success = False
-                for retry in range(3):  # 최대 3회 재시도
-                    try:
-                        _time.sleep(0.8 if retry == 0 else 2)  # 첫 요청 0.8초, 재시도 2초 대기
-                        resp  = requests.get(BASE_URL, params=params, timeout=40)
-                        items = resp.json().get('jsonArray', [])
-                        for item in items:
-                            pid = item.get('pblancId','')
-                            if pid and pid not in seen:
-                                seen.add(pid); all_items.append(item)
-                        logs.append(f"✅ {realm_name}: {len(items)}건")
-                        success = True
-                        break
-                    except Exception as e:
-                        if retry < 2:
-                            logs.append(f"⚠️ {realm_name}: 재시도 중... ({retry+1}/3)")
-                        else:
-                            logs.append(f"❌ {realm_name}: 수집 실패 ({e})")
-                    log_area.code("\n".join(logs))
-                prog.progress((idx+1)/len(REALM_CODES)); log_area.code("\n".join(logs))
-
-            def to_row(item):
-                def pdl(s):
-                    try: return datetime.strptime(re.sub(r'\.', '-', s.split('~')[-1].strip()), "%Y-%m-%d").strftime("%Y-%m-%d")
-                    except: return ""
-                return {"pblancId":item.get('pblancId',''),"공고명":item.get('pblancNm',''),
-                        "주관기관":item.get('jrsdInsttNm',''),"분야":item.get('pldirSportRealmLclasCodeNm',''),
-                        "세부분야":item.get('pldirSportRealmMlsfcCodeNm',''),
-                        "접수기간":item.get('reqstBeginEndDe',''),"마감일":pdl(item.get('reqstBeginEndDe','')),
-                        "지원대상":item.get('trgetNm',''),
-                        "사업개요":strip_html(item.get('bsnsSumryCn','')),  # API 전체 반환값 저장
-                        "해시태그":item.get('hashtags',''),"공고링크":item.get('pblancUrl',''),
-                        "전문내용":"",  # 크롤링 후 채워짐
-                        "수정일":item.get('updtPnttm',''),"수집일":datetime.today().strftime("%Y-%m-%d")}
-
-            today = datetime.today().strftime("%Y-%m-%d")
-            ex_map = {r['pblancId']:r.get('수정일','') for _,r in df_n.iterrows()} if not df_n.empty else {}
-            new_rows, upd_rows = [], []
-            dup_count = 0
-            for item in all_items:
-                pid = item.get('pblancId','')
-                if not pid: continue
-                row = to_row(item)
-                if pid not in ex_map:
-                    new_rows.append(row)
-                elif ex_map[pid] != item.get('updtPnttm',''):
-                    upd_rows.append(row)
-                else:
-                    dup_count += 1
-
-            if not df_n.empty:
-                upd_ids  = {r['pblancId'] for r in upd_rows}
-                df_base  = df_n[~df_n['pblancId'].isin(upd_ids)].copy()
-                # 기존 공고도 수집일 오늘로 갱신 (마지막 수집일 반영)
-                df_base['수집일'] = today
-                df_final = pd.concat([df_base, pd.DataFrame(new_rows+upd_rows)], ignore_index=True)
-            else:
-                df_final = pd.DataFrame(new_rows)
-
-            summary = "\n".join(logs) + f"\n\n📊 결과 요약\n  신규: {len(new_rows)}건 / 업데이트: {len(upd_rows)}건 / 중복유지: {dup_count}건 / 총 DB: {len(df_final):,}건"
-            log_area.code(summary)
-
-            with st.spinner("드라이브 저장 중..."):
-                save_ok = save_excel(drive, df_final, NOTICES_FILE, "공고DB", "00897B")
-
-            prog.progress(1.0)
-            if save_ok:
-                st.session_state['notices_count'] = len(df_final)
-                st.session_state['notices_new']   = len(new_rows)
-                st.session_state['notices_upd']   = len(upd_rows)
-                st.session_state['pending_crawl'] = True  # 크롤링 필요 플래그
-                st.success(
-                    f"✅ 수집 완료 — 총 {len(df_final):,}건 "
-                    f"(신규 {len(new_rows)} / 업데이트 {len(upd_rows)} / 중복유지 {dup_count})"
-                )
-                st.rerun()
-            else:
-                st.error("❌ 드라이브 저장 실패 — 설정 메뉴에서 드라이브 연동 확인 필요")
-                st.info(f"수집은 완료: 총 {len(df_final):,}건 (신규 {len(new_rows)} / 업데이트 {len(upd_rows)} / 중복 {dup_count})")
+        if st.button("🔄 현황 새로고침"):
+            st.rerun()
 
         if not df_n.empty:
             st.divider()
             st.subheader("공고 DB 미리보기 (최근 20건)")
             cols = [c for c in ["공고명","주관기관","분야","접수기간","마감일"] if c in df_n.columns]
-            st.dataframe(df_n[cols].head(20), use_container_width=True, hide_index=True)
+            _prev = df_n.copy()
+            if '수집일' in _prev.columns:
+                _prev = _prev.sort_values('수집일', ascending=False)
+            render_html_table(_prev[cols].head(20), max_rows=20)
 
     with tab_cm1b:
         st.subheader("📄 공고 전문 크롤링")
         st.caption("수집된 공고의 상세 내용을 크롤링합니다. 전문이 있어야 매칭 정확도가 높아집니다.")
+
+        st.info("💻 전문 크롤링도 **로컬 PC에서 `crawl_notices.py`** 실행 시 함께 처리됩니다 "
+                "(공고 수집 + 전문 크롤링 통합). 아래는 현재 전문 DB 현황이며, 앱에서 직접 크롤링은 "
+                "기업마당 접근 차단으로 권장하지 않습니다.")
 
         with st.spinner("전문 DB 현황 확인 중..."):
             df_detail = load_excel(drive, DETAIL_FILE)
