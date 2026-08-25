@@ -4174,7 +4174,7 @@ elif page == "발송":
                 _cards_html += """<div style="border-top:1px solid #E8E2D5;
                                     padding-top:14px;margin-top:8px;">
                   <p style="margin:0 0 10px;font-size:10px;font-weight:700;
-                             color:rgba(255,255,255,0.35);letter-spacing:2px;">
+                             color:#A08A5C;letter-spacing:2px;">
                     📌 &nbsp;이런 공고도 있어요</p>"""
                 for n in _ss: _cards_html += _prev_card(n)
                 _cards_html += "</div>"
@@ -4203,14 +4203,14 @@ elif page == "발송":
         # 0건 안내 문구
         if _is_zero_prev:
             _common_html += """
-            <div style="background:rgba(255,255,255,0.04);
-                        border:1px solid rgba(255,255,255,0.08);
+            <div style="background:#F5F0E6;
+                        border:1px solid #E0D5BF;
                         border-radius:8px;padding:14px 16px;margin-bottom:16px;">
               <p style="margin:0 0 6px;font-size:13px;font-weight:500;
-                         color:rgba(255,255,255,0.8);">
+                         color:#5A5548;">
                 이번 주 귀사에 딱 맞는 공고를 찾지 못했습니다.
               </p>
-              <p style="margin:0;font-size:12px;color:#9FD6C0;line-height:1.7;">
+              <p style="margin:0;font-size:12px;color:#8A7B5A;line-height:1.7;">
                 더 정확한 공고를 드리기 위해 추가 키워드나 관심 분야를
                 아래 답장하기 버튼으로 알려주세요.
               </p>
@@ -4220,21 +4220,21 @@ elif page == "발송":
             _common_html += """<div style="border-top:1px solid #E8E2D5;
               padding-top:14px;margin-top:8px;">
               <p style="margin:0 0 6px;font-size:10px;font-weight:700;
-                         color:#F59E0B;letter-spacing:2px;">
+                         color:#A08A5C;letter-spacing:2px;">
                 📢 &nbsp;다른 기업들이 관심 가진 공고</p>
-              <p style="margin:0 0 10px;font-size:11px;color:rgba(255,255,255,0.4);">
+              <p style="margin:0 0 10px;font-size:11px;color:#8A8478;">
                 비슷한 업종·분야의 기업들이 추천받은 공고입니다. 참고해보세요.</p>"""
             for n in _review_prev[:3]:
-                _common_html += f"""<div style="background:rgba(255,255,255,0.03);
-                  border:1px solid rgba(255,255,255,0.06);border-radius:8px;
+                _common_html += f"""<div style="background:#FBF9F5;
+                  border:1px solid #E8E2D5;border-radius:8px;
                   padding:10px 14px;margin-bottom:6px;
                   display:flex;justify-content:space-between;align-items:center;">
                   <div>
-                    <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.6);">{n.get('공고명','')[:35]}</p>
-                    <p style="margin:2px 0 0;font-size:11px;color:rgba(255,255,255,0.25);">
+                    <p style="margin:0;font-size:13px;color:#5A5548;">{n.get('공고명','')[:35]}</p>
+                    <p style="margin:2px 0 0;font-size:11px;color:#9A9488;">
                       {n.get('주관기관','')} · {n.get('마감일','상시')}</p>
                   </div>
-                  <a href="{n.get('공고링크','#')}" style="font-size:11px;color:#10B981;
+                  <a href="{n.get('공고링크','#')}" style="font-size:11px;color:#B0894A;font-weight:700;
                      white-space:nowrap;padding-left:12px;text-decoration:none;">보기 →</a>
                 </div>"""
             _common_html += "</div>"
@@ -4314,24 +4314,24 @@ elif page == "발송":
                 💬 의견 남기기</a>
             </div>
           </div>
-          <div style="background:#0F1D2E;padding:0 28px 20px;">
-            <div style="background:#17293F;border:1px solid #DDD8CE;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
-              <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#5DCAA5;letter-spacing:1px;">
+          <div style="background:#FBFAF7;padding:0 28px 20px;">
+            <div style="background:#FFFFFF;border:1.5px solid #D8D0C0;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+              <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#22344F;letter-spacing:1px;">
                 ✏️ 추가 키워드가 있으신가요?</p>
-              <p style="margin:0 0 10px;font-size:12px;color:#A8BDD1;line-height:1.6;">
+              <p style="margin:0 0 10px;font-size:12px;color:#6B6558;line-height:1.6;">
                 더 잘 맞는 공고를 드리기 위해 받고 싶은 분야나 키워드를 답장으로 알려주세요.</p>
               <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_kw_body}"
                  style="display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;
-                        color:#04342C;background:#5DCAA5;border-radius:6px;text-decoration:none;">
+                        color:#FFFFFF;background:#22344F;border-radius:6px;text-decoration:none;">
                 답장하기 →</a>
             </div>
             <div style="background:#FFFFFF;border:1.5px solid #D8D0C0;border-radius:10px;padding:16px 18px;">
-              <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#5DCAA5;letter-spacing:1px;">
+              <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#9A7B3F;letter-spacing:1px;">
                 📅 공고 마감일 캘린더</p>
-              <p style="margin:0 0 10px;font-size:12px;color:#9FD6C0;line-height:1.6;">
+              <p style="margin:0 0 10px;font-size:12px;color:#6B6558;line-height:1.6;">
                 전체 지원사업 공고 마감일을 한눈에 확인하세요.</p>
               {"<a href='"+CALENDAR_LINK_PREV+"' style='display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;color:#3A2E15;background:#C9A96A;border-radius:7px;text-decoration:none;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK_PREV else ""}
-              <p style="margin:10px 0 0;font-size:11px;color:#9FD6C0;line-height:1.7;">
+              <p style="margin:10px 0 0;font-size:11px;color:#8A7B5A;line-height:1.7;">
                 💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
               </p>
             </div>
@@ -4517,8 +4517,8 @@ elif page == "발송":
                         <td width="60" align="center" valign="middle"
                             style="padding:14px 12px;border-left:1px solid #EDEBE5;">
                           <a href="{_trk}"
-                             style="display:inline-block;font-size:12px;font-weight:600;
-                                    color:#5DCAA5;text-decoration:none;white-space:nowrap;">
+                             style="display:inline-block;font-size:12px;font-weight:700;
+                                    color:#B0894A;text-decoration:none;white-space:nowrap;">
                             보기 →
                           </a>
                         </td>
@@ -4582,7 +4582,7 @@ elif page == "발송":
                                  text-transform:uppercase;">
                         📎 &nbsp;참고해보실 만한 공고
                       </p>
-                      <p style="margin:0 0 10px;font-size:11px;color:rgba(255,255,255,0.35);">
+                      <p style="margin:0 0 10px;font-size:11px;color:#8A8478;">
                         {_ref_desc}
                       </p>"""
                     for i, n in enumerate(notices_review[:3]):
@@ -4596,28 +4596,28 @@ elif page == "발송":
                 fb_bad  = _up_fb.quote("[이번 주 공고 안내 피드백]\n반응: 별로였어요\n\n[추가 의견]\n어떤 점이 아쉬우셨나요?\n\n[Gmail 주소]\n")
                 fb_msg  = _up_fb.quote("[이번 주 공고 안내 피드백]\n\n[추가 의견]\n\n[더 받고 싶은 분야/키워드]\n\n[Gmail 주소]\n")
                 rows_html += f"""
-                <div style="border-top:1px solid #1E3048;
+                <div style="border-top:1px solid #E8E2D5;
                             margin-top:20px;padding-top:16px;text-align:center;">
-                  <p style="margin:0 0 12px;font-size:12px;color:rgba(255,255,255,0.4);">
+                  <p style="margin:0 0 12px;font-size:12px;color:#8A8478;">
                     이번 공고 안내가 도움이 됐나요?
                   </p>
                   <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_good}"
                      style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                            font-weight:600;color:#5DCAA5;background:#0F3A2E;
-                        border:1px solid #1D6E56;border-radius:8px;text-decoration:none;">
+                            font-weight:600;color:#9A7B3F;background:#F3EDE0;
+                        border:1px solid #E0D5BF;border-radius:8px;text-decoration:none;">
                     👍 도움됐어요
                   </a>
                   <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_bad}"
                      style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                            font-weight:600;color:#A8BDD1;background:#17293F;
-                        border:1px solid #24405F;border-radius:8px;text-decoration:none;">
+                            font-weight:600;color:#8A8478;background:#EDEBE5;
+                        border:1px solid #DDD8CE;border-radius:8px;text-decoration:none;">
                     👎 별로였어요
                   </a>
                   <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_msg}"
                      style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                            font-weight:600;color:rgba(255,255,255,0.55);
-                            background:rgba(255,255,255,0.05);
-                            border:1px solid #24405F;
+                            font-weight:600;color:#8A8478;
+                            background:#F3F1EC;
+                            border:1px solid #DDD8CE;
                             border-radius:8px;text-decoration:none;">
                     💬 의견 남기기
                   </a>
@@ -4640,13 +4640,13 @@ elif page == "발송":
 
                 keyword_sec = f"""
                 <div style="background:#FFFFFF;
-                                  border:1px solid #24405F;
+                            border:1.5px solid #D8D0C0;
                             border-radius:10px;padding:16px 18px;margin:16px 0;">
                   <p style="margin:0 0 8px;color:#22344F;font-weight:700;font-size:11px;
                              letter-spacing:1.5px;text-transform:uppercase;">
                     ✏️ 추가 키워드가 있으신가요?
                   </p>
-                  <p style="margin:0 0 12px;font-size:12px;color:#A8BDD1;line-height:1.7;">
+                  <p style="margin:0 0 12px;font-size:12px;color:#6B6558;line-height:1.7;">
                     더 잘 맞는 공고를 드리기 위해 받고 싶은 분야나 키워드를 답장으로 알려주세요.
                   </p>
                   <a href="mailto:onestop.kipcc@gmail.com?subject={kw_subject}&body={kw_body}"
@@ -4658,8 +4658,8 @@ elif page == "발송":
                 </div>"""
 
                 cal_sec = f"""
-                <div style="background:#0F2E24;border-radius:10px;
-                            padding:16px 18px;border:1px solid #A7F3D0;margin:16px 0;">
+                <div style="background:#FFFFFF;border-radius:10px;
+                            padding:16px 18px;border:1.5px solid #D8D0C0;margin:16px 0;">
                   <p style="margin:0 0 4px;color:#9A7B3F;font-weight:700;font-size:11px;
                              letter-spacing:1.5px;text-transform:uppercase;">
                     📅 공고 마감일 캘린더
@@ -4668,7 +4668,7 @@ elif page == "발송":
                     전체 지원사업 공고 마감일을 한눈에 확인하세요.
                   </p>
                   {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#C9A96A;color:#3A2E15;padding:8px 18px;border-radius:7px;text-decoration:none;font-size:12px;font-weight:700;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK else ""}
-                  <p style="margin:10px 0 0;font-size:11px;color:#9FD6C0;line-height:1.7;">
+                  <p style="margin:10px 0 0;font-size:11px;color:#8A7B5A;line-height:1.7;">
                     💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
                   </p>
                 </div>"""
@@ -4729,17 +4729,17 @@ elif page == "발송":
     </td>
   </tr>
 
-  <!-- ── 다크 메인 카드 ── -->
+  <!-- ── 메인 카드 (아이보리) ── -->
   <tr>
-    <td style="background:#0F1D2E;
-               box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+    <td style="background:#FBFAF7;
+               box-shadow:0 8px 32px rgba(26,35,50,0.10);">
 
-      <!-- 헤더존 -->
+      <!-- 헤더존 (네이비) -->
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td style="padding:30px 28px 24px;
-                     background:#101F33;
-                     border-bottom:1px solid rgba(255,255,255,0.06);">
+                     background:#1B2A41;
+                     border-bottom:2px solid #C9A96A;">
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td>
@@ -4757,11 +4757,10 @@ elif page == "발송":
                   </p>
                 </td>
                 <td align="right" valign="middle" width="72">
-                  <div style="background:rgba(74,158,255,0.12);
-                              border:1px solid rgba(74,158,255,0.28);
-                              border-radius:12px;padding:10px 0;width:60px;
+                  <div style="background:linear-gradient(135deg,#C9A96A 0%,#B08D4F 100%);
+                              border-radius:12px;padding:11px 0;width:60px;
                               text-align:center;">
-                    <p style="margin:0;font-size:22px;font-weight:800;color:#10B981;
+                    <p style="margin:0;font-size:22px;font-weight:800;color:#1B2A41;
                                line-height:1;">{len(notices)}</p>
                     <p style="margin:3px 0 0;font-size:9px;letter-spacing:1.2px;
                                color:#3A2E15;font-weight:700;text-transform:uppercase;">picks</p>
@@ -4771,45 +4770,48 @@ elif page == "발송":
             </table>
             <!-- 기업명 카드 -->
             <div style="margin-top:20px;padding:14px 18px;
-                        background:rgba(255,255,255,0.05);
-                        border-radius:8px;border-left:3px solid #10B981;">
+                        background:rgba(255,255,255,0.06);
+                        border-radius:8px;border-left:3px solid #C9A96A;">
               <p style="margin:0 0 3px;font-size:15px;font-weight:700;color:#FFFFFF;">
                 {company}
                 <span style="font-size:13px;font-weight:400;
-                             color:rgba(255,255,255,0.45);margin-left:4px;">담당자님</span>
+                             color:#B4C0CE;margin-left:4px;">담당자님</span>
               </p>
               <p style="margin:0;font-size:12px;color:#B4C0CE;line-height:1.6;">
                 기술 키워드 분석을 통해 선별된 공고를 안내드립니다.
               </p>
             </div>
 
-            <!-- 기업 정보 카드 -->
-            {f"""<div style="margin-top:12px;padding:12px 16px;
-                        background:rgba(16,185,129,0.08);
-                        border:1px solid rgba(16,185,129,0.2);
-                        border-left:3px solid #10B981;border-radius:8px;">
-              <p style="margin:0 0 8px;font-size:10px;font-weight:700;color:#DFC28A;letter-spacing:1.5px;">
-                저희가 파악한 귀사 정보</p>
-              <p style="margin:0 0 4px;font-size:12px;color:#9FD6C0;">
-                기술키워드 <span style="color:#fff;word-break:keep-all;">{str(co_row.get("기술키워드","") or co_row.get("키워드보완","") or "—")[:30]}</span>
-              </p>
-              <p style="margin:0 0 4px;font-size:12px;color:#9FD6C0;">
-                관심분야 <span style="color:#fff;">{str(co_row.get("관심사업분야","") or "—")}</span>
-              </p>
-              <p style="margin:0 0 4px;font-size:12px;color:#9FD6C0;">
-                기업유형 <span style="color:#fff;word-break:keep-all;">{str(co_row.get("기업유형","") or "—")[:25]}</span>
-              </p>
-              <p style="margin:0;font-size:12px;color:#9FD6C0;">
-                소재지 <span style="color:#fff;">{str(co_row.get("소재지","") or "—")}</span>
-              </p>
-            </div>""" if not df_c_cur.empty and not df_c_cur[df_c_cur["기업명"]==company].empty
-            else ""}
           </td>
         </tr>
 
+        <!-- 기업 정보 카드 (아이보리 존) -->
+        {f"""<tr><td style="padding:20px 28px 0;background:#FBFAF7;">
+            <div style="padding:12px 16px;
+                        background:#F5F0E6;
+                        border:1px solid #E0D5BF;
+                        border-left:4px solid #C9A96A;border-radius:8px;">
+              <p style="margin:0 0 8px;font-size:10px;font-weight:700;color:#9A7B3F;letter-spacing:1.5px;">
+                저희가 파악한 귀사 정보</p>
+              <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
+                기술키워드 <span style="color:#2A2620;font-weight:600;word-break:keep-all;">{str(co_row.get("기술키워드","") or co_row.get("키워드보완","") or "—")[:30]}</span>
+              </p>
+              <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
+                관심분야 <span style="color:#2A2620;font-weight:600;">{str(co_row.get("관심사업분야","") or "—")}</span>
+              </p>
+              <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
+                기업유형 <span style="color:#2A2620;font-weight:600;word-break:keep-all;">{str(co_row.get("기업유형","") or "—")[:25]}</span>
+              </p>
+              <p style="margin:0;font-size:12px;color:#6B6558;">
+                소재지 <span style="color:#2A2620;font-weight:600;">{str(co_row.get("소재지","") or "—")}</span>
+              </p>
+            </div>
+          </td></tr>""" if not df_c_cur.empty and not df_c_cur[df_c_cur["기업명"]==company].empty
+            else ""}
+
         <!-- 공고 목록 -->
         <tr>
-          <td style="padding:24px 28px 20px;background:#FBFAF7;">
+          <td style="padding:20px 28px 20px;background:#FBFAF7;">
             {rows_html}
           </td>
         </tr>
@@ -4822,10 +4824,10 @@ elif page == "발송":
     </td>
   </tr>
 
-  <!-- ── 흰 푸터 ── -->
+  <!-- ── 네이비 푸터 ── -->
   <tr>
-    <td style="background:#0A1628;border-radius:0 0 14px 14px;
-               padding:18px 28px;border-top:1px solid #1E3048;">
+    <td style="background:#1B2A41;border-radius:0 0 14px 14px;
+               padding:18px 28px;border-top:2px solid #C9A96A;">
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td>
@@ -4836,12 +4838,12 @@ elif page == "발송":
                 onestop.kipcc@gmail.com
               </a>
             </p>
-            <p style="margin:8px 0 0;font-size:11px;color:#6E7C8C;">
+            <p style="margin:8px 0 0;font-size:11px;color:#7A96B2;">
               본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.
             </p>
           </td>
           <td align="right" valign="middle">
-            <p style="margin:0;font-size:10px;color:#6E7C8C;letter-spacing:0.5px;">
+            <p style="margin:0;font-size:10px;color:#7A96B2;letter-spacing:0.5px;">
               수신 동의 기업 대상 발송
             </p>
           </td>
