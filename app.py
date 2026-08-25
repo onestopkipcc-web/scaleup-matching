@@ -4336,6 +4336,13 @@ elif page == "발송":
                 💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
               </p>
             </div>
+            <div style="background:#22344F;border:1.5px solid #C9A96A;border-radius:8px;padding:14px 16px;margin-top:10px;">
+              <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#C9A96A;letter-spacing:1px;">
+                🤝 함께하기 · 기업 회원소개</p>
+              <p style="margin:0 0 11px;font-size:12px;color:#C5D0DC;line-height:1.6;">
+                원스톱 스케일업 참여 기업의 제품·기술과 협력 희망 분야를 소개하는 공간입니다. 등록하시면 다른 기업·기관이 귀사를 찾아보고 협력을 제안할 수 있습니다.</p>
+              <a href="http://kipcc.eumsvr.com" style="display:inline-block;padding:8px 18px;font-size:12px;font-weight:700;color:#1B2A41;background:#C9A96A;border-radius:6px;text-decoration:none;">회원소개 등록하기 →</a>
+            </div>
           </div>
           <div style="background:#0A1628;padding:14px 28px;text-align:center;border-top:1px solid #1E3048;">
             <p style="margin:0;font-size:12px;color:#A8BDD1;">
@@ -4667,6 +4674,25 @@ elif page == "발송":
                   </p>
                 </div>"""
 
+                together_sec = f"""
+                <div style="background:#22344F;border-radius:10px;
+                            padding:16px 18px;border:1.5px solid #C9A96A;margin:16px 0;">
+                  <p style="margin:0 0 5px;color:#C9A96A;font-weight:700;font-size:11px;
+                             letter-spacing:1.5px;">
+                    🤝 함께하기 · 기업 회원소개
+                  </p>
+                  <p style="margin:0 0 12px;font-size:12px;color:#C5D0DC;line-height:1.65;">
+                    원스톱 스케일업 참여 기업의 제품·기술과 협력 희망 분야를 소개하는 공간입니다.
+                    등록하시면 다른 기업·기관이 귀사를 찾아보고 협력을 제안할 수 있습니다.
+                  </p>
+                  <a href="http://kipcc.eumsvr.com"
+                     style="display:inline-block;padding:9px 20px;font-size:12px;font-weight:700;
+                            color:#1B2A41;background:#C9A96A;border-radius:6px;
+                            text-decoration:none;">
+                    회원소개 등록하기 →
+                  </a>
+                </div>"""
+
                 today_str = datetime.today().strftime('%Y.%m.%d')
                 html=f"""<!DOCTYPE html>
 <html lang="ko">
@@ -4792,6 +4818,7 @@ elif page == "발송":
         <!-- 캘린더 -->
         {f'''<tr><td style="padding:0 28px 24px;background:#0F1D2E;">{keyword_sec}</td></tr>''' if keyword_sec else ''}
         {f'''<tr><td style="padding:0 28px 24px;background:#0F1D2E;">{cal_sec}</td></tr>''' if cal_sec else ''}
+        <tr><td style="padding:0 28px 24px;background:#0F1D2E;">{together_sec}</td></tr>
       </table>
     </td>
   </tr>
