@@ -4699,17 +4699,18 @@ elif page == "발송":
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
 </head>
-<body style="margin:0;padding:0;background:#F2F4F7;
+<body style="margin:0;padding:0;background:#E6E9EE;
              font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0"
-       style="background:#EDE9E0;padding:36px 0 52px;">
+       style="background:#E6E9EE;padding:36px 0 52px;">
 <tr><td align="center">
 <table width="560" cellpadding="0" cellspacing="0">
 
   <!-- ── 로고 헤더 (흰 배경) ── -->
   <tr>
     <td style="background:#FFFFFF;border-radius:14px 14px 0 0;
-               padding:20px 28px;border-bottom:1px solid #E8ECF0;">
+               padding:20px 28px;border-bottom:1px solid #E8ECF0;
+               border-top:1px solid #D9DEE5;">
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td valign="middle">
