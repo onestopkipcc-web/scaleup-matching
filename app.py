@@ -4133,28 +4133,28 @@ elif page == "발송":
             if hashtags:
                 tag_html = "<div style=\'margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;\'>"
                 for _ti, tag in enumerate(hashtags.split()):
-                    _tc = ("background:#0F3A2E;color:#5DCAA5" if _ti == 0
-                           else "background:#1E3048;color:#A8BDD1")
+                    _tc = ("background:#F3EDE0;color:#9A7B3F" if _ti == 0
+                           else "background:#EDEBE5;color:#7A756A")
                     tag_html += f"<span style=\'font-size:11px;{_tc};padding:3px 8px;border-radius:20px;\'>{tag}</span>"
                 tag_html += "</div>"
             nm = n.get('공고명','')
             return f"""
             <table width="100%" cellpadding="0" cellspacing="0"
-                   style="margin-bottom:8px;background:#16293F;border:1px solid #24405F;
-                          border-radius:10px;overflow:hidden;">
+                   style="margin-bottom:8px;background:#FFFFFF;border:1px solid #E8E2D5;
+                          border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(26,35,50,0.05);">
               <tr>
                 <td style="padding:12px 16px;">
                   <a href="{n.get('공고링크','#')}" style="font-size:14px;font-weight:600;
-                     color:#E8EFF6;text-decoration:none;display:block;">{nm}</a>
-                  <p style="margin:3px 0;font-size:12px;color:#A8BDD1;">
-                    {n.get('주관기관','')} · 마감 {f'<span style="color:#E0A458;font-weight:600;">{dl}</span>' if dl else '상시'}
+                     color:#1B2A41;text-decoration:none;display:block;">{nm}</a>
+                  <p style="margin:3px 0;font-size:12px;color:#8A8478;">
+                    {n.get('주관기관','')} · 마감 {f'<span style="color:#B0894A;font-weight:600;">{dl}</span>' if dl else '상시'}
                   </p>
                   {tag_html}
                 </td>
                 <td width="60" align="center" valign="middle"
-                    style="padding:14px 12px;border-left:1px solid #24405F;">
+                    style="padding:14px 12px;border-left:1px solid #EDEBE5;">
                   <a href="{n.get('공고링크','#')}"
-                     style="font-size:12px;font-weight:600;color:#5DCAA5;
+                     style="font-size:12px;font-weight:700;color:#B0894A;
                             text-decoration:none;white-space:nowrap;">보기 →</a>
                 </td>
               </tr>
@@ -4168,10 +4168,10 @@ elif page == "발송":
             # ★★★ 주목할 만한 공고
             if _sss:
                 _cards_html += """<p style="margin:0 0 12px;font-size:10px;font-weight:700;
-                                    color:#5DCAA5;letter-spacing:2px;">🔦 &nbsp;주목할 만한 공고</p>"""
+                                    color:#9A7B3F;letter-spacing:2px;">🔦 &nbsp;주목할 만한 공고</p>"""
                 for n in _sss: _cards_html += _prev_card(n)
             if _ss:
-                _cards_html += """<div style="border-top:1px solid rgba(255,255,255,0.08);
+                _cards_html += """<div style="border-top:1px solid #E8E2D5;
                                     padding-top:14px;margin-top:8px;">
                   <p style="margin:0 0 10px;font-size:10px;font-weight:700;
                              color:rgba(255,255,255,0.35);letter-spacing:2px;">
@@ -4217,7 +4217,7 @@ elif page == "발송":
             </div>"""
 
         if _review_prev:
-            _common_html += """<div style="border-top:1px solid rgba(255,255,255,0.08);
+            _common_html += """<div style="border-top:1px solid #E8E2D5;
               padding-top:14px;margin-top:8px;">
               <p style="margin:0 0 6px;font-size:10px;font-weight:700;
                          color:#F59E0B;letter-spacing:2px;">
@@ -4245,78 +4245,77 @@ elif page == "발송":
 
         _preview_html = f"""
         <div style="max-width:600px;margin:0 auto;font-family:'Apple SD Gothic Neo',Arial,sans-serif;
-                    border:1px solid #24405F;border-radius:12px;overflow:hidden;">
-          <div style="background:#FFFFFF;padding:20px 28px;border-bottom:1px solid #E8ECF0;">
+                    border:1px solid #D8D0C0;border-radius:12px;overflow:hidden;">
+          <div style="background:#1B2A41;padding:20px 28px;border-bottom:1px solid #22344F;">
             <table width="100%" cellpadding="0" cellspacing="0"><tr>
               <td valign="middle">
-                <img src="{LOGO_URL}" alt="혁신제품지원센터" width="160" height="auto"
-                     style="display:block;height:auto;max-height:36px;object-fit:contain;object-position:left;">
+                <p style="margin:0;font-size:14px;font-weight:700;color:#FFFFFF;letter-spacing:0.5px;">◈ 혁신제품지원센터</p>
               </td>
               <td align="right" valign="middle">
-                <p style="margin:0;font-size:11px;color:#A0ADB8;letter-spacing:0.3px;">{_today_prev}</p>
+                <p style="margin:0;font-size:11px;color:#9CAAB8;letter-spacing:0.3px;">{_today_prev}</p>
               </td>
             </tr></table>
           </div>
-          <div style="background:#101F33;padding:24px 28px 20px;">
+          <div style="background:#22344F;padding:24px 28px 20px;border-bottom:2px solid #C9A96A;">
             <table width="100%" cellpadding="0" cellspacing="0"><tr>
               <td>
-                <p style="margin:0 0 4px;font-size:11px;color:#7A96B2;letter-spacing:1px;">
-                  혁신제품지원센터 · 원스톱 스케일업</p>
-                <p style="margin:0;font-size:20px;font-weight:500;color:#fff;">이번 주 맞춤 지원사업 공고</p>
-                <p style="margin:4px 0 0;font-size:13px;color:#A8BDD1;">{preview_co} 담당자님께</p>
+                <p style="margin:0 0 4px;font-size:11px;color:#C9A96A;letter-spacing:1.5px;">
+                  원스톱 스케일업</p>
+                <p style="margin:0;font-size:20px;font-weight:600;color:#fff;">이번 주 맞춤 지원사업 공고</p>
+                <p style="margin:4px 0 0;font-size:13px;color:#B4C0CE;">{preview_co} 담당자님께</p>
               </td>
               <td align="right" valign="middle" width="72">
-                <div style="background:#0F3A2E;border:1px solid #1D6E56;border-radius:12px;
-                            padding:10px 0;width:60px;text-align:center;">
-                  <p style="margin:0;font-size:22px;font-weight:700;color:#5DCAA5;line-height:1;">{len(_sss)+len(_ss)}</p>
-                  <p style="margin:3px 0 0;font-size:9px;letter-spacing:1.2px;color:#5DCAA5;">PICKS</p>
+                <div style="background:linear-gradient(135deg,#C9A96A 0%,#B08D4F 100%);border-radius:12px;
+                            padding:11px 0;width:60px;text-align:center;">
+                  <p style="margin:0;font-size:22px;font-weight:800;color:#1B2A41;line-height:1;">{len(_sss)+len(_ss)}</p>
+                  <p style="margin:3px 0 0;font-size:9px;letter-spacing:1.2px;color:#3A2E15;font-weight:700;">PICKS</p>
                 </div>
               </td>
             </tr></table>
           </div>
-          <div style="background:#0F1D2E;padding:0 28px 20px;padding-top:20px;">
-            <div style="background:#132E26;border:1px solid #1D6E56;
-                        border-left:3px solid #5DCAA5;border-radius:8px;padding:12px 16px;">
-              <p style="margin:0 0 8px;font-size:10px;font-weight:600;color:#5DCAA5;letter-spacing:1.5px;">
+          <div style="background:#FBFAF7;padding:0 28px 20px;padding-top:20px;">
+            <div style="background:#F5F0E6;border:1px solid #E0D5BF;
+                        border-left:4px solid #C9A96A;border-radius:8px;padding:12px 16px;">
+              <p style="margin:0 0 8px;font-size:10px;font-weight:700;color:#9A7B3F;letter-spacing:1.5px;">
                 저희가 파악한 귀사 정보</p>
-              <p style="margin:0 0 4px;font-size:12px;color:#9FD6C0;">
-                기술키워드 <span style="color:#fff;word-break:keep-all;">{_kw}</span></p>
-              <p style="margin:0 0 4px;font-size:12px;color:#9FD6C0;">
-                관심분야 <span style="color:#fff;">{_area}</span></p>
-              <p style="margin:0 0 4px;font-size:12px;color:#9FD6C0;">
-                기업유형 <span style="color:#fff;word-break:keep-all;">{_type}</span></p>
-              <p style="margin:0;font-size:12px;color:#9FD6C0;">
-                소재지 <span style="color:#fff;">{_loc}</span></p>
+              <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
+                기술키워드 <span style="color:#2A2620;font-weight:600;word-break:keep-all;">{_kw}</span></p>
+              <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
+                관심분야 <span style="color:#2A2620;font-weight:600;">{_area}</span></p>
+              <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
+                기업유형 <span style="color:#2A2620;font-weight:600;word-break:keep-all;">{_type}</span></p>
+              <p style="margin:0;font-size:12px;color:#6B6558;">
+                소재지 <span style="color:#2A2620;font-weight:600;">{_loc}</span></p>
             </div>
           </div>
-          <div style="background:#0F1D2E;padding:0 28px 8px;">{_cards_html}</div>
-          <div style="background:#0F1D2E;padding:8px 28px 20px;">{_common_html}</div>
-          <div style="background:#0F1D2E;padding:0 28px 16px;">
-            <div style="border-top:1px solid #1E3048;
+          <div style="background:#FBFAF7;padding:0 28px 8px;">{_cards_html}</div>
+          <div style="background:#FBFAF7;padding:8px 28px 20px;">{_common_html}</div>
+          <div style="background:#FBFAF7;padding:0 28px 16px;">
+            <div style="border-top:1px solid #E8E2D5;
                         padding-top:16px;text-align:center;">
-              <p style="margin:0 0 12px;font-size:12px;color:rgba(255,255,255,0.4);">
+              <p style="margin:0 0 12px;font-size:12px;color:#8A8478;">
                 이번 공고 안내가 도움이 됐나요?</p>
               <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_up2.quote('[이번 주 공고 안내 피드백]\\n반응: 도움됐어요\\n\\n[추가 의견]\\n\\n[Gmail 주소]\\n')}"
                  style="display:inline-block;margin:0 4px;padding:8px 16px;font-size:12px;
-                        font-weight:600;color:#5DCAA5;background:#0F3A2E;
-                        border:1px solid #1D6E56;border-radius:8px;text-decoration:none;">
+                        font-weight:600;color:#9A7B3F;background:#F3EDE0;
+                        border:1px solid #E0D5BF;border-radius:8px;text-decoration:none;">
                 👍 도움됐어요</a>
               <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_up2.quote('[이번 주 공고 안내 피드백]\\n반응: 별로였어요\\n\\n[추가 의견]\\n\\n[Gmail 주소]\\n')}"
                  style="display:inline-block;margin:0 4px;padding:8px 16px;font-size:12px;
-                        font-weight:600;color:#A8BDD1;background:#17293F;
-                        border:1px solid #24405F;border-radius:8px;text-decoration:none;">
+                        font-weight:600;color:#8A8478;background:#EDEBE5;
+                        border:1px solid #DDD8CE;border-radius:8px;text-decoration:none;">
                 👎 별로였어요</a>
               <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_kw_body}"
                  style="display:inline-block;margin:0 4px;padding:8px 16px;font-size:12px;
-                        font-weight:600;color:rgba(255,255,255,0.55);
-                        background:rgba(255,255,255,0.05);
-                        border:1px solid #24405F;
+                        font-weight:600;color:#8A8478;
+                        background:#F3F1EC;
+                        border:1px solid #DDD8CE;
                         border-radius:8px;text-decoration:none;">
                 💬 의견 남기기</a>
             </div>
           </div>
           <div style="background:#0F1D2E;padding:0 28px 20px;">
-            <div style="background:#17293F;border:1px solid #24405F;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
+            <div style="background:#17293F;border:1px solid #DDD8CE;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
               <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#5DCAA5;letter-spacing:1px;">
                 ✏️ 추가 키워드가 있으신가요?</p>
               <p style="margin:0 0 10px;font-size:12px;color:#A8BDD1;line-height:1.6;">
@@ -4326,12 +4325,12 @@ elif page == "발송":
                         color:#04342C;background:#5DCAA5;border-radius:6px;text-decoration:none;">
                 답장하기 →</a>
             </div>
-            <div style="background:#0F2E24;border:1px solid #1D6E56;border-radius:8px;padding:14px 16px;">
+            <div style="background:#FFFFFF;border:1.5px solid #D8D0C0;border-radius:10px;padding:16px 18px;">
               <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#5DCAA5;letter-spacing:1px;">
                 📅 공고 마감일 캘린더</p>
               <p style="margin:0 0 10px;font-size:12px;color:#9FD6C0;line-height:1.6;">
                 전체 지원사업 공고 마감일을 한눈에 확인하세요.</p>
-              {"<a href='"+CALENDAR_LINK_PREV+"' style='display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;color:#04342C;background:#5DCAA5;border-radius:6px;text-decoration:none;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK_PREV else ""}
+              {"<a href='"+CALENDAR_LINK_PREV+"' style='display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;color:#3A2E15;background:#C9A96A;border-radius:7px;text-decoration:none;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK_PREV else ""}
               <p style="margin:10px 0 0;font-size:11px;color:#9FD6C0;line-height:1.7;">
                 💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
               </p>
@@ -4344,9 +4343,9 @@ elif page == "발송":
               <a href="http://kipcc.eumsvr.com" style="display:inline-block;padding:8px 18px;font-size:12px;font-weight:700;color:#1B2A41;background:#C9A96A;border-radius:6px;text-decoration:none;">회원소개 등록하기 →</a>
             </div>
           </div>
-          <div style="background:#0A1628;padding:14px 28px;text-align:center;border-top:1px solid #1E3048;">
+          <div style="background:#1B2A41;padding:16px 28px;text-align:center;">
             <p style="margin:0;font-size:12px;color:#A8BDD1;">
-              혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:#5DCAA5;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
+              혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:#C9A96A;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
               <p style="margin:4px 0 0;font-size:11px;color:#7A96B2;">
                 본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
           </div>
@@ -4467,15 +4466,15 @@ elif page == "발송":
                            style="margin-bottom:6px;">
                       <tr>
                         <td style="padding:10px 14px;
-                                   background:rgba(255,255,255,0.02);
-                                   border:1px solid rgba(255,255,255,0.05);
+                                   background:#FBF9F5;
+                                   border:1px solid #E8E2D5;
                                    border-radius:6px;">
                           <a href="{_trk}"
-                             style="font-size:13px;font-weight:500;color:rgba(255,255,255,0.6);
+                             style="font-size:13px;font-weight:500;color:#5A5548;
                                     text-decoration:none;display:block;">
                             {n.get('공고명','')}
                           </a>
-                          <p style="margin:3px 0 0;font-size:11px;color:rgba(255,255,255,0.25);">
+                          <p style="margin:3px 0 0;font-size:11px;color:#9A9488;">
                             {n.get('주관기관','')} &nbsp;·&nbsp; 마감 {dl_raw}
                           </p>
                         </td>
@@ -4491,8 +4490,8 @@ elif page == "발송":
                     if hashtags:
                         tag_html = "<div style=\'margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;\'>"
                         for _ti, tag in enumerate(hashtags.split()):
-                            _tc = ("background:#0F3A2E;color:#5DCAA5" if _ti == 0
-                                   else "background:#1E3048;color:#A8BDD1")
+                            _tc = ("background:#F3EDE0;color:#9A7B3F" if _ti == 0
+                                   else "background:#EDEBE5;color:#7A756A")
                             tag_html += f"<span style=\'font-size:11px;{_tc};padding:3px 8px;border-radius:20px;\'>{tag}</span>"
                         tag_html += "</div>"
                     notice_name = n.get("공고명","")
@@ -4500,23 +4499,23 @@ elif page == "발송":
                                       n.get("공고ID",""), notice_name)
                     return f"""
                     <table width="100%" cellpadding="0" cellspacing="0"
-                           style="margin-bottom:8px;background:#16293F;
-                                  border:1px solid #24405F;border-radius:10px;overflow:hidden;
-                                  box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                           style="margin-bottom:8px;background:#FFFFFF;
+                                  border:1px solid #E8E2D5;border-radius:10px;overflow:hidden;
+                                  box-shadow:0 1px 4px rgba(26,35,50,0.05);">
                       <tr>
                         <td style="padding:12px 16px;">
                           <a href="{_trk}"
-                             style="font-size:14px;font-weight:600;color:#E8EFF6;
+                             style="font-size:14px;font-weight:600;color:#1B2A41;
                                     text-decoration:none;line-height:1.5;display:block;">
                             {notice_name}
                           </a>
-                          <p style="margin:4px 0 0;font-size:12px;color:#A8BDD1;">
-                            {n.get("주관기관","")} &nbsp;·&nbsp; 마감 {f'<span style="color:#E0A458;font-weight:600;">{dl_raw}</span>' if dl_raw else "상시"}
+                          <p style="margin:4px 0 0;font-size:12px;color:#8A8478;">
+                            {n.get("주관기관","")} &nbsp;·&nbsp; 마감 {f'<span style="color:#B0894A;font-weight:600;">{dl_raw}</span>' if dl_raw else "상시"}
                           </p>
                           {tag_html}
                         </td>
                         <td width="60" align="center" valign="middle"
-                            style="padding:14px 12px;border-left:1px solid #24405F;">
+                            style="padding:14px 12px;border-left:1px solid #EDEBE5;">
                           <a href="{_trk}"
                              style="display:inline-block;font-size:12px;font-weight:600;
                                     color:#5DCAA5;text-decoration:none;white-space:nowrap;">
@@ -4532,14 +4531,14 @@ elif page == "발송":
                 is_zero = not notices_sss and not notices_ss
                 if is_zero:
                     rows_html += """
-                    <div style="background:rgba(255,255,255,0.04);
-                                border:1px solid rgba(255,255,255,0.08);
+                    <div style="background:#F5F0E6;
+                                border:1px solid #E0D5BF;
                                 border-radius:8px;padding:14px 16px;margin-bottom:16px;">
                       <p style="margin:0 0 6px;font-size:13px;font-weight:500;
-                                 color:rgba(255,255,255,0.8);">
+                                 color:#5A5548;">
                         이번 주 귀사에 딱 맞는 공고를 찾지 못했습니다.
                       </p>
-                      <p style="margin:0;font-size:12px;color:#9FD6C0;line-height:1.7;">
+                      <p style="margin:0;font-size:12px;color:#8A7B5A;line-height:1.7;">
                         더 정확한 공고를 드리기 위해 추가 키워드나 관심 분야를
                         아래 답장하기 버튼으로 알려주세요.
                       </p>
@@ -4549,7 +4548,7 @@ elif page == "발송":
                 if notices_sss:
                     rows_html += """
                     <p style="margin:0 0 12px;font-size:10px;font-weight:700;
-                               color:#5DCAA5;letter-spacing:2px;text-transform:uppercase;">
+                               color:#9A7B3F;letter-spacing:2px;text-transform:uppercase;">
                       🔦 &nbsp;주목할 만한 공고
                     </p>"""
                     for i, n in enumerate(notices_sss):
@@ -4558,10 +4557,10 @@ elif page == "발송":
                 # ── 📌 이런 공고도 있어요 (★★) ──────────
                 if notices_ss:
                     rows_html += """
-                    <div style="border-top:1px solid rgba(255,255,255,0.08);
+                    <div style="border-top:1px solid #E8E2D5;
                                 padding-top:16px;margin-top:8px;">
                       <p style="margin:0 0 10px;font-size:10px;font-weight:700;
-                                 color:#F59E0B;letter-spacing:2px;
+                                 color:#A08A5C;letter-spacing:2px;
                                  text-transform:uppercase;">
                         📌 &nbsp;이런 공고도 있어요
                       </p>"""
@@ -4576,10 +4575,10 @@ elif page == "발송":
                                  if _has_approved else
                                  "이번 주 딱 맞는 공고는 없었지만, 귀사와 연관성이 있어 참고용으로 안내드립니다.")
                     rows_html += f"""
-                    <div style="border-top:1px solid rgba(255,255,255,0.08);
+                    <div style="border-top:1px solid #E8E2D5;
                                 padding-top:16px;margin-top:8px;">
                       <p style="margin:0 0 6px;font-size:10px;font-weight:700;
-                                 color:#F59E0B;letter-spacing:2px;
+                                 color:#A08A5C;letter-spacing:2px;
                                  text-transform:uppercase;">
                         📎 &nbsp;참고해보실 만한 공고
                       </p>
@@ -4640,10 +4639,10 @@ elif page == "발송":
                 )
 
                 keyword_sec = f"""
-                <div style="background:#16293F;
+                <div style="background:#FFFFFF;
                                   border:1px solid #24405F;
                             border-radius:10px;padding:16px 18px;margin:16px 0;">
-                  <p style="margin:0 0 8px;color:#5DCAA5;font-weight:700;font-size:11px;
+                  <p style="margin:0 0 8px;color:#22344F;font-weight:700;font-size:11px;
                              letter-spacing:1.5px;text-transform:uppercase;">
                     ✏️ 추가 키워드가 있으신가요?
                   </p>
@@ -4652,7 +4651,7 @@ elif page == "발송":
                   </p>
                   <a href="mailto:onestop.kipcc@gmail.com?subject={kw_subject}&body={kw_body}"
                      style="display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;
-                            color:#04342C;background:#5DCAA5;border-radius:8px;
+                            color:#FFFFFF;background:#22344F;border-radius:8px;
                             text-decoration:none;">
                     답장하기 →
                   </a>
@@ -4661,14 +4660,14 @@ elif page == "발송":
                 cal_sec = f"""
                 <div style="background:#0F2E24;border-radius:10px;
                             padding:16px 18px;border:1px solid #A7F3D0;margin:16px 0;">
-                  <p style="margin:0 0 4px;color:#059669;font-weight:700;font-size:11px;
+                  <p style="margin:0 0 4px;color:#9A7B3F;font-weight:700;font-size:11px;
                              letter-spacing:1.5px;text-transform:uppercase;">
                     📅 공고 마감일 캘린더
                   </p>
-                  <p style="margin:0 0 10px;font-size:12px;color:#CCCCCC;">
+                  <p style="margin:0 0 10px;font-size:12px;color:#6B6558;">
                     전체 지원사업 공고 마감일을 한눈에 확인하세요.
                   </p>
-                  {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#10B981;color:#fff;padding:7px 16px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK else ""}
+                  {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#C9A96A;color:#3A2E15;padding:8px 18px;border-radius:7px;text-decoration:none;font-size:12px;font-weight:700;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK else ""}
                   <p style="margin:10px 0 0;font-size:11px;color:#9FD6C0;line-height:1.7;">
                     💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
                   </p>
@@ -4703,7 +4702,7 @@ elif page == "발송":
 <body style="margin:0;padding:0;background:#F2F4F7;
              font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0"
-       style="background:#F2F4F7;padding:36px 0 52px;">
+       style="background:#EDE9E0;padding:36px 0 52px;">
 <tr><td align="center">
 <table width="560" cellpadding="0" cellspacing="0">
 
@@ -4721,7 +4720,7 @@ elif page == "발송":
                         object-fit:contain;object-position:left;">
           </td>
           <td align="right" valign="middle">
-            <p style="margin:0;font-size:11px;color:#A0ADB8;letter-spacing:0.3px;">
+            <p style="margin:0;font-size:11px;color:#9CAAB8;letter-spacing:0.3px;">
               {today_str}
             </p>
           </td>
@@ -4745,7 +4744,7 @@ elif page == "발송":
               <tr>
                 <td>
                   <p style="margin:0 0 2px;font-size:10px;font-weight:700;
-                             letter-spacing:2.5px;color:rgba(255,255,255,0.3);
+                             letter-spacing:2.5px;color:#C9A96A;
                              text-transform:uppercase;">
                     Scale-Up Program
                   </p>
@@ -4753,7 +4752,7 @@ elif page == "발송":
                              color:#FFFFFF;letter-spacing:-0.6px;line-height:1.2;">
                     원스톱 스케일업
                   </h1>
-                  <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.38);">
+                  <p style="margin:0;font-size:12px;color:#B4C0CE;">
                     이번 주 맞춤 지원사업 공고
                   </p>
                 </td>
@@ -4765,7 +4764,7 @@ elif page == "발송":
                     <p style="margin:0;font-size:22px;font-weight:800;color:#10B981;
                                line-height:1;">{len(notices)}</p>
                     <p style="margin:3px 0 0;font-size:9px;letter-spacing:1.2px;
-                               color:rgba(74,158,255,0.6);text-transform:uppercase;">picks</p>
+                               color:#3A2E15;font-weight:700;text-transform:uppercase;">picks</p>
                   </div>
                 </td>
               </tr>
@@ -4779,7 +4778,7 @@ elif page == "발송":
                 <span style="font-size:13px;font-weight:400;
                              color:rgba(255,255,255,0.45);margin-left:4px;">담당자님</span>
               </p>
-              <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.38);line-height:1.6;">
+              <p style="margin:0;font-size:12px;color:#B4C0CE;line-height:1.6;">
                 기술 키워드 분석을 통해 선별된 공고를 안내드립니다.
               </p>
             </div>
@@ -4789,7 +4788,7 @@ elif page == "발송":
                         background:rgba(16,185,129,0.08);
                         border:1px solid rgba(16,185,129,0.2);
                         border-left:3px solid #10B981;border-radius:8px;">
-              <p style="margin:0 0 8px;font-size:10px;font-weight:600;color:#5DCAA5;letter-spacing:1.5px;">
+              <p style="margin:0 0 8px;font-size:10px;font-weight:700;color:#DFC28A;letter-spacing:1.5px;">
                 저희가 파악한 귀사 정보</p>
               <p style="margin:0 0 4px;font-size:12px;color:#9FD6C0;">
                 기술키워드 <span style="color:#fff;word-break:keep-all;">{str(co_row.get("기술키워드","") or co_row.get("키워드보완","") or "—")[:30]}</span>
@@ -4810,15 +4809,15 @@ elif page == "발송":
 
         <!-- 공고 목록 -->
         <tr>
-          <td style="padding:24px 28px 20px;background:#0F1D2E;">
+          <td style="padding:24px 28px 20px;background:#FBFAF7;">
             {rows_html}
           </td>
         </tr>
 
         <!-- 캘린더 -->
-        {f'''<tr><td style="padding:0 28px 24px;background:#0F1D2E;">{keyword_sec}</td></tr>''' if keyword_sec else ''}
-        {f'''<tr><td style="padding:0 28px 24px;background:#0F1D2E;">{cal_sec}</td></tr>''' if cal_sec else ''}
-        <tr><td style="padding:0 28px 24px;background:#0F1D2E;">{together_sec}</td></tr>
+        {f'''<tr><td style="padding:0 28px 24px;background:#FBFAF7;">{keyword_sec}</td></tr>''' if keyword_sec else ''}
+        {f'''<tr><td style="padding:0 28px 24px;background:#FBFAF7;">{cal_sec}</td></tr>''' if cal_sec else ''}
+        <tr><td style="padding:0 28px 24px;background:#FBFAF7;">{together_sec}</td></tr>
       </table>
     </td>
   </tr>
@@ -4830,19 +4829,19 @@ elif page == "발송":
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td>
-            <p style="margin:0;font-size:12px;color:#A8BDD1;line-height:1.9;">
+            <p style="margin:0;font-size:12px;color:#B4C0CE;line-height:1.9;">
               혁신제품지원센터 원스톱 스케일업 운영팀<br>
               <a href="mailto:onestop.kipcc@gmail.com"
-                 style="color:#5DCAA5;text-decoration:none;font-weight:600;">
+                 style="color:#C9A96A;text-decoration:none;font-weight:600;">
                 onestop.kipcc@gmail.com
               </a>
             </p>
-            <p style="margin:8px 0 0;font-size:11px;color:#7A96B2;">
+            <p style="margin:8px 0 0;font-size:11px;color:#6E7C8C;">
               본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.
             </p>
           </td>
           <td align="right" valign="middle">
-            <p style="margin:0;font-size:10px;color:#5F7A96;letter-spacing:0.5px;">
+            <p style="margin:0;font-size:10px;color:#6E7C8C;letter-spacing:0.5px;">
               수신 동의 기업 대상 발송
             </p>
           </td>
