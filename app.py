@@ -3386,7 +3386,10 @@ elif page == "공고·매칭":
                                 for gi, (_, gr) in enumerate(all_rows.iterrows()):
                                     gkey = f"{gr['기업명']}_{gr.get('공고ID','')}"
 
-                                    if gkey not in st.session_state['ai_analysis']:
+                                    _cached = st.session_state['ai_analysis'].get(gkey)
+                                    # 캐시가 없거나, 에러/빈 결과(추천여부 없음)면 재분석
+                                    _need = (not _cached) or ('error' in _cached) or (not _cached.get('추천여부'))
+                                    if _need:
                                         ci = {}
                                         if 'df_companies_cache' in st.session_state:
                                             df_co_g = st.session_state['df_companies_cache']
@@ -3662,7 +3665,8 @@ elif page == "공고·매칭":
                                 prog_co_ai = st.progress(0, text="AI 분석 중...")
                                 for ai_i, (_, ai_row) in enumerate(co_rows.iterrows()):
                                     ai_key = f"{ai_row['기업명']}_{ai_row.get('공고ID','')}"
-                                    if ai_key not in st.session_state.get('ai_analysis', {}):
+                                    _c = st.session_state.get('ai_analysis', {}).get(ai_key)
+                                    if (not _c) or ('error' in _c) or (not _c.get('추천여부')):
                                         ci = {}
                                         if 'df_companies_cache' in st.session_state:
                                             df_co3 = st.session_state['df_companies_cache']
@@ -3844,7 +3848,7 @@ elif page == "공고·매칭":
                                 st.link_button("🔗 공고 원문", row.get('공고링크',''),
                                                use_container_width=True)
                         with b4:
-                            if not ai_res:
+                            if (not ai_res) or ai_res.get('error') or (not ai_res.get('추천여부')):
                                 if st.button("🤖 AI 분석", key=f"ai_{key}_{i}", use_container_width=True):
                                     with st.spinner("분석 중..."):
                                         ci = {}
