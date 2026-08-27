@@ -1418,20 +1418,32 @@ def claude_call_raw(prompt, max_tokens=1000):
         "anthropic-version": "2023-06-01"
     }
     payload = {
-        "model": "claude-sonnet-4-6",
+        "model": "claude-sonnet-4-5",
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}]
     }
-    try:
-        resp = requests.post("https://api.anthropic.com/v1/messages",
-                             headers=headers, json=payload, timeout=30)
-        if resp.ok:
-            content = resp.json().get('content', [])
-            return content[0].get('text', '') if content else ''
-        else:
-            st.warning(f"⚠️ Claude API 오류 {resp.status_code}: {resp.text[:100]}")
-    except Exception as e:
-        st.warning(f"⚠️ Claude API 예외: {e}")
+    import time as _t
+    _last_err = ""
+    for _attempt in range(4):  # 최대 4회 시도 (재시도 3회)
+        try:
+            if _attempt > 0:
+                _t.sleep(min(2 ** _attempt, 8))  # 2,4,8초 백오프
+            resp = requests.post("https://api.anthropic.com/v1/messages",
+                                 headers=headers, json=payload, timeout=60)
+            if resp.ok:
+                content = resp.json().get('content', [])
+                return content[0].get('text', '') if content else ''
+            # 429(과부하)·5xx는 재시도, 4xx(키·요청오류)는 즉시 중단
+            if resp.status_code == 429 or resp.status_code >= 500:
+                _last_err = f"{resp.status_code}: {resp.text[:80]}"
+                continue
+            else:
+                st.warning(f"⚠️ Claude API 오류 {resp.status_code}: {resp.text[:100]}")
+                return ''
+        except Exception as e:
+            _last_err = str(e)[:80]
+            continue
+    st.warning(f"⚠️ Claude API 재시도 실패(4회): {_last_err}")
     return ''
 
 
@@ -1504,36 +1516,50 @@ JSON 형식으로만 답하세요:
   "주의사항": "신청 전 반드시 확인할 사항 (없으면 없음)"
 }}"""
 
-    try:
-        resp = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-sonnet-4-5",
-                "max_tokens": 600,
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            timeout=30
-        )
-        if resp.ok:
-            text = resp.json()['content'][0]['text']
-            import re as _re
-            json_match = _re.search(r'[{].*[}]', text, _re.DOTALL)
-            if json_match:
-                return json.loads(json_match.group())
-            return {"error": "응답 파싱 실패", "raw": text[:200]}
-        else:
-            try:
-                err_detail = resp.json().get('error', {}).get('message', resp.text[:300])
-            except:
-                err_detail = resp.text[:300]
-            return {"error": f"API 오류 {resp.status_code}: {err_detail}"}
-    except Exception as e:
-        return {"error": str(e)}
+    import time as _t
+    _last_err = ""
+    for _attempt in range(4):  # 최대 4회 시도 (재시도 3회)
+        try:
+            if _attempt > 0:
+                _t.sleep(min(2 ** _attempt, 8))  # 2,4,8초 백오프
+            resp = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": "claude-sonnet-4-5",
+                    "max_tokens": 600,
+                    "messages": [{"role": "user", "content": prompt}]
+                },
+                timeout=60
+            )
+            if resp.ok:
+                text = resp.json()['content'][0]['text']
+                import re as _re
+                json_match = _re.search(r'[{].*[}]', text, _re.DOTALL)
+                if json_match:
+                    return json.loads(json_match.group())
+                return {"error": "응답 파싱 실패", "raw": text[:200]}
+            # 429·5xx는 재시도, 4xx는 즉시 중단
+            if resp.status_code == 429 or resp.status_code >= 500:
+                try:
+                    _last_err = resp.json().get('error', {}).get('message', resp.text[:120])
+                except Exception:
+                    _last_err = resp.text[:120]
+                continue
+            else:
+                try:
+                    err_detail = resp.json().get('error', {}).get('message', resp.text[:300])
+                except Exception:
+                    err_detail = resp.text[:300]
+                return {"error": f"API 오류 {resp.status_code}: {err_detail}"}
+        except Exception as e:
+            _last_err = str(e)[:120]
+            continue
+    return {"error": f"재시도 실패(4회): {_last_err}"}
 
 def _build_reason(stars, matched_target, matched_type, matched_co,
                   matched_demand=[], location_score=0, matched_industry=[]):
@@ -6773,7 +6799,7 @@ elif page == "교육 신청 집계":
                                     headers={'x-api-key': st.secrets.get('ANTHROPIC_API_KEY',''),
                                              'anthropic-version': '2023-06-01',
                                              'content-type': 'application/json'},
-                                    json={'model': 'claude-sonnet-4-6',
+                                    json={'model': 'claude-sonnet-4-5',
                                           'max_tokens': 500,
                                           'messages': [{'role':'user','content': ai_prompt}]}
                                 )
