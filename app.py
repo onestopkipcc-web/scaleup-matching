@@ -4052,10 +4052,17 @@ elif page == "발송":
 
     # 참고 공고: 승인 0건 기업용 — 그 기업의 ★★ 검토 공고 상위 3건 (제외 여부 무관)
     # AI가 '검토'로 판정한 것 중 점수 높은 순. 승인 공고 없는 기업의 빈자리를 채움.
+    # 단, "세부사업별 상이"·"차수별 상이"처럼 개별 마감일이 따로 있는 통합공고는
+    # 그 자체로 신청 불가(마감 여부 불명)이라 참고공고에서 제외.
+    def _ref_ok(r):
+        _rp = str(r.get('접수기간','') or '')
+        if ('세부사업별 상이' in _rp) or ('차수별 상이' in _rp):
+            return False
+        return True
     _ref_by_co = {}
     for r in _results_live:
         _rec = ai_cache.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", {}).get('추천여부','')
-        if _rec == '검토':
+        if _rec == '검토' and _ref_ok(r):
             _ref_by_co.setdefault(r.get('기업명',''), []).append(r)
     for _co in _ref_by_co:
         _ref_by_co[_co] = sorted(_ref_by_co[_co],
@@ -4217,13 +4224,18 @@ elif page == "발송":
         ]
 
         # 0건 기업이면 전체 review_grade 공통 공고로 보완
+        # ("세부사업별 상이"·"차수별 상이"는 제외 — 실제 발송과 동일 기준)
         _is_zero_prev = not _rec_prev and not _rest_prev
         if not _review_prev and _is_zero_prev:
             from collections import Counter as _Counter
-            _nc = _Counter(r.get('공고명','') for r in review_grade)
+            def _rg_ok(r):
+                _rp = str(r.get('접수기간','') or '')
+                return ('세부사업별 상이' not in _rp) and ('차수별 상이' not in _rp)
+            _rg_valid = [r for r in review_grade if _rg_ok(r)]
+            _nc = _Counter(r.get('공고명','') for r in _rg_valid)
             _top = [n for n, _ in _nc.most_common(5)]
             _seen = set()
-            for r in review_grade:
+            for r in _rg_valid:
                 if r.get('공고명','') in _top and r.get('공고명','') not in _seen:
                     _review_prev.append(r)
                     _seen.add(r.get('공고명',''))
@@ -4483,6 +4495,19 @@ elif page == "발송":
                         if _rid not in _approved_ids and _rid not in _seen_r:
                             _cand_uniq.append(r); _seen_r.add(_rid)
                     notices_review = _cand_uniq[:_need]
+
+                    # 그래도 0건이면(맞춤·참고 모두 없음) 전체 공통 인기 공고로 최소 채움
+                    # 여러 기업에 걸쳐 '검토'로 자주 잡힌 범용 공고 = 폭넓게 유효
+                    if not notices_review:
+                        from collections import Counter as _Ctr
+                        _all_ref = [r for _co_rs in _ref_map.values() for r in _co_rs]
+                        _pop = _Ctr(r.get('공고ID','') for r in _all_ref)
+                        _by_id = {}
+                        for r in _all_ref:
+                            _by_id.setdefault(r.get('공고ID',''), r)
+                        _popular = [ _by_id[_pid] for _pid, _ in _pop.most_common()
+                                     if _pid and _pid not in _approved_ids ]
+                        notices_review = _popular[:_need]
 
                 def notice_card_simple(n, idx):
                     """공통 공고용 심플 카드 (작고 간결하게)"""
