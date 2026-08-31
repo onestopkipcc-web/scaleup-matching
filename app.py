@@ -236,6 +236,148 @@ def build_aug_edu_html(company="", co_kw="", co_area="", co_type="",
   </div>
 </div>
 </body></html>"""
+def build_sep_edu_html(company="", deadline="2026-09-04", is_reminder=False):
+    """9월 교육(디지털 마케팅 · 김나영) 신청 안내/리마인더 메일 HTML.
+    아이보리+네이비+골드 팔레트. D-day는 날짜 기준 자동 계산."""
+    from datetime import datetime as _dt, date as _date
+    _dl_short = "9/4(금)"
+    try:
+        _dl = _dt.strptime(deadline, "%Y-%m-%d").date()
+        _days = (_dl - _date.today()).days
+        _dday_txt = "마감" if _days < 0 else ("D-DAY" if _days == 0 else f"D-{_days}")
+        _wd = ['월','화','수','목','금','토','일'][_dl.weekday()]
+        _dl_short = f"{_dl.month}/{_dl.day}({_wd})"
+    except Exception:
+        _dday_txt = ""
+    _who = f"<b>{company}</b> 담당자님" if company else "담당자님"
+    _greeting = ("앞서 안내드린 9월 교육 <b style=\"color:#2A2620;\">신청 마감이 다가와</b> 다시 안내드립니다. "
+                 "아직 신청하지 않으셨다면 마감 전에 꼭 회신해 주세요."
+                 if is_reminder else "원스톱 스케일업 9월 교육을 안내드립니다.")
+    _sub_label = "9월 무료 교육 · 신청 마감 임박" if is_reminder else "9월 무료 교육"
+    return f"""<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#E6E9EE;font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#E6E9EE;padding:36px 0 52px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+  <!-- 헤더 -->
+  <tr>
+    <td style="background:#1B2A41;border-radius:14px 14px 0 0;padding:30px 30px 26px;border-bottom:2px solid #C9A96A;">
+      <table width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td valign="top">
+          <p style="margin:0 0 14px;font-size:11px;letter-spacing:2px;color:#C9A96A;font-weight:700;">원스톱 스케일업 · {_sub_label}</p>
+          <p style="margin:0 0 6px;font-size:13px;color:#B4C0CE;">중소조달기업 실무에 바로 적용할 수 있는</p>
+          <p style="margin:0 0 16px;font-size:26px;font-weight:700;color:#FFFFFF;line-height:1.3;">디지털 마케팅</p>
+          <p style="margin:0;font-size:13px;color:#C5D0DC;line-height:1.7;">마케터의 AI 활용 &nbsp;|&nbsp; SNS 마케팅 실무 &nbsp;|&nbsp; B2B 콘텐츠 전략</p>
+        </td>
+        <td width="74" align="right" valign="top">
+          <div style="background:linear-gradient(135deg,#C9A96A 0%,#B08D4F 100%);border-radius:12px;padding:10px 0;width:66px;text-align:center;">
+            <p style="margin:0;font-size:19px;font-weight:800;color:#1B2A41;line-height:1;">{_dday_txt}</p>
+            <p style="margin:4px 0 0;font-size:9px;font-weight:700;color:#1B2A41;letter-spacing:0.5px;">~{_dl_short}</p>
+          </div>
+        </td>
+      </tr></table>
+      <div style="margin-top:20px;">
+        <span style="display:inline-block;font-size:12px;color:#E8D5A8;background:rgba(201,169,106,0.14);border:1px solid rgba(201,169,106,0.45);padding:5px 12px;border-radius:6px;margin-right:6px;">무료 · 온라인 2시간</span>
+        <span style="display:inline-block;font-size:12px;color:#C5D0DC;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.18);padding:5px 12px;border-radius:6px;">선착순 · 조기 종료 가능</span>
+      </div>
+    </td>
+  </tr>
+
+  <!-- 본문 -->
+  <tr>
+    <td style="background:#FBFAF7;padding:30px 30px 28px;word-break:keep-all;overflow-wrap:break-word;">
+
+      <p style="margin:0 0 16px;font-size:14px;color:#2A2620;">{_who}, 안녕하세요.</p>
+
+      <p style="margin:0 0 12px;font-size:13px;color:#5A5548;line-height:1.9;">
+        {_greeting}
+      </p>
+      <p style="margin:0 0 12px;font-size:13px;color:#5A5548;line-height:1.9;">
+        이번 교육은 <b style="color:#2A2620;">AI 활용, SNS 운영, B2B 콘텐츠</b> 실무를 다룹니다.
+      </p>
+      <p style="margin:0 0 26px;font-size:13px;color:#5A5548;line-height:1.9;">
+        마케팅 담당자가 따로 없는 조달기업에서도 큰 예산 없이 바로 써볼 수 있는 방법에 초점을 맞췄습니다.
+      </p>
+
+      <div style="margin-bottom:30px;padding:14px 18px;background:#F5F0E6;border:1px solid #E0D5BF;border-radius:8px;">
+        <p style="margin:0;font-size:13px;color:#5A5548;line-height:1.8;">💻 <b style="color:#2A2620;">비대면 Zoom</b>으로 진행되어 자리에서 부담 없이 참여하실 수 있습니다. 마케팅·영업 담당자, 대표님 누구나 환영합니다.</p>
+      </div>
+
+      <p style="margin:0 0 14px;font-size:15px;font-weight:700;color:#2A2620;">📚 이런 걸 배웁니다</p>
+
+      <div style="margin-bottom:12px;padding:16px 18px;background:#FFFFFF;border:1px solid #E8E2D5;border-left:4px solid #C9A96A;border-radius:0 8px 8px 0;">
+        <p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#2A2620;">마케터의 AI 활용</p>
+        <p style="margin:0;font-size:12.5px;color:#6B6558;line-height:1.8;">실무에서 AI를 어떻게 활용해 마케팅 업무의 효율과 결과물의 질을 높이는지. 카피·기획·리서치에 바로 쓰는 프롬프트와 툴</p>
+      </div>
+      <div style="margin-bottom:12px;padding:16px 18px;background:#FFFFFF;border:1px solid #E8E2D5;border-left:4px solid #C9A96A;border-radius:0 8px 8px 0;">
+        <p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#2A2620;">온라인 SNS 마케팅 실무</p>
+        <p style="margin:0;font-size:12.5px;color:#6B6558;line-height:1.8;">채널 운영과 콘텐츠 기획 등 현장에서 바로 적용 가능한 실무 노하우. 어떤 채널을, 어떤 주기로, 무엇을 올릴 것인가</p>
+      </div>
+      <div style="margin-bottom:30px;padding:16px 18px;background:#FFFFFF;border:1px solid #E8E2D5;border-left:4px solid #C9A96A;border-radius:0 8px 8px 0;">
+        <p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#2A2620;">B2B 콘텐츠 전략</p>
+        <p style="margin:0;font-size:12.5px;color:#6B6558;line-height:1.8;">조달기업 특성에 맞는 효과적인 B2B 콘텐츠 유형. 공공기관·구매담당자에게 신뢰를 주는 상세페이지, 사례, 자료 구성</p>
+      </div>
+
+      <!-- 일시 · 강사 -->
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;">
+        <tr>
+          <td width="50%" style="padding:16px 18px;background:#1B2A41;border-radius:8px 0 0 8px;">
+            <p style="margin:0 0 6px;font-size:11px;color:#C9A96A;font-weight:700;">일시</p>
+            <p style="margin:0;font-size:14px;color:#FFFFFF;font-weight:600;">9/16(수) 14:00 ~ 16:00</p>
+          </td>
+          <td width="50%" style="padding:16px 18px;background:#22344F;border-radius:0 8px 8px 0;">
+            <p style="margin:0 0 6px;font-size:11px;color:#C9A96A;font-weight:700;">방식 · 강사</p>
+            <p style="margin:0;font-size:14px;color:#FFFFFF;font-weight:600;">비대면 Zoom · 김나영</p>
+          </td>
+        </tr>
+      </table>
+
+      <!-- 강사 소개 -->
+      <div style="margin-bottom:30px;padding:18px 20px;background:#FFFFFF;border:1.5px solid #D8D0C0;border-radius:10px;">
+        <p style="margin:0 0 12px;font-size:11px;font-weight:700;color:#9A7B3F;letter-spacing:1.5px;">강사 소개</p>
+        <p style="margin:0 0 14px;font-size:16px;font-weight:700;color:#2A2620;">김나영 <span style="font-size:12px;font-weight:400;color:#8A8478;margin-left:6px;">마케팅 전문가 · 강사</span></p>
+        <table cellpadding="0" cellspacing="0" style="font-size:12.5px;color:#5A5548;line-height:1.9;">
+          <tr><td width="28" valign="top" style="color:#C9A96A;font-weight:700;">현)</td><td>CCFM 전략기획실 실장</td></tr>
+          <tr><td valign="top" style="color:#C9A96A;font-weight:700;">전)</td><td>그로스쿨(Groschool) 대표 &nbsp;— 실무 마케팅 교육 플랫폼, 2020 창업·2025 엑싯</td></tr>
+          <tr><td valign="top" style="color:#C9A96A;font-weight:700;">전)</td><td>아이보스 · 인크루트 · 플랜티교육그룹 · 해커스교육그룹 마케팅</td></tr>
+          <tr><td valign="top" style="color:#C9A96A;font-weight:700;">저서</td><td>『한 권으로 끝내는 인스타그램!』 (공저)</td></tr>
+          <tr><td valign="top" style="color:#C9A96A;font-weight:700;">출강</td><td>카카오톡 · 언더독스 · 교보문고 등 기업·기관 다수</td></tr>
+        </table>
+      </div>
+
+      <!-- 신청 방법 -->
+      <div style="background:#F5F0E6;border:1.5px solid #D8C9A8;border-radius:10px;padding:18px 20px;">
+        <p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#2A2620;">📩 신청 방법 <span style="color:#B0894A;font-size:12px;font-weight:600;margin-left:4px;">~{_dl_short} 마감</span></p>
+        <p style="margin:0 0 10px;font-size:13px;color:#5A5548;line-height:1.8;">이 메일에 아래 정보를 <b style="color:#1B2A41;">회신</b>해 주세요.</p>
+        <p style="margin:0;font-size:13px;color:#5A5548;line-height:2.0;">
+          · 기업명<br>
+          · 담당자명 / 연락처<br>
+          · 참석 인원 (추가 참석자 있으면 함께)
+        </p>
+      </div>
+
+      <div style="margin-top:14px;padding:14px 18px;background:#FFFFFF;border:1px solid #E8E2D5;border-radius:8px;">
+        <p style="margin:0;font-size:12px;color:#6B6558;line-height:1.9;">📎 <b style="color:#2A2620;">줌 링크와 교육 자료</b>는 접수 종료 후 신청하신 모든 기업께 일괄 발송해 드립니다.</p>
+      </div>
+
+    </td>
+  </tr>
+
+  <!-- 푸터 -->
+  <tr>
+    <td style="background:#1B2A41;border-radius:0 0 14px 14px;padding:20px 30px;border-top:2px solid #C9A96A;">
+      <p style="margin:0;font-size:12px;color:#B4C0CE;line-height:1.9;">혁신제품지원센터 원스톱 스케일업 운영팀<br><a href="mailto:onestop.kipcc@gmail.com" style="color:#C9A96A !important;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
+      <p style="margin:10px 0 0;font-size:11px;color:#7A96B2;">함께 참석하실 사내 담당자분들께도 공유 부탁드립니다.</p>
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
+</body></html>"""
+
 API_KEY          = "Nt604D"
 BASE_URL         = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do"
 SELECTED_FILE    = "선정기업_명단.xlsx"   # ← 핵심 변경
@@ -1418,32 +1560,20 @@ def claude_call_raw(prompt, max_tokens=1000):
         "anthropic-version": "2023-06-01"
     }
     payload = {
-        "model": "claude-sonnet-4-5",
+        "model": "claude-sonnet-4-6",
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}]
     }
-    import time as _t
-    _last_err = ""
-    for _attempt in range(4):  # 최대 4회 시도 (재시도 3회)
-        try:
-            if _attempt > 0:
-                _t.sleep(min(2 ** _attempt, 8))  # 2,4,8초 백오프
-            resp = requests.post("https://api.anthropic.com/v1/messages",
-                                 headers=headers, json=payload, timeout=60)
-            if resp.ok:
-                content = resp.json().get('content', [])
-                return content[0].get('text', '') if content else ''
-            # 429(과부하)·5xx는 재시도, 4xx(키·요청오류)는 즉시 중단
-            if resp.status_code == 429 or resp.status_code >= 500:
-                _last_err = f"{resp.status_code}: {resp.text[:80]}"
-                continue
-            else:
-                st.warning(f"⚠️ Claude API 오류 {resp.status_code}: {resp.text[:100]}")
-                return ''
-        except Exception as e:
-            _last_err = str(e)[:80]
-            continue
-    st.warning(f"⚠️ Claude API 재시도 실패(4회): {_last_err}")
+    try:
+        resp = requests.post("https://api.anthropic.com/v1/messages",
+                             headers=headers, json=payload, timeout=30)
+        if resp.ok:
+            content = resp.json().get('content', [])
+            return content[0].get('text', '') if content else ''
+        else:
+            st.warning(f"⚠️ Claude API 오류 {resp.status_code}: {resp.text[:100]}")
+    except Exception as e:
+        st.warning(f"⚠️ Claude API 예외: {e}")
     return ''
 
 
@@ -1516,50 +1646,36 @@ JSON 형식으로만 답하세요:
   "주의사항": "신청 전 반드시 확인할 사항 (없으면 없음)"
 }}"""
 
-    import time as _t
-    _last_err = ""
-    for _attempt in range(4):  # 최대 4회 시도 (재시도 3회)
-        try:
-            if _attempt > 0:
-                _t.sleep(min(2 ** _attempt, 8))  # 2,4,8초 백오프
-            resp = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": "claude-sonnet-4-5",
-                    "max_tokens": 600,
-                    "messages": [{"role": "user", "content": prompt}]
-                },
-                timeout=60
-            )
-            if resp.ok:
-                text = resp.json()['content'][0]['text']
-                import re as _re
-                json_match = _re.search(r'[{].*[}]', text, _re.DOTALL)
-                if json_match:
-                    return json.loads(json_match.group())
-                return {"error": "응답 파싱 실패", "raw": text[:200]}
-            # 429·5xx는 재시도, 4xx는 즉시 중단
-            if resp.status_code == 429 or resp.status_code >= 500:
-                try:
-                    _last_err = resp.json().get('error', {}).get('message', resp.text[:120])
-                except Exception:
-                    _last_err = resp.text[:120]
-                continue
-            else:
-                try:
-                    err_detail = resp.json().get('error', {}).get('message', resp.text[:300])
-                except Exception:
-                    err_detail = resp.text[:300]
-                return {"error": f"API 오류 {resp.status_code}: {err_detail}"}
-        except Exception as e:
-            _last_err = str(e)[:120]
-            continue
-    return {"error": f"재시도 실패(4회): {_last_err}"}
+    try:
+        resp = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-sonnet-4-5",
+                "max_tokens": 600,
+                "messages": [{"role": "user", "content": prompt}]
+            },
+            timeout=30
+        )
+        if resp.ok:
+            text = resp.json()['content'][0]['text']
+            import re as _re
+            json_match = _re.search(r'[{].*[}]', text, _re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+            return {"error": "응답 파싱 실패", "raw": text[:200]}
+        else:
+            try:
+                err_detail = resp.json().get('error', {}).get('message', resp.text[:300])
+            except:
+                err_detail = resp.text[:300]
+            return {"error": f"API 오류 {resp.status_code}: {err_detail}"}
+    except Exception as e:
+        return {"error": str(e)}
 
 def _build_reason(stars, matched_target, matched_type, matched_co,
                   matched_demand=[], location_score=0, matched_industry=[]):
@@ -3386,10 +3502,7 @@ elif page == "공고·매칭":
                                 for gi, (_, gr) in enumerate(all_rows.iterrows()):
                                     gkey = f"{gr['기업명']}_{gr.get('공고ID','')}"
 
-                                    _cached = st.session_state['ai_analysis'].get(gkey)
-                                    # 캐시가 없거나, 에러/빈 결과(추천여부 없음)면 재분석
-                                    _need = (not _cached) or ('error' in _cached) or (not _cached.get('추천여부'))
-                                    if _need:
+                                    if gkey not in st.session_state['ai_analysis']:
                                         ci = {}
                                         if 'df_companies_cache' in st.session_state:
                                             df_co_g = st.session_state['df_companies_cache']
@@ -3665,8 +3778,7 @@ elif page == "공고·매칭":
                                 prog_co_ai = st.progress(0, text="AI 분석 중...")
                                 for ai_i, (_, ai_row) in enumerate(co_rows.iterrows()):
                                     ai_key = f"{ai_row['기업명']}_{ai_row.get('공고ID','')}"
-                                    _c = st.session_state.get('ai_analysis', {}).get(ai_key)
-                                    if (not _c) or ('error' in _c) or (not _c.get('추천여부')):
+                                    if ai_key not in st.session_state.get('ai_analysis', {}):
                                         ci = {}
                                         if 'df_companies_cache' in st.session_state:
                                             df_co3 = st.session_state['df_companies_cache']
@@ -3848,7 +3960,7 @@ elif page == "공고·매칭":
                                 st.link_button("🔗 공고 원문", row.get('공고링크',''),
                                                use_container_width=True)
                         with b4:
-                            if (not ai_res) or ai_res.get('error') or (not ai_res.get('추천여부')):
+                            if not ai_res:
                                 if st.button("🤖 AI 분석", key=f"ai_{key}_{i}", use_container_width=True):
                                     with st.spinner("분석 중..."):
                                         ci = {}
@@ -4052,17 +4164,10 @@ elif page == "발송":
 
     # 참고 공고: 승인 0건 기업용 — 그 기업의 ★★ 검토 공고 상위 3건 (제외 여부 무관)
     # AI가 '검토'로 판정한 것 중 점수 높은 순. 승인 공고 없는 기업의 빈자리를 채움.
-    # 단, "세부사업별 상이"·"차수별 상이"처럼 개별 마감일이 따로 있는 통합공고는
-    # 그 자체로 신청 불가(마감 여부 불명)이라 참고공고에서 제외.
-    def _ref_ok(r):
-        _rp = str(r.get('접수기간','') or '')
-        if ('세부사업별 상이' in _rp) or ('차수별 상이' in _rp):
-            return False
-        return True
     _ref_by_co = {}
     for r in _results_live:
         _rec = ai_cache.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", {}).get('추천여부','')
-        if _rec == '검토' and _ref_ok(r):
+        if _rec == '검토':
             _ref_by_co.setdefault(r.get('기업명',''), []).append(r)
     for _co in _ref_by_co:
         _ref_by_co[_co] = sorted(_ref_by_co[_co],
@@ -4224,18 +4329,13 @@ elif page == "발송":
         ]
 
         # 0건 기업이면 전체 review_grade 공통 공고로 보완
-        # ("세부사업별 상이"·"차수별 상이"는 제외 — 실제 발송과 동일 기준)
         _is_zero_prev = not _rec_prev and not _rest_prev
         if not _review_prev and _is_zero_prev:
             from collections import Counter as _Counter
-            def _rg_ok(r):
-                _rp = str(r.get('접수기간','') or '')
-                return ('세부사업별 상이' not in _rp) and ('차수별 상이' not in _rp)
-            _rg_valid = [r for r in review_grade if _rg_ok(r)]
-            _nc = _Counter(r.get('공고명','') for r in _rg_valid)
+            _nc = _Counter(r.get('공고명','') for r in review_grade)
             _top = [n for n, _ in _nc.most_common(5)]
             _seen = set()
-            for r in _rg_valid:
+            for r in review_grade:
                 if r.get('공고명','') in _top and r.get('공고명','') not in _seen:
                     _review_prev.append(r)
                     _seen.add(r.get('공고명',''))
@@ -4495,19 +4595,6 @@ elif page == "발송":
                         if _rid not in _approved_ids and _rid not in _seen_r:
                             _cand_uniq.append(r); _seen_r.add(_rid)
                     notices_review = _cand_uniq[:_need]
-
-                    # 그래도 0건이면(맞춤·참고 모두 없음) 전체 공통 인기 공고로 최소 채움
-                    # 여러 기업에 걸쳐 '검토'로 자주 잡힌 범용 공고 = 폭넓게 유효
-                    if not notices_review:
-                        from collections import Counter as _Ctr
-                        _all_ref = [r for _co_rs in _ref_map.values() for r in _co_rs]
-                        _pop = _Ctr(r.get('공고ID','') for r in _all_ref)
-                        _by_id = {}
-                        for r in _all_ref:
-                            _by_id.setdefault(r.get('공고ID',''), r)
-                        _popular = [ _by_id[_pid] for _pid, _ in _pop.most_common()
-                                     if _pid and _pid not in _approved_ids ]
-                        notices_review = _popular[:_need]
 
                 def notice_card_simple(n, idx):
                     """공통 공고용 심플 카드 (작고 간결하게)"""
@@ -5505,6 +5592,8 @@ JSON만 응답 (코드블록 없이):
                 "선정 기업 축하 및 프로그램 안내",
                 "7월 교육 프로그램 신청 안내",
                 "8월 교육 리마인더 (미신청 대상)",
+                "9월 교육 신청 안내",
+                "9월 교육 리마인더 (미신청 대상)",
                 "함께하기 회원소개 가입 안내",
                 "CES 혁신상 밋업 신청 안내",
                 "교육 프로그램 수요조사",
@@ -5517,6 +5606,14 @@ JSON만 응답 (코드블록 없이):
         )
 
         TEMPLATES = {
+            "9월 교육 신청 안내": {
+                "subject": "[원스톱 스케일업] 9월 무료 교육 신청 안내 (~9/4) — 실무에 바로 적용하는 디지털 마케팅",
+                "body": "9월 16일(수) 14~16시 Zoom으로 진행되는 디지털 마케팅 교육을 안내드립니다. 9/4(금)까지 회신으로 신청해 주세요.",
+            },
+            "9월 교육 리마인더 (미신청 대상)": {
+                "subject": "[원스톱 스케일업] 9월 교육 신청 마감 안내 (~9/4) — 아직 신청 안 하셨나요?",
+                "body": "9월 교육 신청 마감이 다가와 다시 안내드립니다. 마감 전에 꼭 신청해 주세요.",
+            },
             "8월 교육 리마인더 (미신청 대상)": {
                 "subject": "[원스톱 스케일업] 8월 교육 신청 마감 안내 (~8/7) — 아직 신청 안 하셨나요?",
                 "body": "8월 교육 신청 마감이 다가와 다시 안내드립니다. 마감 전에 꼭 신청해 주세요.",
@@ -5830,7 +5927,7 @@ onestop.kipcc@gmail.com""",
 
         if df_target.empty and not direct_input_email:
             st.warning("발송 대상 기업이 없습니다.")
-        elif (not mail_subject or not mail_body) and template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 리마인더 (미신청 대상)", "함께하기 회원소개 가입 안내", "CES 혁신상 밋업 신청 안내"):
+        elif (not mail_subject or not mail_body) and template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 리마인더 (미신청 대상)", "9월 교육 신청 안내", "9월 교육 리마인더 (미신청 대상)", "함께하기 회원소개 가입 안내", "CES 혁신상 밋업 신청 안내"):
             st.info("제목과 본문을 작성하면 미리보기가 표시됩니다.")
         else:
             sample_company = df_target.iloc[0]['기업명'] if not df_target.empty else "샘플기업"
@@ -5854,6 +5951,13 @@ onestop.kipcc@gmail.com""",
                 _nm = df_target.iloc[0].get('기업명','') if not df_target.empty else ''
                 sample_html = build_together_html(company=_nm, 담당자='')
                 st.components.v1.html(sample_html, height=1400, scrolling=True)
+
+            # 9월 교육 안내/리마인더 전용 HTML 미리보기
+            elif template_choice in ("9월 교육 신청 안내", "9월 교육 리마인더 (미신청 대상)"):
+                _co_nm = df_target.iloc[0].get('기업명','') if not df_target.empty else ''
+                sample_html = build_sep_edu_html(company=_co_nm,
+                    is_reminder=(template_choice == "9월 교육 리마인더 (미신청 대상)"))
+                st.components.v1.html(sample_html, height=1300, scrolling=True)
 
             # 8월 교육 리마인더 전용 HTML 미리보기
             elif template_choice == "8월 교육 리마인더 (미신청 대상)":
@@ -6300,6 +6404,9 @@ onestop.kipcc@gmail.com""",
                     if template_choice == "함께하기 회원소개 가입 안내":
                         html_body = build_together_html(
                             company=str(row.get('기업명','')), 담당자='')
+                    elif template_choice in ("9월 교육 신청 안내", "9월 교육 리마인더 (미신청 대상)"):
+                        html_body = build_sep_edu_html(company=str(row.get('기업명','')),
+                            is_reminder=(template_choice == "9월 교육 리마인더 (미신청 대상)"))
                     elif template_choice == "8월 교육 리마인더 (미신청 대상)":
                         _co_kw   = str(row.get('기술키워드','') or row.get('키워드보완','') or '')[:40]
                         _co_area = str(row.get('관심사업분야','') or '')
@@ -6559,7 +6666,7 @@ onestop.kipcc@gmail.com""",
                           <a href="{form_link}" style="font-size:13px;color:#10B981;">{form_link}</a>
                         </div>"""
 
-                    if template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 리마인더 (미신청 대상)", "함께하기 회원소개 가입 안내", "CES 혁신상 밋업 신청 안내"):
+                    if template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 리마인더 (미신청 대상)", "9월 교육 신청 안내", "9월 교육 리마인더 (미신청 대상)", "함께하기 회원소개 가입 안내", "CES 혁신상 밋업 신청 안내"):
                         html_body = f"""<!DOCTYPE html>
     <html lang="ko"><head><meta charset="UTF-8"></head>
     <body style="margin:0;padding:0;background:#F2F4F7;
@@ -6828,7 +6935,7 @@ elif page == "교육 신청 집계":
                                     headers={'x-api-key': st.secrets.get('ANTHROPIC_API_KEY',''),
                                              'anthropic-version': '2023-06-01',
                                              'content-type': 'application/json'},
-                                    json={'model': 'claude-sonnet-4-5',
+                                    json={'model': 'claude-sonnet-4-6',
                                           'max_tokens': 500,
                                           'messages': [{'role':'user','content': ai_prompt}]}
                                 )
