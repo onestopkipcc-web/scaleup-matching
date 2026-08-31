@@ -294,11 +294,8 @@ def build_sep_edu_html(company="", deadline="2026-09-04", is_reminder=False):
       <p style="margin:0 0 12px;font-size:13px;color:#5A5548;line-height:1.9;">
         {_greeting}
       </p>
-      <p style="margin:0 0 12px;font-size:13px;color:#5A5548;line-height:1.9;">
-        이번 교육은 <b style="color:#2A2620;">AI 활용, SNS 운영, B2B 콘텐츠</b> 실무를 다룹니다.
-      </p>
       <p style="margin:0 0 26px;font-size:13px;color:#5A5548;line-height:1.9;">
-        마케팅 담당자가 따로 없는 조달기업에서도 큰 예산 없이 바로 써볼 수 있는 방법에 초점을 맞췄습니다.
+        이번 교육은 <b style="color:#2A2620;">AI 활용, SNS 운영, B2B 콘텐츠</b> 실무를 다룹니다.
       </p>
 
       <div style="margin-bottom:30px;padding:14px 18px;background:#F5F0E6;border:1px solid #E0D5BF;border-radius:8px;">
