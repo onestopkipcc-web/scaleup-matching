@@ -236,11 +236,11 @@ def build_aug_edu_html(company="", co_kw="", co_area="", co_type="",
   </div>
 </div>
 </body></html>"""
-def build_sep_edu_html(company="", deadline="2026-09-04", is_reminder=False):
+def build_sep_edu_html(company="", deadline="2026-09-09", is_reminder=False):
     """9월 교육(디지털 마케팅 · 김나영) 신청 안내/리마인더 메일 HTML.
     아이보리+네이비+골드 팔레트. D-day는 날짜 기준 자동 계산."""
     from datetime import datetime as _dt, date as _date
-    _dl_short = "9/4(금)"
+    _dl_short = "9/9(수)"
     try:
         _dl = _dt.strptime(deadline, "%Y-%m-%d").date()
         _days = (_dl - _date.today()).days
@@ -250,10 +250,12 @@ def build_sep_edu_html(company="", deadline="2026-09-04", is_reminder=False):
     except Exception:
         _dday_txt = ""
     _who = f"<b>{company}</b> 담당자님" if company else "담당자님"
-    _greeting = ("앞서 안내드린 9월 교육 <b style=\"color:#2A2620;\">신청 마감이 다가와</b> 다시 안내드립니다. "
-                 "아직 신청하지 않으셨다면 마감 전에 꼭 회신해 주세요."
-                 if is_reminder else "원스톱 스케일업 9월 교육을 안내드립니다.")
-    _sub_label = "9월 무료 교육 · 신청 마감 임박" if is_reminder else "9월 무료 교육"
+    _greeting = (f"많은 관심에 감사드리며, 9월 교육 신청 기간을 <b style=\"color:#2A2620;\">{_dl_short}까지 연장</b>하여 다시 안내드립니다. "
+                 "아직 신청하지 않으셨다면 기간 내 회신으로 신청해 주세요."
+                 if is_reminder else "원스톱 9월 교육을 안내드립니다.")
+    _sub_label = "9월 무료 교육 · 접수 기간 연장" if is_reminder else "9월 무료 교육"
+    _brand = "원스톱 지원 서비스" if is_reminder else "원스톱 스케일업"
+    _dl_label = f"~{_dl_short} 마감 (기간 연장)" if is_reminder else f"~{_dl_short} 마감"
     return f"""<!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#E6E9EE;font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
@@ -266,7 +268,7 @@ def build_sep_edu_html(company="", deadline="2026-09-04", is_reminder=False):
     <td style="background:#1B2A41;border-radius:14px 14px 0 0;padding:30px 30px 26px;border-bottom:2px solid #C9A96A;">
       <table width="100%" cellpadding="0" cellspacing="0"><tr>
         <td valign="top">
-          <p style="margin:0 0 14px;font-size:11px;letter-spacing:2px;color:#C9A96A;font-weight:700;">원스톱 스케일업 · {_sub_label}</p>
+          <p style="margin:0 0 14px;font-size:11px;letter-spacing:2px;color:#C9A96A;font-weight:700;">{_brand} · {_sub_label}</p>
           <p style="margin:0 0 6px;font-size:13px;color:#B4C0CE;">중소조달기업 실무에 바로 적용할 수 있는</p>
           <p style="margin:0 0 16px;font-size:26px;font-weight:700;color:#FFFFFF;line-height:1.3;">디지털 마케팅</p>
           <p style="margin:0;font-size:13px;color:#C5D0DC;line-height:1.7;">마케터의 AI 활용 &nbsp;|&nbsp; SNS 마케팅 실무 &nbsp;|&nbsp; B2B 콘텐츠 전략</p>
@@ -346,7 +348,7 @@ def build_sep_edu_html(company="", deadline="2026-09-04", is_reminder=False):
 
       <!-- 신청 방법 -->
       <div style="background:#F5F0E6;border:1.5px solid #D8C9A8;border-radius:10px;padding:18px 20px;">
-        <p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#2A2620;">📩 신청 방법 <span style="color:#B0894A;font-size:12px;font-weight:600;margin-left:4px;">~{_dl_short} 마감</span></p>
+        <p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#2A2620;">📩 신청 방법 <span style="color:#B0894A;font-size:12px;font-weight:600;margin-left:4px;">{_dl_label}</span></p>
         <p style="margin:0 0 10px;font-size:13px;color:#5A5548;line-height:1.8;">이 메일에 아래 정보를 <b style="color:#1B2A41;">회신</b>해 주세요.</p>
         <p style="margin:0;font-size:13px;color:#5A5548;line-height:2.0;">
           · 기업명<br>
@@ -365,7 +367,7 @@ def build_sep_edu_html(company="", deadline="2026-09-04", is_reminder=False):
   <!-- 푸터 -->
   <tr>
     <td style="background:#1B2A41;border-radius:0 0 14px 14px;padding:20px 30px;border-top:2px solid #C9A96A;">
-      <p style="margin:0;font-size:12px;color:#B4C0CE;line-height:1.9;">혁신제품지원센터 원스톱 스케일업 운영팀<br><a href="mailto:onestop.kipcc@gmail.com" style="color:#C9A96A !important;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
+      <p style="margin:0;font-size:12px;color:#B4C0CE;line-height:1.9;">혁신제품지원센터 {_brand} 운영팀<br><a href="mailto:onestop.kipcc@gmail.com" style="color:#C9A96A !important;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
       <p style="margin:10px 0 0;font-size:11px;color:#7A96B2;">함께 참석하실 사내 담당자분들께도 공유 부탁드립니다.</p>
     </td>
   </tr>
@@ -5604,12 +5606,12 @@ JSON만 응답 (코드블록 없이):
 
         TEMPLATES = {
             "9월 교육 신청 안내": {
-                "subject": "[원스톱 스케일업] 9월 무료 교육 신청 안내 (~9/4) — 실무에 바로 적용하는 디지털 마케팅",
-                "body": "9월 16일(수) 14~16시 Zoom으로 진행되는 디지털 마케팅 교육을 안내드립니다. 9/4(금)까지 회신으로 신청해 주세요.",
+                "subject": "[원스톱 스케일업] 9월 무료 교육 신청 안내 (~9/9) — 실무에 바로 적용하는 디지털 마케팅",
+                "body": "9월 16일(수) 14~16시 Zoom으로 진행되는 디지털 마케팅 교육을 안내드립니다. 9/9(수)까지 회신으로 신청해 주세요.",
             },
             "9월 교육 리마인더 (미신청 대상)": {
-                "subject": "[원스톱 스케일업] 9월 교육 신청 마감 안내 (~9/4) — 아직 신청 안 하셨나요?",
-                "body": "9월 교육 신청 마감이 다가와 다시 안내드립니다. 마감 전에 꼭 신청해 주세요.",
+                "subject": "[원스톱 지원 서비스] 9월 무료 교육 신청 기간 연장 안내 (~9/9) — 디지털 마케팅",
+                "body": "9월 교육 신청 기간을 9/9(수)까지 연장하여 다시 안내드립니다. 기간 내 회신으로 신청해 주세요.",
             },
             "8월 교육 리마인더 (미신청 대상)": {
                 "subject": "[원스톱 스케일업] 8월 교육 신청 마감 안내 (~8/7) — 아직 신청 안 하셨나요?",
