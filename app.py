@@ -5572,6 +5572,16 @@ JSON만 응답 (코드블록 없이):
         else:
             df_target = df_active
 
+        # 제외 기업 선택 (모든 그룹 공통 — 이미 신청한 기업 등 빼고 발송)
+        if direct_input_email is None and not df_target.empty:
+            _excl = st.multiselect(
+                "🚫 제외할 기업 (선택)", df_target['기업명'].tolist(),
+                key="notice_mail_exclude",
+                help="이미 신청했거나 이번 발송에서 빼야 하는 기업을 선택하세요.")
+            if _excl:
+                df_target = df_target[~df_target['기업명'].isin(_excl)]
+                st.caption(f"제외 {len(_excl)}개사 적용 → 최종 발송 대상 {len(df_target)}개사")
+
         with col2:
             st.metric("발송 대상", f"{len(df_target)}개사")
             if not df_target.empty:
