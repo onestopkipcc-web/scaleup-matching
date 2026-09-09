@@ -1570,10 +1570,14 @@ def _anthropic_post(headers, payload, max_tries=4):
 def get_detail_map_cached():
     """AI 분석용 전문 DB(pblancId → 전문내용 등) — 세션 캐시.
     실패 사유는 _detail_map_ai_err에 저장해 화면에 노출."""
-    if '_detail_map_ai' not in st.session_state:
+    if not st.session_state.get('_detail_map_ai'):   # 빈 맵은 캐시 취급 안 함 → 재시도
         _dm = {}; _err = ''
         try:
-            _dfd = load_excel(_get_drive(), DETAIL_FILE)
+            _dfd = pd.DataFrame()
+            for _try_dm in range(2):                     # 대용량 다운로드 재시도
+                _dfd = load_excel(_get_drive(), DETAIL_FILE)
+                if not _dfd.empty:
+                    break
             if _dfd.empty:
                 _err = f"{DETAIL_FILE} 이 비어 있거나 로드 실패"
             elif 'pblancId' not in _dfd.columns:
@@ -3615,7 +3619,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0909-4 · 전문DB 계측 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0909-5 · 전문 없으면 분석 차단 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
@@ -3646,11 +3650,18 @@ elif page == "공고·매칭":
                             # 전문 DB 상태 점검 — AI에 전문이 실제로 들어가는지 가시화
                             _dm_chk = get_detail_map_cached()
                             _dm_err = st.session_state.get('_detail_map_ai_err', '')
-                            if _dm_err:
-                                st.error(f"⚠️ AI용 전문 DB 문제: {_dm_err} — 이 상태로 분석하면 요약(300자)만으로 판정되어 '검토'가 과다 발생합니다.")
+                            _pid_col = df_show['공고ID'].astype(str).str.strip() if '공고ID' in df_show.columns else pd.Series([], dtype=str)
+                            _hit_chk = int(_pid_col.isin(set(_dm_chk.keys())).sum())
+                            if _dm_err or _hit_chk == 0:
+                                _why = _dm_err or "전문 DB는 열렸으나 현재 매칭 공고와 겹치는 전문이 0건"
+                                st.error(f"⛔ 분석 중단: {_why}\n\n"
+                                         f"요약(300자)만으로 분석하면 '검토' 판정이 과다 발생해 비용만 낭비됩니다. "
+                                         f"전문 DB 문제를 해결한 뒤 다시 실행하세요. "
+                                         f"(부득이하게 강행하려면 아래 체크 후 재실행)")
+                                if not st.session_state.get('force_no_fulltext', False):
+                                    st.checkbox("⚠️ 전문 없이 강행 (권장 안 함)", key="force_no_fulltext")
+                                    st.stop()
                             else:
-                                _pid_col = df_show['공고ID'].astype(str).str.strip() if '공고ID' in df_show.columns else pd.Series([], dtype=str)
-                                _hit_chk = int(_pid_col.isin(set(_dm_chk.keys())).sum())
                                 st.caption(f"📄 AI용 전문 DB {len(_dm_chk)}건 로드 · 현재 매칭 {len(df_show)}건 중 전문 반영 가능 {_hit_chk}건")
 
                             # 드라이브 캐시 먼저 로드 → 세션에 병합
