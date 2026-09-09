@@ -1568,20 +1568,29 @@ def _anthropic_post(headers, payload, max_tries=4):
     return None, last_err or "재시도 초과"
 
 def get_detail_map_cached():
-    """AI 분석용 전문 DB(pblancId → 전문내용 등) — 세션 캐시."""
+    """AI 분석용 전문 DB(pblancId → 전문내용 등) — 세션 캐시.
+    실패 사유는 _detail_map_ai_err에 저장해 화면에 노출."""
     if '_detail_map_ai' not in st.session_state:
-        _dm = {}
+        _dm = {}; _err = ''
         try:
             _dfd = load_excel(_get_drive(), DETAIL_FILE)
-            if not _dfd.empty and 'pblancId' in _dfd.columns:
+            if _dfd.empty:
+                _err = f"{DETAIL_FILE} 이 비어 있거나 로드 실패"
+            elif 'pblancId' not in _dfd.columns:
+                _err = f"{DETAIL_FILE} 에 pblancId 컬럼 없음 — 컬럼: {list(_dfd.columns)[:6]}"
+            else:
                 if '크롤링성공' in _dfd.columns:
                     _dfd = _dfd[_dfd['크롤링성공'] == 'Y']
                 _dfd = _dfd.dropna(subset=['pblancId'])
                 _dfd['pblancId'] = _dfd['pblancId'].astype(str).str.strip()
+                _dfd = _dfd[_dfd['전문내용'].astype(str).str.len() >= 200] if '전문내용' in _dfd.columns else _dfd
                 _dm = _dfd.set_index('pblancId').to_dict('index')
-        except Exception:
-            _dm = {}
+                if not _dm:
+                    _err = "전문 DB 필터 후 0건 (크롤링성공=Y & 전문 200자 이상 없음)"
+        except Exception as _e:
+            _err = f"전문 DB 로드 예외: {str(_e)[:120]}"
         st.session_state['_detail_map_ai'] = _dm
+        st.session_state['_detail_map_ai_err'] = _err
     return st.session_state['_detail_map_ai']
 
 def enrich_for_ai(nd):
@@ -3606,7 +3615,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0909-3 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0909-4 · 전문DB 계측 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
@@ -3634,6 +3643,16 @@ elif page == "공고·매칭":
                             _drive = _get_drive()
                             prog_g = st.progress(0, text="캐시 확인 중...")
 
+                            # 전문 DB 상태 점검 — AI에 전문이 실제로 들어가는지 가시화
+                            _dm_chk = get_detail_map_cached()
+                            _dm_err = st.session_state.get('_detail_map_ai_err', '')
+                            if _dm_err:
+                                st.error(f"⚠️ AI용 전문 DB 문제: {_dm_err} — 이 상태로 분석하면 요약(300자)만으로 판정되어 '검토'가 과다 발생합니다.")
+                            else:
+                                _pid_col = df_show['공고ID'].astype(str).str.strip() if '공고ID' in df_show.columns else pd.Series([], dtype=str)
+                                _hit_chk = int(_pid_col.isin(set(_dm_chk.keys())).sum())
+                                st.caption(f"📄 AI용 전문 DB {len(_dm_chk)}건 로드 · 현재 매칭 {len(df_show)}건 중 전문 반영 가능 {_hit_chk}건")
+
                             # 드라이브 캐시 먼저 로드 → 세션에 병합
                             cached = load_json(_drive, AI_ANALYSIS_FILE) or {}
                             if 'ai_analysis' not in st.session_state:
@@ -3646,7 +3665,7 @@ elif page == "공고·매칭":
                             if total_g == 0:
                                 st.warning("매칭 결과가 없습니다. 먼저 매칭을 실행하세요.")
                             else:
-                                ok_g = 0; ap_g = 0; rj_g = 0; skip_g = 0; cut_g = 0; fail_g = 0
+                                ok_g = 0; ap_g = 0; rj_g = 0; skip_g = 0; cut_g = 0; fail_g = 0; enr_g = 0
                                 prog_g.progress(0, text=f"0/{total_g} 처리 중...")
 
                                 for gi, (_, gr) in enumerate(all_rows.iterrows()):
@@ -3667,7 +3686,10 @@ elif page == "공고·매칭":
                                                 mx_g = df_co_g[df_co_g['기업명']==gr['기업명']]
                                                 if not mx_g.empty: ci = mx_g.iloc[0].to_dict()
                                             ci['기업명'] = gr['기업명']
-                                            _res_g = claude_analyze(ci, enrich_for_ai(gr.to_dict()))
+                                            _nd_g = enrich_for_ai(gr.to_dict())
+                                            if len(str(_nd_g.get('전문내용','') or '')) >= 200:
+                                                enr_g += 1
+                                            _res_g = claude_analyze(ci, _nd_g)
                                             if _res_g.get('error'):
                                                 fail_g += 1   # 오류는 캐시하지 않음 → 다음 실행 때 자동 재시도
                                             else:
@@ -3699,7 +3721,7 @@ elif page == "공고·매칭":
                                     save_ai_analysis(_drive)
                                 prog_g.progress(1.0, text="✅ 완료!")
                                 st.session_state['bulk_result'] = (
-                                    f"신규분석 {ok_g}건 / 지역컷 {cut_g}건 / 캐시재사용 {skip_g}건 / 자동승인 {ap_g}건 / 자동제외 {rj_g}건"
+                                    f"신규분석 {ok_g}건(전문반영 {enr_g}건) / 지역컷 {cut_g}건 / 캐시재사용 {skip_g}건 / 자동승인 {ap_g}건 / 자동제외 {rj_g}건"
                                     + (f" / ⚠️ 실패 {fail_g}건 — 같은 버튼으로 다시 실행하면 실패분만 재시도됩니다" if fail_g else ""))
                                 st.rerun()
 
