@@ -3606,17 +3606,23 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    _ai_cache_now = st.session_state.get('ai_analysis', {})
-                    _stale_review = [k for k, v in _ai_cache_now.items()
-                                     if isinstance(v, dict) and v.get('추천여부') == '검토'
-                                     and not v.get('_지역컷') and not v.get('_전문반영')]
-                    if _stale_review:
-                        if st.button(f"🔁 '검토' 판정 {len(_stale_review)}건 재분석 준비 (전문 반영)",
-                                     key="requeue_review_ai",
-                                     help="전문 없이 요약만 보고 '검토'로 미뤄진 판정의 캐시를 지웁니다. 이후 ⚡ 일괄 실행을 누르면 공고 전문을 반영해 다시 분석합니다."):
+                    if st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
+                                 key="requeue_review_ai",
+                                 help="전문 없이 요약만 보고 '검토'로 미뤄진 판정의 캐시를 지웁니다. 이후 ⚡ 일괄 실행을 누르면 공고 전문을 반영해 다시 분석합니다."):
+                        _drv_rq = _get_drive()
+                        # 드라이브 캐시 + 세션 캐시 병합 후 대상 산출 (재부팅 직후에도 동작)
+                        _merged_rq = load_json(_drv_rq, AI_ANALYSIS_FILE) or {}
+                        _merged_rq.update(st.session_state.get('ai_analysis', {}))
+                        _stale_review = [k for k, v in _merged_rq.items()
+                                         if isinstance(v, dict) and v.get('추천여부') == '검토'
+                                         and not v.get('_지역컷') and not v.get('_전문반영')]
+                        if not _stale_review:
+                            st.info("재분석 대상이 없습니다 — '검토' 판정이 모두 전문 반영본이거나 캐시가 비어 있습니다.")
+                        else:
                             for _k in _stale_review:
-                                st.session_state['ai_analysis'].pop(_k, None)
-                            save_ai_analysis(_get_drive())
+                                _merged_rq.pop(_k, None)
+                            st.session_state['ai_analysis'] = _merged_rq
+                            save_ai_analysis(_drv_rq)
                             st.success(f"'검토' {len(_stale_review)}건 캐시 삭제 완료 — 아래 ⚡ 전 기업 일괄 실행을 누르면 전문 반영으로 재분석됩니다.")
 
                     btn_col1, btn_col2 = st.columns(2)
