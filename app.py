@@ -3606,10 +3606,12 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0909-2 (검토 재분석 지원)")
-                    if st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
-                                 key="requeue_review_ai",
-                                 help="전문 없이 요약만 보고 '검토'로 미뤄진 판정의 캐시를 지웁니다. 이후 ⚡ 일괄 실행을 누르면 공고 전문을 반영해 다시 분석합니다."):
+                    st.caption("🏷️ 빌드 v0909-3 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    rq_col1, _rq_sp = st.columns([2, 2])
+                    with rq_col1:
+                        _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
+                                                key="requeue_review_ai", use_container_width=True)
+                    if _rq_clicked:
                         _drv_rq = _get_drive()
                         # 드라이브 캐시 + 세션 캐시 병합 후 대상 산출 (재부팅 직후에도 동작)
                         _merged_rq = load_json(_drv_rq, AI_ANALYSIS_FILE) or {}
