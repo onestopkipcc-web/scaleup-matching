@@ -3558,6 +3558,9 @@ elif page == "공고·매칭":
                         auto_reject  = st.checkbox("비추천 자동 제외", value=True, key="bulk_auto_reject")
                         skip_region  = st.checkbox("타지역 공고 AI 생략 (자동 비추천)", value=True, key="bulk_skip_region",
                                                    help="공고지역이 기업 소재지와 안 맞는 공고는 API 호출 없이 규칙으로 비추천 처리 — 비용·시간 절감")
+                        run_limit    = st.number_input("이번 실행 신규 분석 한도", min_value=50, max_value=600,
+                                                       value=150, step=50, key="bulk_run_limit",
+                                                       help="한 번에 다 돌리다 끊기면 유실됩니다. 150건씩 나눠 실행하고, 끝나면 같은 버튼을 다시 누르세요 — 완료분은 캐시로 건너뜁니다.")
                     with bulk_c2:
                         already_done = sum(1 for _, r in filtered.iterrows()
                                            if f"{r['기업명']}_{r.get('공고ID','')}"
@@ -3609,8 +3612,16 @@ elif page == "공고·매칭":
                                             else:
                                                 st.session_state['ai_analysis'][gkey] = _res_g
                                                 ok_g += 1
+                                                if ok_g % 25 == 0:
+                                                    save_ai_analysis(_drive)   # 25건마다 중간 저장 — 끊겨도 유실 없음
+                                            import time as _t_g; _t_g.sleep(0.5)   # 레이트리밋 완화 간격
                                     else:
                                         skip_g += 1
+
+                                    if ok_g >= run_limit:
+                                        save_ai_analysis(_drive)
+                                        st.info(f"이번 실행 한도 {run_limit}건 도달 — 저장 완료. 같은 버튼을 다시 누르면 이어서 진행합니다.")
+                                        break
 
                                     rec_g = st.session_state['ai_analysis'].get(gkey, {}).get('추천여부', '')
                                     if auto_approve and rec_g == '추천':
