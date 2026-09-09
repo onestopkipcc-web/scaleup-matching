@@ -1540,6 +1540,93 @@ def estimate_cost(n_notices):
     total_krw  = total_usd * USD_TO_KRW
     return total_usd, total_krw
 
+def _anthropic_post(headers, payload, max_tries=4):
+    """Anthropic API 호출 + 재시도(backoff).
+    429/5xx/타임아웃 시 2→5→10초 대기 후 재시도. Retry-After 헤더 존중."""
+    import time as _time
+    _waits = [2, 5, 10]
+    last_err = None
+    for _try in range(max_tries):
+        try:
+            resp = requests.post("https://api.anthropic.com/v1/messages",
+                                 headers=headers, json=payload, timeout=45)
+            if resp.ok:
+                return resp, None
+            if resp.status_code in (429, 500, 502, 503, 529) and _try < max_tries - 1:
+                _ra = resp.headers.get('retry-after', '')
+                try:    _wait = min(max(float(_ra), 1), 30) if _ra else _waits[min(_try, 2)]
+                except Exception: _wait = _waits[min(_try, 2)]
+                _time.sleep(_wait)
+                last_err = f"HTTP {resp.status_code}"
+                continue
+            return resp, None            # 재시도 불가 오류(4xx 등)는 그대로 반환
+        except requests.exceptions.RequestException as e:
+            last_err = str(e)[:80]
+            if _try < max_tries - 1:
+                _time.sleep(_waits[min(_try, 2)])
+                continue
+    return None, last_err or "재시도 초과"
+
+def _region_cut_result(row):
+    """타지역 한정 공고 — AI 호출 없이 규칙으로 비추천 처리."""
+    _rg = str(row.get('공고지역', '') or '해당 지역')
+    return {'추천여부': '비추천', '적합도': '낮음', '한줄요약': '타지역 한정 공고',
+            '업종일치': '△', '자격충족': '△', '지역적합': 'X', '수요일치': '△',
+            '판단근거': f"'{_rg}' 지역 한정 공고로 귀사 소재지가 신청 대상 지역에 해당하지 않습니다. (규칙 자동 판정 — AI 호출 생략)",
+            '주의사항': '없음', '_지역컷': True}
+
+_RE_NOTICE_VARIANT = re.compile(r'(신규지정|기간연장|규격추가|재공고|추가모집|연장)')
+
+def notice_base_key(name):
+    """같은 사업의 변형 공고(신규지정/기간연장/규격추가 등)를 묶기 위한 정규화 키."""
+    t = re.sub(r'\[[^\]]*\]', '', str(name or ''))
+    t = _RE_NOTICE_VARIANT.sub('', t)
+    t = re.sub(r'공고\s*$', '', t.strip())
+    return re.sub(r'\s+', '', t)
+
+def group_related_notices(notices):
+    """같은 사업 변형 공고를 대표 1건으로 묶고 나머지는 rep['_related']에 보관.
+    대표 선정: 신규지정 우선 → 점수 높은 순. 반환 목록은 점수 내림차순."""
+    groups = {}
+    for n in notices:
+        groups.setdefault(notice_base_key(n.get('공고명', '')), []).append(n)
+    out = []
+    for g in groups.values():
+        if len(g) == 1:
+            out.append(g[0]); continue
+        g2 = sorted(g, key=lambda x: (0 if '신규지정' in str(x.get('공고명', '')) else 1,
+                                      -float(x.get('점수', 0) or 0)))
+        rep_n = dict(g2[0]); rep_n['_related'] = g2[1:]
+        out.append(rep_n)
+    out.sort(key=lambda x: -float(x.get('점수', 0) or 0))
+    return out
+
+def attach_ai_reason(n, company, ai_cache):
+    """공고 dict에 수신자용 추천 이유(_ai_reason)·주의사항(_ai_caution)을 부착.
+    AI_판단근거 첫 문장에서 기업명을 '귀사'로 치환."""
+    import html as _h
+    _k = f"{n.get('기업명', '') or company}_{n.get('공고ID', '')}"
+    res = ai_cache.get(_k, {}) or {}
+    if res.get('error'):
+        return n
+    reason = str(res.get('판단근거', '') or '').strip()
+    if reason and reason.lower() != 'nan':
+        first = re.split(r'(?<=다\.)\s+', reason)[0]
+        _names = {str(company or ''), str(n.get('기업명', '') or '')}
+        for _nm in list(_names):
+            _core = re.sub(r'\(주\)|\(유\)|주식회사|\s', '', _nm)
+            if len(_core) >= 2:
+                _names.add(_core)
+        for _nm in sorted(_names, key=len, reverse=True):
+            if len(_nm) >= 2:
+                first = first.replace(f"'{_nm}'", '귀사').replace(_nm, '귀사')
+        first = re.sub(r'귀사(은|는)', '귀사는', first)
+        n['_ai_reason'] = _h.escape(first[:120])
+    caution = str(res.get('주의사항', '') or '').strip()
+    if caution and caution not in ('없음', 'nan'):
+        n['_ai_caution'] = _h.escape(caution[:90])
+    return n
+
 def claude_call_raw(prompt, max_tokens=1000):
     """단순 텍스트 프롬프트 → Claude 응답 문자열 반환"""
     api_key = ""
@@ -1563,16 +1650,14 @@ def claude_call_raw(prompt, max_tokens=1000):
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}]
     }
-    try:
-        resp = requests.post("https://api.anthropic.com/v1/messages",
-                             headers=headers, json=payload, timeout=30)
-        if resp.ok:
-            content = resp.json().get('content', [])
-            return content[0].get('text', '') if content else ''
-        else:
-            st.warning(f"⚠️ Claude API 오류 {resp.status_code}: {resp.text[:100]}")
-    except Exception as e:
-        st.warning(f"⚠️ Claude API 예외: {e}")
+    resp, _err = _anthropic_post(headers, payload)
+    if resp is not None and resp.ok:
+        content = resp.json().get('content', [])
+        return content[0].get('text', '') if content else ''
+    if resp is not None:
+        st.warning(f"⚠️ Claude API 오류 {resp.status_code}: {resp.text[:100]}")
+    else:
+        st.warning(f"⚠️ Claude API 예외: {_err}")
     return ''
 
 
@@ -1646,20 +1731,20 @@ JSON 형식으로만 답하세요:
 }}"""
 
     try:
-        resp = requests.post(
-            "https://api.anthropic.com/v1/messages",
+        resp, _rerr = _anthropic_post(
             headers={
                 "x-api-key": api_key,
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json",
             },
-            json={
+            payload={
                 "model": "claude-sonnet-4-5",
                 "max_tokens": 600,
                 "messages": [{"role": "user", "content": prompt}]
             },
-            timeout=30
         )
+        if resp is None:
+            return {"error": f"재시도 후에도 실패: {_rerr}"}
         if resp.ok:
             text = resp.json()['content'][0]['text']
             import re as _re
@@ -3471,6 +3556,8 @@ elif page == "공고·매칭":
                     with bulk_c1:
                         auto_approve = st.checkbox("추천 자동 승인", value=True, key="bulk_auto_approve")
                         auto_reject  = st.checkbox("비추천 자동 제외", value=True, key="bulk_auto_reject")
+                        skip_region  = st.checkbox("타지역 공고 AI 생략 (자동 비추천)", value=True, key="bulk_skip_region",
+                                                   help="공고지역이 기업 소재지와 안 맞는 공고는 API 호출 없이 규칙으로 비추천 처리 — 비용·시간 절감")
                     with bulk_c2:
                         already_done = sum(1 for _, r in filtered.iterrows()
                                            if f"{r['기업명']}_{r.get('공고ID','')}"
@@ -3495,21 +3582,33 @@ elif page == "공고·매칭":
                             if total_g == 0:
                                 st.warning("매칭 결과가 없습니다. 먼저 매칭을 실행하세요.")
                             else:
-                                ok_g = 0; ap_g = 0; rj_g = 0; skip_g = 0
+                                ok_g = 0; ap_g = 0; rj_g = 0; skip_g = 0; cut_g = 0; fail_g = 0
                                 prog_g.progress(0, text=f"0/{total_g} 처리 중...")
 
                                 for gi, (_, gr) in enumerate(all_rows.iterrows()):
                                     gkey = f"{gr['기업명']}_{gr.get('공고ID','')}"
 
-                                    if gkey not in st.session_state['ai_analysis']:
-                                        ci = {}
-                                        if 'df_companies_cache' in st.session_state:
-                                            df_co_g = st.session_state['df_companies_cache']
-                                            mx_g = df_co_g[df_co_g['기업명']==gr['기업명']]
-                                            if not mx_g.empty: ci = mx_g.iloc[0].to_dict()
-                                        ci['기업명'] = gr['기업명']
-                                        st.session_state['ai_analysis'][gkey] = claude_analyze(ci, gr.to_dict())
-                                        ok_g += 1
+                                    _prev_g = st.session_state['ai_analysis'].get(gkey)
+                                    if not _prev_g or _prev_g.get('error'):
+                                        # 지역 컷: 타지역 한정 공고는 API 호출 없이 규칙 판정
+                                        try:    _loc_g = float(gr.get('소재지점수', 0) or 0)
+                                        except Exception: _loc_g = 0
+                                        if skip_region and _loc_g <= -5:
+                                            st.session_state['ai_analysis'][gkey] = _region_cut_result(gr)
+                                            cut_g += 1
+                                        else:
+                                            ci = {}
+                                            if 'df_companies_cache' in st.session_state:
+                                                df_co_g = st.session_state['df_companies_cache']
+                                                mx_g = df_co_g[df_co_g['기업명']==gr['기업명']]
+                                                if not mx_g.empty: ci = mx_g.iloc[0].to_dict()
+                                            ci['기업명'] = gr['기업명']
+                                            _res_g = claude_analyze(ci, gr.to_dict())
+                                            if _res_g.get('error'):
+                                                fail_g += 1   # 오류는 캐시하지 않음 → 다음 실행 때 자동 재시도
+                                            else:
+                                                st.session_state['ai_analysis'][gkey] = _res_g
+                                                ok_g += 1
                                     else:
                                         skip_g += 1
 
@@ -3521,13 +3620,15 @@ elif page == "공고·매칭":
 
                                     prog_g.progress(
                                         (gi+1)/total_g,
-                                        text=f"{gi+1}/{total_g} 처리 중... (신규 {ok_g}건 / 캐시 {skip_g}건)"
+                                        text=f"{gi+1}/{total_g} 처리 중... (신규 {ok_g} / 지역컷 {cut_g} / 캐시 {skip_g} / 실패 {fail_g})"
                                     )
 
-                                if ok_g > 0:
+                                if ok_g > 0 or cut_g > 0:
                                     save_ai_analysis(_drive)
                                 prog_g.progress(1.0, text="✅ 완료!")
-                                st.session_state['bulk_result'] = f"신규분석 {ok_g}건 / 캐시재사용 {skip_g}건 / 자동승인 {ap_g}건 / 자동제외 {rj_g}건"
+                                st.session_state['bulk_result'] = (
+                                    f"신규분석 {ok_g}건 / 지역컷 {cut_g}건 / 캐시재사용 {skip_g}건 / 자동승인 {ap_g}건 / 자동제외 {rj_g}건"
+                                    + (f" / ⚠️ 실패 {fail_g}건 — 같은 버튼으로 다시 실행하면 실패분만 재시도됩니다" if fail_g else ""))
                                 st.rerun()
 
                 # 완료 메시지 (rerun 후)
@@ -3777,16 +3878,24 @@ elif page == "공고·매칭":
                                 prog_co_ai = st.progress(0, text="AI 분석 중...")
                                 for ai_i, (_, ai_row) in enumerate(co_rows.iterrows()):
                                     ai_key = f"{ai_row['기업명']}_{ai_row.get('공고ID','')}"
-                                    if ai_key not in st.session_state.get('ai_analysis', {}):
-                                        ci = {}
-                                        if 'df_companies_cache' in st.session_state:
-                                            df_co3 = st.session_state['df_companies_cache']
-                                            mx = df_co3[df_co3['기업명']==ai_row['기업명']]
-                                            if not mx.empty: ci = mx.iloc[0].to_dict()
-                                        ci['기업명'] = ai_row['기업명']
-                                        if 'ai_analysis' not in st.session_state:
-                                            st.session_state['ai_analysis'] = {}
-                                        st.session_state['ai_analysis'][ai_key] = claude_analyze(ci, ai_row.to_dict())
+                                    if 'ai_analysis' not in st.session_state:
+                                        st.session_state['ai_analysis'] = {}
+                                    _prev_c = st.session_state['ai_analysis'].get(ai_key)
+                                    if not _prev_c or _prev_c.get('error'):
+                                        try:    _loc_c = float(ai_row.get('소재지점수', 0) or 0)
+                                        except Exception: _loc_c = 0
+                                        if st.session_state.get('bulk_skip_region', True) and _loc_c <= -5:
+                                            st.session_state['ai_analysis'][ai_key] = _region_cut_result(ai_row)
+                                        else:
+                                            ci = {}
+                                            if 'df_companies_cache' in st.session_state:
+                                                df_co3 = st.session_state['df_companies_cache']
+                                                mx = df_co3[df_co3['기업명']==ai_row['기업명']]
+                                                if not mx.empty: ci = mx.iloc[0].to_dict()
+                                            ci['기업명'] = ai_row['기업명']
+                                            _res_c = claude_analyze(ci, ai_row.to_dict())
+                                            if not _res_c.get('error'):
+                                                st.session_state['ai_analysis'][ai_key] = _res_c
                                     prog_co_ai.progress((ai_i+1)/co_ai_total,
                                                         text=f"AI 분석 중... {ai_i+1}/{co_ai_total}")
                                 save_ai_analysis(_get_drive())
@@ -3959,8 +4068,9 @@ elif page == "공고·매칭":
                                 st.link_button("🔗 공고 원문", row.get('공고링크',''),
                                                use_container_width=True)
                         with b4:
-                            if not ai_res:
-                                if st.button("🤖 AI 분석", key=f"ai_{key}_{i}", use_container_width=True):
+                            if not ai_res or ai_res.get('error'):
+                                _ai_btn_lbl = "🔁 재분석" if (ai_res and ai_res.get('error')) else "🤖 AI 분석"
+                                if st.button(_ai_btn_lbl, key=f"ai_{key}_{i}", use_container_width=True):
                                     with st.spinner("분석 중..."):
                                         ci = {}
                                         if 'df_companies_cache' in st.session_state:
@@ -4279,6 +4389,22 @@ elif page == "발송":
                     tag_html += f"<span style=\'font-size:11px;{_tc};padding:3px 8px;border-radius:20px;\'>{tag}</span>"
                 tag_html += "</div>"
             nm = n.get('공고명','')
+            _extra_p = ""
+            if n.get('_ai_reason'):
+                _extra_p += (f"<p style=\"margin:7px 0 0;font-size:12px;color:#7A6B45;"
+                             f"line-height:1.65;\">💡 {n['_ai_reason']}</p>")
+            if n.get('_ai_caution'):
+                _extra_p += (f"<p style=\"margin:4px 0 0;font-size:11px;color:#A08A5C;"
+                             f"line-height:1.6;\">📌 신청 전 확인: {n['_ai_caution']}</p>")
+            if n.get('_related'):
+                _rl_p = []
+                for _rn in n['_related'][:3]:
+                    _m = _RE_NOTICE_VARIANT.search(str(_rn.get('공고명','')))
+                    _lb = _m.group(0) if _m else str(_rn.get('공고명',''))[:10]
+                    _rl_p.append(f"<a href=\"{_rn.get('공고링크','#')}\" style=\"color:#B0894A;"
+                                 f"text-decoration:none;font-weight:600;\">{_lb}</a>")
+                _extra_p += (f"<p style=\"margin:5px 0 0;font-size:11px;color:#9A9488;\">"
+                             f"같은 사업 관련 공고: {' · '.join(_rl_p)}</p>")
             return f"""
             <table width="100%" cellpadding="0" cellspacing="0"
                    style="margin-bottom:8px;background:#FFFFFF;border:1px solid #E8E2D5;
@@ -4291,6 +4417,7 @@ elif page == "발송":
                     {n.get('주관기관','')} · 마감 {f'<span style="color:#B0894A;font-weight:600;">{dl}</span>' if dl else '상시'}
                   </p>
                   {tag_html}
+                  {_extra_p}
                 </td>
                 <td width="60" align="center" valign="middle"
                     style="padding:14px 12px;border-left:1px solid #EDEBE5;">
@@ -4302,8 +4429,10 @@ elif page == "발송":
             </table>"""
 
         _today_prev = datetime.today().strftime('%Y.%m.%d')
-        _sss = [n for n in _notices_custom if n.get('관련도','') == '★★★']
-        _ss  = [n for n in _notices_custom if n.get('관련도','') == '★★']
+        _sss = group_related_notices([n for n in _notices_custom if n.get('관련도','') == '★★★'])
+        _ss  = group_related_notices([n for n in _notices_custom if n.get('관련도','') == '★★'])
+        for _pn_dec in _sss + _ss:
+            attach_ai_reason(_pn_dec, preview_co, _ai_cache_prev)
         _cards_html = ""
         if _notices_custom:
             # ★★★ 주목할 만한 공고
@@ -4570,8 +4699,10 @@ elif page == "발송":
                     _k = f"{company}_{n.get('공고ID','')}"
                     _ind = _ai_an.get(_k, {}).get('업종일치', '')
                     return _ind != '△' and _ind != 'X'  # O이거나 미판정('')은 통과
-                notices_sss    = [n for n in _sss_raw if _ind_ok(n)]
-                notices_ss     = [n for n in _ss_raw if _ind_ok(n)]
+                notices_sss    = group_related_notices([n for n in _sss_raw if _ind_ok(n)])
+                notices_ss     = group_related_notices([n for n in _ss_raw if _ind_ok(n)])
+                for _n_dec in notices_sss + notices_ss:
+                    attach_ai_reason(_n_dec, company, _ai_an)
                 _demoted       = [n for n in (_sss_raw + _ss_raw) if not _ind_ok(n)]  # 업종△/X → 참고행
                 notices_common = []
 
@@ -4638,6 +4769,24 @@ elif page == "발송":
                     notice_name = n.get("공고명","")
                     _trk = track_link(n.get("공고링크","#"), company,
                                       n.get("공고ID",""), notice_name)
+                    _extra = ""
+                    if n.get('_ai_reason'):
+                        _extra += (f"<p style=\"margin:7px 0 0;font-size:12px;color:#7A6B45;"
+                                   f"line-height:1.65;\">💡 {n['_ai_reason']}</p>")
+                    if n.get('_ai_caution'):
+                        _extra += (f"<p style=\"margin:4px 0 0;font-size:11px;color:#A08A5C;"
+                                   f"line-height:1.6;\">📌 신청 전 확인: {n['_ai_caution']}</p>")
+                    if n.get('_related'):
+                        _rl = []
+                        for _rn in n['_related'][:3]:
+                            _m = _RE_NOTICE_VARIANT.search(str(_rn.get('공고명','')))
+                            _lb = _m.group(0) if _m else str(_rn.get('공고명',''))[:10]
+                            _rtrk = track_link(_rn.get('공고링크','#'), company,
+                                               _rn.get('공고ID',''), _rn.get('공고명',''))
+                            _rl.append(f"<a href=\"{_rtrk}\" style=\"color:#B0894A;"
+                                       f"text-decoration:none;font-weight:600;\">{_lb}</a>")
+                        _extra += (f"<p style=\"margin:5px 0 0;font-size:11px;color:#9A9488;\">"
+                                   f"같은 사업 관련 공고: {' · '.join(_rl)}</p>")
                     return f"""
                     <table width="100%" cellpadding="0" cellspacing="0"
                            style="margin-bottom:8px;background:#FFFFFF;
@@ -4654,6 +4803,7 @@ elif page == "발송":
                             {n.get("주관기관","")} &nbsp;·&nbsp; 마감 {f'<span style="color:#B0894A;font-weight:600;">{dl_raw}</span>' if dl_raw else "상시"}
                           </p>
                           {tag_html}
+                          {_extra}
                         </td>
                         <td width="60" align="center" valign="middle"
                             style="padding:14px 12px;border-left:1px solid #EDEBE5;">
