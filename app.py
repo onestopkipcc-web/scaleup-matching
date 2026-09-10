@@ -4780,7 +4780,20 @@ elif page == "발송":
         st.components.v1.html(_preview_html, height=900, scrolling=True)
 
         st.divider()
-        if st.button("📤 발송 실행", type="primary"):
+        # ── 발송 화면 미리보기 (발송 없이 실제 발송 HTML 렌더) ──
+        _pv_c1, _pv_c2 = st.columns([3, 1])
+        with _pv_c1:
+            _pv_all_cos = sorted({r['기업명'] for r in approved} | set(
+                load_excel(drive, SELECTED_FILE).query("선정구분=='선정'")['기업명'].dropna().tolist()
+                if '선정구분' in load_excel(drive, SELECTED_FILE).columns else []))
+            _pv_co_sel = st.selectbox("👁 발송 화면 미리보기 기업 (실제 발송 HTML 그대로, 발송 안 됨)",
+                                      _pv_all_cos, key="send_preview_co_sel")
+        with _pv_c2:
+            st.write("")
+            if st.button("👁 미리보기", use_container_width=True, key="send_preview_btn"):
+                st.session_state['_send_preview_co'] = _pv_co_sel
+
+        if st.button("📤 발송 실행", type="primary") or st.session_state.get('_send_preview_co'):
             from email.mime.multipart import MIMEMultipart
             from email.mime.text import MIMEText
             import base64
@@ -4805,6 +4818,15 @@ elif page == "발송":
             for co in all_companies:
                 if co not in grouped:
                     grouped[co] = []  # 승인 공고 없음 → 빈 리스트로 추가
+
+            # ── 발송 화면 미리보기 모드: 선택 기업만 ──────
+            _pv_only = st.session_state.get('_send_preview_co')
+            if _pv_only:
+                grouped = {k: v for k, v in grouped.items() if k == _pv_only}
+                if not grouped:
+                    st.warning(f"{_pv_only} — 매칭 데이터가 없어 미리보기를 만들 수 없습니다.")
+                    st.session_state.pop('_send_preview_co', None)
+                    st.stop()
 
             # ── 테스트 모드: 지정 개수만 추출 ──────────────
             if test_mode and _test_limit and _test_limit < len(grouped):
@@ -5328,6 +5350,13 @@ elif page == "발송":
                     prog.progress((idx+1)/max(len(grouped),1)); log.text("\n".join(logs[-8:]))
                     continue
 
+                if st.session_state.get('_send_preview_co'):
+                    st.markdown(f"#### 👁 {company} — 실제 발송 HTML 미리보기")
+                    st.components.v1.html(html, height=1500, scrolling=True)
+                    st.caption("위 화면이 수신자가 받는 메일과 동일합니다. 발송은 실행되지 않았습니다.")
+                    st.session_state.pop('_send_preview_co', None)
+                    st.stop()
+
                 recipients = get_test_recipients() if test_mode else [co_email]
                 for to in recipients:
                     msg = MIMEMultipart('alternative')
@@ -5447,7 +5476,10 @@ elif page == "발송":
                     st.success(f"📅 캘린더 이벤트 등록 완료 — 신규 {added}건 / 중복 스킵 {skipped}건")
                 except Exception as e:
                     st.warning(f"캘린더 등록 실패 (발송은 완료됨): {e}")
-            st.session_state['match_results']=[]; st.session_state['review_state']={}
+            if not test_mode:
+                st.session_state['match_results']=[]; st.session_state['review_state']={}
+            else:
+                st.info("테스트 모드 — 매칭 결과와 승인 상태는 그대로 유지됩니다.")
 
 
 # ══════════════════════════════════════════════════════
