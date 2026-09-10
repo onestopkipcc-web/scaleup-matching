@@ -3558,6 +3558,57 @@ elif page == "공고·매칭":
                     filtered = filtered[filtered['___ai_rec'] == '추천']
                     st.info(f"AI 추천 {len(filtered)}건만 표시 중")
 
+                # ── 0건 기업 자동 보완 승인 ──────────────────
+                with st.expander("🟡 0건 기업 자동 보완 승인 (검토 상위)", expanded=False):
+                    st.caption("승인이 0건인 기업에 한해 — AI '검토' 판정 중 타지역·자격미달(X)·이미 제외(✕)한 공고를 빼고 "
+                               "규칙점수 상위 공고를 자동 승인합니다. 추천/비추천 판정은 건드리지 않습니다.")
+                    if st.session_state.get('auto_fill_msg'):
+                        st.success(st.session_state.pop('auto_fill_msg'))
+                    _n_auto = st.number_input("기업당 승인 건수", 1, 3, 1, key="auto_fill_n")
+                    if st.button("🟡 자동 보완 실행", key="auto_fill_go", use_container_width=True):
+                        from collections import defaultdict as _dd
+                        _mrs2 = st.session_state.get('match_results', [])
+                        _rv2  = st.session_state.setdefault('review_state', {})
+                        _ai2  = st.session_state.get('ai_analysis', {})
+                        _by_co = _dd(list)
+                        for _r2 in _mrs2:
+                            _by_co[_r2.get('기업명', '')].append(_r2)
+                        _f_co = 0; _f_cnt = 0; _no_cand = []
+                        for _co2, _rows2 in _by_co.items():
+                            if any(_rv2.get(f"{_co2}_{_r2.get('공고ID','')}") == "○" for _r2 in _rows2):
+                                continue   # 이미 승인 보유
+                            _cands2 = []
+                            for _r2 in _rows2:
+                                _k2 = f"{_co2}_{_r2.get('공고ID','')}"
+                                if _rv2.get(_k2) == "✕":
+                                    continue
+                                _a2 = _ai2.get(_k2, {})
+                                if _a2.get('추천여부') != '검토' or _a2.get('자격충족') == 'X':
+                                    continue
+                                try:
+                                    if float(_r2.get('소재지점수', 0) or 0) < 0:
+                                        continue
+                                except Exception:
+                                    pass
+                                _cands2.append((_r2, _k2))
+                            _cands2.sort(key=lambda x: -float(x[0].get('점수', 0) or 0))
+                            if not _cands2:
+                                _no_cand.append(_co2); continue
+                            for _r2, _k2 in _cands2[:int(_n_auto)]:
+                                _rv2[_k2] = "○"; _f_cnt += 1
+                            _f_co += 1
+                        import json as _json2
+                        drive_upload(drive, "review_state.json",
+                                     _json2.dumps({'review_state': _rv2,
+                                                   'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M')},
+                                                  ensure_ascii=False).encode('utf-8'),
+                                     "application/json")
+                        _msg = f"자동 보완 완료: {_f_co}개사 / {_f_cnt}건 승인 · 드라이브 저장됨"
+                        if _no_cand:
+                            _msg += f" · 후보 없음 {len(_no_cand)}개사({', '.join(_no_cand[:4])}…)"
+                        st.session_state['auto_fill_msg'] = _msg
+                        st.rerun()
+
                 ap      = sum(1 for v in st.session_state['review_state'].values() if v=="○")
                 rj      = sum(1 for v in st.session_state['review_state'].values() if v=="✕")
                 total   = len(df_show)
@@ -3619,7 +3670,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0909-5 · 전문 없으면 분석 차단 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0910-1 · 자동 보완 승인 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
