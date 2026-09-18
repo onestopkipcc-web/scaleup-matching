@@ -3610,8 +3610,9 @@ elif page == "공고·매칭":
                             _by_co[_r2.get('기업명', '')].append(_r2)
                         _f_co = 0; _f_cnt = 0; _no_cand = []
                         for _co2, _rows2 in _by_co.items():
-                            if any(_rv2.get(f"{_co2}_{_r2.get('공고ID','')}") == "○" for _r2 in _rows2):
-                                continue   # 이미 승인 보유
+                            if any(_rv2.get(f"{_co2}_{_r2.get('공고ID','')}") == "○" and _notice_open(_r2)
+                                   for _r2 in _rows2):
+                                continue   # 접수 중인 승인 보유
                             _cands2 = []
                             for _r2 in _rows2:
                                 _k2 = f"{_co2}_{_r2.get('공고ID','')}"
@@ -3620,6 +3621,8 @@ elif page == "공고·매칭":
                                 _a2 = _ai2.get(_k2, {})
                                 if _a2.get('추천여부') != '검토' or _a2.get('자격충족') == 'X':
                                     continue
+                                if not _notice_open(_r2):
+                                    continue   # 마감 경과 공고는 보완 후보에서 제외
                                 try:
                                     if float(_r2.get('소재지점수', 0) or 0) < 0:
                                         continue
@@ -3705,7 +3708,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0918-3 · 자동보완 드라이브 캐시 병합 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0918-4 · 자동보완 마감 공고 제외 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
