@@ -3588,8 +3588,23 @@ elif page == "공고·매칭":
                     if st.button("🟡 자동 보완 실행", key="auto_fill_go", use_container_width=True):
                         from collections import defaultdict as _dd
                         _mrs2 = st.session_state.get('match_results', [])
-                        _rv2  = st.session_state.setdefault('review_state', {})
-                        _ai2  = st.session_state.get('ai_analysis', {})
+                        # 드라이브 AI 캐시 병합 — 재시작 직후 세션이 비어 있어도 동작
+                        _ai2 = load_json(drive, AI_ANALYSIS_FILE) or {}
+                        _ai2.update(st.session_state.get('ai_analysis', {}))
+                        st.session_state['ai_analysis'] = _ai2
+                        # 드라이브 승인 상태 병합 — 기존 승인을 덮어쓰지 않도록
+                        try:
+                            _rv_saved = (load_json(drive, "review_state.json") or {}).get('review_state', {})
+                        except Exception:
+                            _rv_saved = {}
+                        _rv2 = dict(_rv_saved); _rv2.update(st.session_state.get('review_state', {}))
+                        st.session_state['review_state'] = _rv2
+                        if not _mrs2:
+                            st.error("매칭 결과가 세션에 없습니다 — 매칭 실행·검토 화면을 먼저 열어 매칭 상태를 불러온 뒤 다시 눌러주세요.")
+                            st.stop()
+                        if not any(isinstance(v, dict) and v.get('추천여부') == '검토' for v in _ai2.values()):
+                            st.error("AI 분석 캐시에 '검토' 판정이 없습니다 — ⚡ 일괄 분석이 완료된 상태인지 확인해 주세요.")
+                            st.stop()
                         _by_co = _dd(list)
                         for _r2 in _mrs2:
                             _by_co[_r2.get('기업명', '')].append(_r2)
@@ -3690,7 +3705,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0918-2 · 마감텍스트 인식·빈 메일 스킵 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0918-3 · 자동보완 드라이브 캐시 병합 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
