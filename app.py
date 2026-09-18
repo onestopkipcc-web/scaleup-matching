@@ -1616,6 +1616,23 @@ def enrich_for_ai(nd):
         pass
     return nd
 
+def _notice_open(n, _ref=None):
+    """발송 시점 기준으로 접수 중인 공고인지 검사.
+    마감일 → 접수기간 종료일 순으로 날짜를 찾고, 날짜가 없으면(상시 등) 통과."""
+    from datetime import date as _date
+    _ref = _ref or _date.today()
+    _d = None
+    for _src in (n.get('마감일', ''), n.get('접수기간', '')):
+        _ms = re.findall(r'(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})', str(_src or ''))
+        if _ms:
+            _y, _mo, _dd = _ms[-1]
+            try:
+                _d = _date(int(_y), int(_mo), int(_dd))
+            except ValueError:
+                _d = None
+            break
+    return True if _d is None else _d >= _ref
+
 def _region_cut_result(row):
     """타지역 한정 공고 — AI 호출 없이 규칙으로 비추천 처리."""
     _rg = str(row.get('공고지역', '') or '해당 지역')
@@ -3670,7 +3687,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0910-1 · 자동 보완 승인 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0918-1 · 발송시점 마감 가드 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
@@ -4585,8 +4602,8 @@ elif page == "발송":
             </table>"""
 
         _today_prev = datetime.today().strftime('%Y.%m.%d')
-        _sss = group_related_notices([n for n in _notices_custom if n.get('관련도','') == '★★★'])
-        _ss  = group_related_notices([n for n in _notices_custom if n.get('관련도','') == '★★'])
+        _sss = group_related_notices([n for n in _notices_custom if n.get('관련도','') == '★★★' and _notice_open(n)])
+        _ss  = group_related_notices([n for n in _notices_custom if n.get('관련도','') == '★★' and _notice_open(n)])
         for _pn_dec in _sss + _ss:
             attach_ai_reason(_pn_dec, preview_co, _ai_cache_prev)
         _cards_html = ""
@@ -4609,7 +4626,7 @@ elif page == "발송":
         # 검토 등급 공고 (미리보기용)
         _review_prev = [
             r for r in review_grade
-            if r.get('기업명','') == preview_co
+            if r.get('기업명','') == preview_co and _notice_open(r)
         ]
 
         # 0건 기업이면 전체 review_grade 공통 공고로 보완
@@ -4620,7 +4637,7 @@ elif page == "발송":
             _top = [n for n, _ in _nc.most_common(5)]
             _seen = set()
             for r in review_grade:
-                if r.get('공고명','') in _top and r.get('공고명','') not in _seen:
+                if r.get('공고명','') in _top and r.get('공고명','') not in _seen and _notice_open(r):
                     _review_prev.append(r)
                     _seen.add(r.get('공고명',''))
                 if len(_review_prev) >= 3:
@@ -4867,8 +4884,8 @@ elif page == "발송":
                         co_row = _mx.iloc[0].to_dict()
 
                 # 별점 기준으로 분류 (공고유형 무관)
-                _sss_raw = [n for n in notices if n.get('관련도','')=='★★★']
-                _ss_raw  = [n for n in notices if n.get('관련도','')=='★★']
+                _sss_raw = [n for n in notices if n.get('관련도','')=='★★★' and _notice_open(n)]
+                _ss_raw  = [n for n in notices if n.get('관련도','')=='★★' and _notice_open(n)]
 
                 # 방향1: AI 업종일치가 △/X인 공고는 '맞춤'에서 제외 → 참고로 강등
                 # (업종 안 맞는 걸 맞춤이라 내보내면 신뢰도 하락)
@@ -4895,7 +4912,7 @@ elif page == "발송":
                     _approved_ids = {n.get('공고ID','') for n in notices_sss + notices_ss}
                     # 강등된 것 우선, 그다음 검토 공고
                     _cand = _demoted + [r for r in _ref_map.get(company, [])
-                             if r.get('공고ID','') not in _approved_ids]
+                             if r.get('공고ID','') not in _approved_ids and _notice_open(r)]
                     _seen_r = set()
                     _cand_uniq = []
                     for r in _cand:
