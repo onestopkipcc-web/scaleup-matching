@@ -1621,6 +1621,9 @@ def _notice_open(n, _ref=None):
     마감일 → 접수기간 종료일 순으로 날짜를 찾고, 날짜가 없으면(상시 등) 통과."""
     from datetime import date as _date
     _ref = _ref or _date.today()
+    _dl_txt = str(n.get('마감일', '') or '').strip()
+    if _dl_txt in ('마감', '종료', '접수마감', '모집마감', '마감됨'):
+        return False
     _d = None
     for _src in (n.get('마감일', ''), n.get('접수기간', '')):
         _ms = re.findall(r'(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})', str(_src or ''))
@@ -3687,7 +3690,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0918-1 · 발송시점 마감 가드 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0918-2 · 마감텍스트 인식·빈 메일 스킵 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
@@ -4875,6 +4878,7 @@ elif page == "발송":
                 st.info(f"테스트 추출: {len(grouped)}개사 — "
                         + ", ".join(f"{c}({len(n)}건)" for c, n in grouped.items()))
 
+            _empty_skipped = []
             for idx,(company,notices) in enumerate(grouped.items()):
                 # 기업 정보 조회
                 co_row = {}
@@ -4920,6 +4924,15 @@ elif page == "발송":
                         if _rid not in _approved_ids and _rid not in _seen_r:
                             _cand_uniq.append(r); _seen_r.add(_rid)
                     notices_review = _cand_uniq[:_need]
+
+                # ── 빈 메일 방지: 승인·참고 공고가 전부 걸러져 보여줄 카드가 없으면 스킵 ──
+                if not (notices_sss or notices_ss or notices_review or notices_common):
+                    if st.session_state.get('_send_preview_co'):
+                        st.warning(f"{company} — 마감 경과 등으로 안내할 공고가 없어, 실제 발송에서는 이 기업을 건너뜁니다.")
+                        st.session_state.pop('_send_preview_co', None)
+                        st.stop()
+                    _empty_skipped.append(company)
+                    continue
 
                 def notice_card_simple(n, idx):
                     """공통 공고용 심플 카드 (작고 간결하게)"""
@@ -5422,6 +5435,8 @@ elif page == "발송":
             if test_mode:
                 prog.progress(1.0)
                 st.success(f"✅ 테스트 발송 완료 — {len(history_records)}건 (발송 이력 저장 안 함)")
+                if _empty_skipped:
+                    st.info(f"⏭️ 안내할 공고가 없어 발송 제외: {len(_empty_skipped)}개사 — {', '.join(_empty_skipped[:8])}{' 외' if len(_empty_skipped)>8 else ''}")
                 st.info("테스트 모드에서는 발송 이력 저장과 캘린더 등록이 모두 생략됩니다. "
                         "실제 발송 시에만 기록·등록됩니다.")
             else:
@@ -5432,6 +5447,8 @@ elif page == "발송":
                     save_excel(drive, df_fin, HISTORY_FILE, "발송이력", "375623")
                 prog.progress(1.0)
                 st.success(f"발송 완료 — {len(history_records)}건 → send_history.xlsx 저장")
+                if _empty_skipped:
+                    st.info(f"⏭️ 안내할 공고가 없어 발송 제외: {len(_empty_skipped)}개사 — {', '.join(_empty_skipped[:8])}{' 외' if len(_empty_skipped)>8 else ''}")
 
                 # ── 공통 캘린더 마감일 이벤트 자동 등록 ──
                 _CAL_ID = "9078a49950a47b46ddb3511040886f3a016b75ca17169ec1113e5692b7327375@group.calendar.google.com"  # 직접 하드코딩
