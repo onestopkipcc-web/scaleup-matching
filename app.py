@@ -1955,6 +1955,39 @@ _RE_NOTICE_HEAD = re.compile(r'소관부처|사업개요|신청기간')
 _RE_NOTICE_FOOT = re.compile(r'자료이용 및 저작권보호|웹접근성정책|Copyright|'
                              r'중소벤처기업연구원 시스템문의|자주하는 질문|개인정보처리방침')
 
+# ── AI 판정 버전 ──────────────────────────────────────
+# 캐시 키(기업명_공고ID)는 그대로 두고, 판정 결과 안에 어떤 입력으로 뽑았는지를
+# 기록한다. 프로필·전문·프롬프트가 바뀌면 '재분석 대상'으로 표시만 하고
+# 자동 실행하지 않는다 (비용이 나가는 일은 담당자가 누를 때만).
+AI_PROMPT_VER = "2026-09-29"          # claude_analyze 프롬프트를 고칠 때 올린다
+_PROFILE_KEYS = ('소재지', '기업유형', '관심사업분야', '제품분야', '기술키워드',
+                 '핵심수요태그', '수출실적', 'TRL단계', '매출규모', '설립연도')
+
+def _short_hash(text, n=8):
+    import hashlib
+    return hashlib.md5(str(text or '').encode('utf-8')).hexdigest()[:n]
+
+def profile_hash(company_info):
+    """기업 프로필 핵심 항목의 해시 — 프로필이 바뀌면 값이 바뀐다."""
+    return _short_hash('|'.join(str((company_info or {}).get(k, '') or '')
+                                for k in _PROFILE_KEYS))
+
+def ai_input_version(company_info, notice_info):
+    """이 판정이 어떤 입력으로 나왔는지."""
+    return {'_v_profile': profile_hash(company_info),
+            '_v_notice':  _short_hash(clean_notice_text(
+                (notice_info or {}).get('전문내용', '') or
+                (notice_info or {}).get('사업개요', ''))),
+            '_v_prompt':  AI_PROMPT_VER}
+
+def ai_version_stale(res, company_info, notice_info):
+    """캐시된 판정이 지금 입력과 어긋나는가. 버전 정보가 없는 옛 판정은
+    '알 수 없음'으로 보고 건드리지 않는다(False)."""
+    if not isinstance(res, dict) or res.get('error') or not res.get('_v_prompt'):
+        return False
+    cur = ai_input_version(company_info, notice_info)
+    return any(res.get(k) != cur[k] for k in cur)
+
 def clean_notice_text(text):
     """공고 전문에서 사이트 네비게이션·푸터를 걷어낸다.
     제거 후 200자 미만이 되면(실측 0건) 원문을 그대로 돌려준다 — 내용 유실 방지."""
@@ -2698,8 +2731,11 @@ JSON 형식으로만 답하세요:
             json_match = _re.search(r'[{].*[}]', text, _re.DOTALL)
             if json_match:
                 _parsed = json.loads(json_match.group())
-                if isinstance(_parsed, dict) and len(str(notice_info.get('전문내용','') or '')) >= 200:
-                    _parsed['_전문반영'] = True
+                if isinstance(_parsed, dict):
+                    if len(str(notice_info.get('전문내용','') or '')) >= 200:
+                        _parsed['_전문반영'] = True
+                    # 어떤 입력으로 뽑은 판정인지 함께 남긴다 (재분석 대상 판별용)
+                    _parsed.update(ai_input_version(company_info, notice_info))
                 return _parsed
             return {"error": "응답 파싱 실패", "raw": text[:200]}
         else:
@@ -4647,11 +4683,41 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0929-9 · 전문 가드를 보유율 기준으로 강화 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
-                    rq_col1, _rq_sp = st.columns([2, 2])
+                    st.caption("🏷️ 빌드 v0929-10 · AI 판정 버전 기록 (프로필·전문·프롬프트) · 불일치는 표시만 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    # ── 버전이 달라진 판정 — 표시만 하고 자동 실행하지 않는다 ──
+                    _ai_now = st.session_state.get('ai_analysis', {})
+                    _co_cache = st.session_state.get('df_companies_cache')
+                    _stale_ver = []
+                    if _co_cache is not None and not _co_cache.empty:
+                        _co_map = {r['기업명']: r.to_dict() for _, r in _co_cache.iterrows()}
+                        for _, _r in filtered.iterrows():
+                            _k = f"{_r['기업명']}_{_r.get('공고ID','')}"
+                            _res = _ai_now.get(_k)
+                            if _res and ai_version_stale(_res, _co_map.get(_r['기업명'], {}),
+                                                         enrich_for_ai(_r.to_dict())):
+                                _stale_ver.append(_k)
+                    if _stale_ver:
+                        st.warning(f"🔁 버전 변경 {len(_stale_ver)}건 — 기업 프로필이나 공고 전문, "
+                                   f"프롬프트가 바뀐 뒤의 판정입니다. 자동으로 다시 돌리지 않으니 "
+                                   f"필요하면 아래 버튼으로 캐시를 지우고 ⚡ 실행하세요.")
+
+                    rq_col1, rq_col2 = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
                                                 key="requeue_review_ai", use_container_width=True)
+                    with rq_col2:
+                        if st.button(f"🔁 버전 변경 {len(_stale_ver)}건 재분석 준비",
+                                     key="requeue_stale_ver", use_container_width=True,
+                                     disabled=not _stale_ver):
+                            _drv_sv = _get_drive()
+                            _m_sv = load_json(_drv_sv, AI_ANALYSIS_FILE) or {}
+                            _m_sv.update(st.session_state.get('ai_analysis', {}))
+                            for _k in _stale_ver:
+                                _m_sv.pop(_k, None)
+                            st.session_state['ai_analysis'] = _m_sv
+                            save_ai_analysis(_drv_sv)
+                            st.success(f"버전 변경 {len(_stale_ver)}건 캐시 삭제 — "
+                                       f"⚡ 전 기업 일괄 실행 시 다시 분석됩니다.")
                     if _rq_clicked:
                         _drv_rq = _get_drive()
                         # 드라이브 캐시 + 세션 캐시 병합 후 대상 산출 (재부팅 직후에도 동작)
