@@ -1943,6 +1943,9 @@ def get_detail_map_cached():
 
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
+# 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
+BUILD_TAG = "v0929-15"
+
 NOTICE_TEXT_CAP = 8000
 
 # ⚡ 일괄 AI 분석을 시작하려면 매칭 공고 중 이 비율 이상이 전문을 갖고 있어야 한다.
@@ -4842,12 +4845,19 @@ elif page == "공고·매칭":
                                                        value=150, step=50, key="bulk_run_limit",
                                                        help="한 번에 다 돌리다 끊기면 유실됩니다. 150건씩 나눠 실행하고, 끝나면 같은 버튼을 다시 누르세요 — 완료분은 캐시로 건너뜁니다.")
                     with bulk_c2:
-                        already_done = sum(1 for _, r in filtered.iterrows()
-                                           if f"{r['기업명']}_{r.get('공고ID','')}"
-                                           in st.session_state.get('ai_analysis', {}))
-                        st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
+                        # ⚡ 일괄 실행은 필터와 무관하게 df_show 전체를 돈다.
+                        # 예전에는 필터된 건수만 보여줘 실행 시 나오는 숫자와 어긋났다.
+                        _ai_cache_now = st.session_state.get('ai_analysis', {})
+                        _done_all = sum(1 for _, r in df_show.iterrows()
+                                        if f"{r['기업명']}_{r.get('공고ID','')}" in _ai_cache_now)
+                        _done_view = sum(1 for _, r in filtered.iterrows()
+                                         if f"{r['기업명']}_{r.get('공고ID','')}" in _ai_cache_now)
+                        st.metric("분석 완료", f"{_done_all:,}/{len(df_show):,}건",
+                                  help="⚡ 일괄 실행이 실제로 도는 범위입니다 (화면 필터와 무관).")
+                        st.caption(f"화면 표시분 {_done_view:,}/{len(filtered):,}건")
 
-                    st.caption("🏷️ 빌드 v0929-14 · 기업 프로필을 드라이브에서 자동 복구 (AI 판정 오염 방지) · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    # 빌드 태그는 배포 검증용이라 짧게 둔다 (설명은 각 버튼의 help 로)
+                    st.caption(f"🏷️ 빌드 {BUILD_TAG}")
                     # ── 버전이 달라진 판정 — 표시만 하고 자동 실행하지 않는다 ──
                     _ai_now = st.session_state.get('ai_analysis', {})
                     _co_cache = get_companies_df()
@@ -4867,8 +4877,11 @@ elif page == "공고·매칭":
 
                     rq_col1, rq_col2 = st.columns([2, 2])
                     with rq_col1:
-                        _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
-                                                key="requeue_review_ai", use_container_width=True)
+                        _rq_clicked = st.button(
+                            "🔁 '검토' 판정 재분석 준비 (전문 반영)",
+                            key="requeue_review_ai", use_container_width=True,
+                            help="요약만 보고 '검토'로 미뤄진 판정을 지웁니다. "
+                                 "지운 뒤 ⚡ 실행을 누르면 공고 전문을 반영해 다시 분석합니다.")
                     with rq_col2:
                         if st.button(f"🔁 버전 변경 {len(_stale_ver)}건 재분석 준비",
                                      key="requeue_stale_ver", use_container_width=True,
@@ -5631,7 +5644,13 @@ elif page == "발송":
         _ref_by_co[_co] = sorted(_ref_by_co[_co],
                                  key=lambda x: x.get('점수', 0), reverse=True)[:3]
     st.session_state['_ref_notices_by_co'] = _ref_by_co
-    matched_group = st.session_state.get('match_target_group', '미확인')
+    # 매칭 실행 탭을 안 열었거나 앱이 재시작되면 위젯 키가 비어 '미확인'이 떴다.
+    # keywords.json 의 last_match 에 실제 값이 있으므로 세션 → 세션 캐시 → 드라이브 순으로 찾는다.
+    matched_group = (
+        st.session_state.get('match_target_group')
+        or st.session_state.get('last_match_info', {}).get('target_group')
+        or ((load_json(drive, KEYWORDS_FILE) or {}).get('last_match', {}) or {}).get('target_group')
+        or '미확인')
 
     if not approved:
         st.warning("승인된 공고 없음 — '매칭 결과'에서 검토 완료 후 진행")
