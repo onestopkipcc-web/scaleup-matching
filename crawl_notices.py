@@ -163,6 +163,13 @@ def collect_notices(creds):
                 "접수기간":item.get('reqstBeginEndDe',''),"마감일":pdl(item.get('reqstBeginEndDe','')),
                 "지원대상":item.get('trgetNm',''),"사업개요":_strip_html(item.get('bsnsSumryCn','')),
                 "해시태그":item.get('hashtags',''),"공고링크":item.get('pblancUrl',''),
+                # 공고문 파일 — API가 주는데 그동안 버리고 있었다.
+                # 웹 본문에는 자격 조건이 21.6%에만 있는 반면, 이 파일에는 96~100% 들어 있다.
+                # 지금은 저장만 하고 파싱하지 않는다 (다음 단계 준비).
+                "공고문파일명":item.get('printFileNm',''),
+                "공고문파일URL":item.get('printFlpthNm',''),
+                "첨부파일명":item.get('fileNm',''),
+                "첨부파일URL":item.get('flpthNm',''),
                 "전문내용":"","수정일":item.get('updtPnttm',''),"수집일":today}
 
     new_rows, upd_rows, dup = [], [], 0
