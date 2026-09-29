@@ -1934,6 +1934,27 @@ def get_detail_map_cached():
         st.session_state['_detail_map_ai_err'] = _err
     return st.session_state['_detail_map_ai']
 
+# AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
+# 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
+NOTICE_TEXT_CAP = 8000
+
+# 기업마당 페이지를 통째로 긁은 탓에 모든 전문 앞에 메뉴가, 39%에 푸터가 붙어 있다.
+# 실측: 앞 네비 10.6% + 뒤 푸터 4.9% = 전체 분량의 15.5%가 공고와 무관한 문자열.
+_RE_NOTICE_HEAD = re.compile(r'소관부처|사업개요|신청기간')
+_RE_NOTICE_FOOT = re.compile(r'자료이용 및 저작권보호|웹접근성정책|Copyright|'
+                             r'중소벤처기업연구원 시스템문의|자주하는 질문|개인정보처리방침')
+
+def clean_notice_text(text):
+    """공고 전문에서 사이트 네비게이션·푸터를 걷어낸다.
+    제거 후 200자 미만이 되면(실측 0건) 원문을 그대로 돌려준다 — 내용 유실 방지."""
+    t = re.sub(r'\s+', ' ', str(text or '')).strip()
+    if len(t) < 200:
+        return t
+    _h = _RE_NOTICE_HEAD.search(t)
+    _f = _RE_NOTICE_FOOT.search(t)
+    core = t[_h.start() if _h else 0: _f.start() if _f else len(t)].strip()
+    return core if len(core) >= 200 else t
+
 def enrich_for_ai(nd):
     """매칭 결과 행(300자 요약뿐)에 크롤링 전문을 병합해 AI에 전달.
     — 매칭 단계와 달리 AI 분석 단계에는 전문이 전달되지 않던 문제 보완."""
@@ -1943,7 +1964,7 @@ def enrich_for_ai(nd):
             return nd
         d = get_detail_map_cached().get(pid)
         if d:
-            full = str(d.get('전문내용', '') or '')
+            full = clean_notice_text(d.get('전문내용', ''))
             if len(full) >= 200:
                 nd['전문내용'] = full
             for _k in ('지원금액', '선정규모'):
@@ -2594,11 +2615,11 @@ def claude_analyze(company_info, notice_info):
             available = []
         return {"error": f"API 키 없음 — Secrets 키 목록: {available}"}
 
-    # 전문 내용 우선 활용
-    notice_content = (
-        notice_info.get('전문내용','') or
-        notice_info.get('사업개요','')
-    )[:1500]
+    # 전문 내용 우선 활용 — 네비·푸터를 걷어내고 상한까지 그대로 넣는다.
+    # (예전 1,500자 절단으로 뒤쪽 신청 자격·제외 대상이 잘리던 문제)
+    notice_content = clean_notice_text(
+        notice_info.get('전문내용','') or notice_info.get('사업개요','')
+    )[:NOTICE_TEXT_CAP]
 
     prompt = f"""당신은 정부 지원사업 매칭 전문가입니다.
 아래 기업 정보와 공고를 보고 이 기업이 이 공고에 지원하는 게 적합한지 판단하세요.
@@ -4615,7 +4636,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0929-6 · 회차별 판단 기록 (결정 출처·클릭·반응 누적) · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0929-7 · 공고 본문 정리(네비·푸터 제거) + AI 투입 절단 해제 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
