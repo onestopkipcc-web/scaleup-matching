@@ -1944,7 +1944,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v0929-16"
+BUILD_TAG = "v0929-17"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -3410,95 +3410,97 @@ with st.sidebar:
     if test_mode: st.warning("테스트 메일 발송")
     else:         st.success("실제 기업 발송")
 
-    # ── 진단용 결과 추출 ──────────────────────────────────
+    # ── 데이터 내보내기 ───────────────────────────────────
+    # 진단 추출과 판단 기록 모두 가끔 쓰는 기능이라, 사이드바를 길게 차지하지
+    # 않도록 한 묶음으로 접어둔다.
     st.divider()
-    st.caption("🔍 진단용 결과 추출")
-    _mr = st.session_state.get('match_results', [])
-    if _mr:
-        import io as _io
-        _ai = st.session_state.get('ai_analysis', {})
-        _rv = st.session_state.get('review_state', {})
-        _df = pd.DataFrame(_mr).fillna('')
-        def _key(r):
-            return f"{r.get('기업명','')}_{r.get('공고ID','')}"
-        _ai_fields = ['추천여부','적합도','한줄요약','업종일치','자격충족',
-                      '지역적합','수요일치','판단근거','주의사항']
-        for _f in _ai_fields:
-            _df['AI_'+_f] = _df.apply(lambda r: _ai.get(_key(r), {}).get(_f, ''), axis=1)
-        _stat = {'○':'승인','✕':'제외'}
-        _df['검토상태'] = _df.apply(lambda r: _stat.get(_rv.get(_key(r), ''), '미검토'), axis=1)
-        def _agg(g):
-            s = g['관련도'].astype(str)
-            rec = g['AI_추천여부']; stt = g['검토상태']
-            return pd.Series({
-                '매칭건수': len(g),
-                '★★★': (s=='★★★').sum(), '★★': (s=='★★').sum(),
-                'AI추천': (rec=='추천').sum(), 'AI검토': (rec=='검토').sum(),
-                'AI비추천': (rec=='비추천').sum(), 'AI미분석': (rec=='').sum(),
-                '승인': (stt=='승인').sum(), '제외': (stt=='제외').sum(),
-                '미검토': (stt=='미검토').sum(),
-            })
-        _summary = _df.groupby('기업명').apply(_agg).reset_index()
-        _buf = _io.BytesIO()
-        with pd.ExcelWriter(_buf, engine='openpyxl') as _w:
-            _summary.to_excel(_w, index=False, sheet_name='기업별요약')
-            _df.to_excel(_w, index=False, sheet_name='매칭상세')
-        st.download_button(
-            "📥 진단용 결과 다운로드",
-            data=_buf.getvalue(),
-            file_name=f"매칭진단_{datetime.today().strftime('%Y%m%d')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
-        st.caption(f"기업 {_df['기업명'].nunique()}곳 · 매칭 {len(_df)}건")
-    else:
-        st.caption("매칭 결과 없음 — 먼저 매칭·AI 분석을 실행하세요")
-
-    # ── 판단 기록 ─────────────────────────────────────────
-    st.divider()
-    st.caption("📊 판단 기록 (회차별 판단·반응 누적)")
-    if st.button("🔄 갱신 (클릭·반응 수집)", key="declog_refresh", use_container_width=True):
-        with st.spinner("클릭 로그·반응 회신 수집 중..."):
-            _dd   = _get_drive()
-            _drid = current_round_id()
-            _cmap = build_click_map(load_click_log())
-            _rmap = collect_reactions()
-            _smap = load_send_progress(_dd, _drid).get('sent', {}) if _drid else {}
-            _ok_d, _cnt_d = record_decision_log(_dd, _drid, _smap, _cmap, _rmap)
-        if _ok_d:
-            st.success(f"갱신 완료 — 누적 {_cnt_d}행")
+    with st.expander("📦 데이터 내보내기", expanded=False):
+        st.caption("🔍 진단용 결과 추출")
+        _mr = st.session_state.get('match_results', [])
+        if _mr:
+            import io as _io
+            _ai = st.session_state.get('ai_analysis', {})
+            _rv = st.session_state.get('review_state', {})
+            _df = pd.DataFrame(_mr).fillna('')
+            def _key(r):
+                return f"{r.get('기업명','')}_{r.get('공고ID','')}"
+            _ai_fields = ['추천여부','적합도','한줄요약','업종일치','자격충족',
+                          '지역적합','수요일치','판단근거','주의사항']
+            for _f in _ai_fields:
+                _df['AI_'+_f] = _df.apply(lambda r: _ai.get(_key(r), {}).get(_f, ''), axis=1)
+            _stat = {'○':'승인','✕':'제외'}
+            _df['검토상태'] = _df.apply(lambda r: _stat.get(_rv.get(_key(r), ''), '미검토'), axis=1)
+            def _agg(g):
+                s = g['관련도'].astype(str)
+                rec = g['AI_추천여부']; stt = g['검토상태']
+                return pd.Series({
+                    '매칭건수': len(g),
+                    '★★★': (s=='★★★').sum(), '★★': (s=='★★').sum(),
+                    'AI추천': (rec=='추천').sum(), 'AI검토': (rec=='검토').sum(),
+                    'AI비추천': (rec=='비추천').sum(), 'AI미분석': (rec=='').sum(),
+                    '승인': (stt=='승인').sum(), '제외': (stt=='제외').sum(),
+                    '미검토': (stt=='미검토').sum(),
+                })
+            _summary = _df.groupby('기업명').apply(_agg).reset_index()
+            _buf = _io.BytesIO()
+            with pd.ExcelWriter(_buf, engine='openpyxl') as _w:
+                _summary.to_excel(_w, index=False, sheet_name='기업별요약')
+                _df.to_excel(_w, index=False, sheet_name='매칭상세')
+            st.download_button(
+                "📥 진단용 결과 다운로드",
+                data=_buf.getvalue(),
+                file_name=f"매칭진단_{datetime.today().strftime('%Y%m%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+            st.caption(f"기업 {_df['기업명'].nunique()}곳 · 매칭 {len(_df)}건")
         else:
-            st.warning("갱신할 매칭 결과가 없거나 저장에 실패했습니다.")
+            st.caption("매칭 결과 없음 — 먼저 매칭·AI 분석을 실행하세요")
 
-    if '_declog_cache' not in st.session_state:
-        st.session_state['_declog_cache'] = load_decision_log(_get_drive())
-    _rows_d = st.session_state.get('_declog_cache') or []
-    if _rows_d:
-        import io as _io2
-        _dfd  = pd.DataFrame(_rows_d)
-        _bufd = _io2.BytesIO()
-        with pd.ExcelWriter(_bufd, engine='openpyxl') as _wd:
-            _dfd.to_excel(_wd, index=False, sheet_name='전체')
-            if '회차ID' in _dfd.columns:
-                _sm_d = _dfd.groupby('회차ID').agg(
-                    매칭건수=('공고ID', 'count'),
-                    승인=('최종결정', lambda s: (s == '승인').sum()),
-                    제외=('최종결정', lambda s: (s == '제외').sum()),
-                    발송=('발송여부', lambda s: s.isin(['Y', '참고']).sum()),
-                    클릭=('클릭여부', lambda s: (s == 'Y').sum()),
-                ).reset_index()
-                _sm_d.to_excel(_wd, index=False, sheet_name='회차별 요약')
-        st.download_button(
-            "📥 판단 기록 다운로드",
-            data=_bufd.getvalue(),
-            file_name=f"판단기록_{datetime.today().strftime('%Y%m%d')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
-        _nr = _dfd['회차ID'].nunique() if '회차ID' in _dfd.columns else 0
-        st.caption(f"누적 {len(_dfd)}행 · 회차 {_nr}개")
-    else:
-        st.caption("아직 기록 없음 — 검토 완료 저장·발송 후 쌓입니다")
+        st.divider()
+        st.caption("📊 판단 기록 (회차별 판단·반응 누적)")
+        if st.button("🔄 갱신 (클릭·반응 수집)", key="declog_refresh", use_container_width=True):
+            with st.spinner("클릭 로그·반응 회신 수집 중..."):
+                _dd   = _get_drive()
+                _drid = current_round_id()
+                _cmap = build_click_map(load_click_log())
+                _rmap = collect_reactions()
+                _smap = load_send_progress(_dd, _drid).get('sent', {}) if _drid else {}
+                _ok_d, _cnt_d = record_decision_log(_dd, _drid, _smap, _cmap, _rmap)
+            if _ok_d:
+                st.success(f"갱신 완료 — 누적 {_cnt_d}행")
+            else:
+                st.warning("갱신할 매칭 결과가 없거나 저장에 실패했습니다.")
+
+        if '_declog_cache' not in st.session_state:
+            st.session_state['_declog_cache'] = load_decision_log(_get_drive())
+        _rows_d = st.session_state.get('_declog_cache') or []
+        if _rows_d:
+            import io as _io2
+            _dfd  = pd.DataFrame(_rows_d)
+            _bufd = _io2.BytesIO()
+            with pd.ExcelWriter(_bufd, engine='openpyxl') as _wd:
+                _dfd.to_excel(_wd, index=False, sheet_name='전체')
+                if '회차ID' in _dfd.columns:
+                    _sm_d = _dfd.groupby('회차ID').agg(
+                        매칭건수=('공고ID', 'count'),
+                        승인=('최종결정', lambda s: (s == '승인').sum()),
+                        제외=('최종결정', lambda s: (s == '제외').sum()),
+                        발송=('발송여부', lambda s: s.isin(['Y', '참고']).sum()),
+                        클릭=('클릭여부', lambda s: (s == 'Y').sum()),
+                    ).reset_index()
+                    _sm_d.to_excel(_wd, index=False, sheet_name='회차별 요약')
+            st.download_button(
+                "📥 판단 기록 다운로드",
+                data=_bufd.getvalue(),
+                file_name=f"판단기록_{datetime.today().strftime('%Y%m%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+            _nr = _dfd['회차ID'].nunique() if '회차ID' in _dfd.columns else 0
+            st.caption(f"누적 {len(_dfd)}행 · 회차 {_nr}개")
+        else:
+            st.caption("아직 기록 없음 — 검토 완료 저장·발송 후 쌓입니다")
 
 # 구글 서비스 — 필요할 때 get_creds()로 직접 인증
 
@@ -5717,16 +5719,21 @@ elif page == "발송":
 
         st.divider()
         st.subheader("발송 미리보기")
-        st.caption("실제 발송과 동일한 함수(build_match_mail)로 만든 HTML입니다.")
+        st.caption("실제 발송과 같은 함수(build_match_mail)로 만든 HTML입니다. 발송되지 않습니다.")
 
-        preview_co = st.selectbox("기업 선택", sorted(companies))
+        _pv_c1, _pv_c2 = st.columns([3, 1])
+        with _pv_c1:
+            preview_co = st.selectbox("기업 선택", sorted(companies),
+                                      key="send_preview_co_sel")
+        with _pv_c2:
+            st.write("")
+            if st.button("👁 발송 경로로 확인", use_container_width=True,
+                         key="send_preview_btn",
+                         help="같은 HTML을 실제 발송 루프를 그대로 통과시켜 렌더합니다. "
+                              "기업 묶기·건너뛰기까지 확인할 때 쓰세요. 발송은 안 됩니다."):
+                st.session_state['_send_preview_co'] = preview_co
 
-        _df_c_prev = load_excel(drive, SELECTED_FILE)
-        _co_info = {}
-        if not _df_c_prev.empty:
-            _mx = _df_c_prev[_df_c_prev['기업명'] == preview_co]
-            if not _mx.empty:
-                _co_info = _mx.iloc[0].to_dict()
+        _co_info = company_profile(preview_co)
 
         _preview_html, _prev_meta = build_match_mail(
             preview_co,
@@ -5739,23 +5746,14 @@ elif page == "발송":
         if _preview_html is None:
             st.warning(f"{preview_co} — 안내할 공고가 없어 실제 발송에서도 제외됩니다.")
         else:
-            st.caption(f"🔦 주목 {len(_prev_meta['sss'])}건 · 📌 이런 공고도 {len(_prev_meta['ss'])}건 "
-                       f"· 📎 참고 {len(_prev_meta['review'])}건")
+            _pv_fb = any(x.get('_undated_fallback') for x in _prev_meta['review'])
+            st.caption(f"🔦 주목 {len(_prev_meta['sss']):,}건 · "
+                       f"📌 이런 공고도 {len(_prev_meta['ss']):,}건 · "
+                       f"📎 참고 {len(_prev_meta['review']):,}건"
+                       + ("  ·  ⚠️ 접수기간 미명시 공고로 채운 메일" if _pv_fb else ""))
             st.components.v1.html(_preview_html, height=900, scrolling=True)
 
         st.divider()
-        # ── 발송 화면 미리보기 (발송 없이 실제 발송 HTML 렌더) ──
-        _pv_c1, _pv_c2 = st.columns([3, 1])
-        with _pv_c1:
-            _pv_all_cos = sorted({r['기업명'] for r in approved} | set(
-                load_excel(drive, SELECTED_FILE).query("선정구분=='선정'")['기업명'].dropna().tolist()
-                if '선정구분' in load_excel(drive, SELECTED_FILE).columns else []))
-            _pv_co_sel = st.selectbox("👁 발송 화면 미리보기 기업 (실제 발송 HTML 그대로, 발송 안 됨)",
-                                      _pv_all_cos, key="send_preview_co_sel")
-        with _pv_c2:
-            st.write("")
-            if st.button("👁 미리보기", use_container_width=True, key="send_preview_btn"):
-                st.session_state['_send_preview_co'] = _pv_co_sel
 
         if st.button("📤 발송 실행", type="primary") or st.session_state.get('_send_preview_co'):
             from email.mime.multipart import MIMEMultipart
