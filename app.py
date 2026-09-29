@@ -1944,7 +1944,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v0929-15"
+BUILD_TAG = "v0929-16"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -3388,20 +3388,23 @@ with st.sidebar:
     st.divider()
 
     # 메뉴 그룹핑
-    st.caption("▸ 운영")
-    page = st.radio("메뉴", [
-        "대시보드",
-        "기업 관리",
-        "공고·매칭",
-        "발송",
-        "안내 메일",
-        "교육 신청 집계",
-        "발송 이력",
-        "클릭 반응",
-        "캘린더",
-        "설정",
-        "시스템 명세",
-    ], label_visibility="collapsed")
+    # 예전에는 '▸ 운영' 캡션 하나 아래 11개가 한 덩어리였다. 성격이 달라 찾기 어렵다.
+    # 라디오는 하나로 두되(선택 상태를 나눌 수 없으므로) 구분선으로 묶어 보여준다.
+    _MENU_GROUPS = [
+        ("운영",   ["대시보드", "공고·매칭", "발송"]),
+        ("데이터", ["기업 관리", "발송 이력", "클릭 반응", "교육 신청 집계"]),
+        ("도구",   ["안내 메일", "캘린더", "설정", "시스템 명세"]),
+    ]
+    _MENU = [m for _, items in _MENU_GROUPS for m in items]
+    _GROUP_OF = {m: g for g, items in _MENU_GROUPS for m in items}
+
+    def _menu_label(m):
+        return m
+
+    st.caption("▸ " + " · ".join(g for g, _ in _MENU_GROUPS))
+    page = st.radio("메뉴", _MENU, format_func=_menu_label,
+                    label_visibility="collapsed")
+    st.caption(f"지금 보는 화면 — {_GROUP_OF.get(page, '')} / {page}")
     st.divider()
     test_mode = st.toggle("테스트 모드", value=True)
     if test_mode: st.warning("테스트 메일 발송")
@@ -4803,11 +4806,16 @@ elif page == "공고·매칭":
                 pending = max(0, total - ap - rj)
 
                 # ── 상단 진행 현황 ──────────────────────────────
-                c1, c2, c3, c4, c5 = st.columns([2, 2, 2, 2, 3])
-                c1.metric("전체", f"{len(df_show)}건")
-                c2.metric("✅ 승인", f"{ap}건")
-                c3.metric("❌ 제외", f"{rj}건")
-                c4.metric("⏳ 미검토", f"{pending}건")
+                # '전체'는 맥락일 뿐이라 캡션으로 내리고, 사람이 오래 머무는 화면이니
+                # "얼마나 남았나"를 진행률 바로 먼저 보여준다.
+                _done = ap + rj
+                st.progress(_done / max(total, 1),
+                            text=f"검토 {_done:,}/{total:,}건  ({_done/max(total,1)*100:.0f}%)"
+                                 + (f" · 남은 {pending:,}건" if pending else " · 완료"))
+                c2, c3, c4, c5 = st.columns([2, 2, 2, 3])
+                c2.metric("✅ 승인", f"{ap:,}건")
+                c3.metric("❌ 제외", f"{rj:,}건")
+                c4.metric("⏳ 미검토", f"{pending:,}건")
                 with c5:
                     if ap > 0:
                         if st.button(
@@ -5655,11 +5663,17 @@ elif page == "발송":
     if not approved:
         st.warning("승인된 공고 없음 — '매칭 결과'에서 검토 완료 후 진행")
     else:
-        st.info(f"📌 현재 매칭 대상 그룹: **{matched_group}** (다른 그룹 발송 시 '매칭 결과'에서 그룹 변경 후 재매칭 필요)")
+        # 배너가 연달아 세 개면 정작 중요한 '발송 모드'가 묻힌다.
+        # 맥락 정보(대상 그룹·자동 제외)는 캡션과 접힘으로 내리고 경고는 모드에만 쓴다.
+        st.caption(f"📌 매칭 대상 그룹 **{matched_group}** · 기준일 {_today_str}"
+                   "  —  다른 그룹으로 보내려면 '공고·매칭'에서 그룹을 바꿔 재매칭하세요.")
         if _n_expired:
-            _cut_detail = " · ".join(f"{_k} {_v}건" for _k, _v in
+            _cut_detail = " · ".join(f"{_k} {_v:,}건" for _k, _v in
                                      sorted(_cut_reason.items(), key=lambda x: -x[1]))
-            st.warning(f"⏰ 발송 대상에서 자동 제외 {_n_expired}건 — {_cut_detail} (기준일 {_today_str})")
+            with st.expander(f"⏰ 발송 대상에서 자동 제외 {_n_expired:,}건", expanded=False):
+                st.markdown(f"**{_cut_detail}**")
+                st.caption("담당자 제외(✕)는 검토 화면에서, 접수기간 불명·마감 경과는 "
+                           "공고 데이터에서 비롯됩니다.")
         # 전체 기업 목록 로드 (선정 기업만)
         _df_c_top = load_excel(drive, SELECTED_FILE)
         if not _df_c_top.empty and '기업명' in _df_c_top.columns:
@@ -5671,11 +5685,12 @@ elif page == "발송":
         else:
             companies = list(set(r['기업명'] for r in approved))
         c1,c2,c3  = st.columns(3)
-        c1.metric("승인 건수", f"{len(approved)}건")
-        c2.metric("대상 기업", f"{len(companies)}개사")
-        c3.metric("발송 모드", "테스트" if test_mode else "실제")
+        c1.metric("승인 건수", f"{len(approved):,}건")
+        c2.metric("대상 기업", f"{len(companies):,}개사")
+        c3.metric("발송 모드", "테스트" if test_mode else "실제 발송",
+                  help="사이드바의 '테스트 모드' 토글로 바꿉니다.")
         if test_mode:
-            st.warning("⚠️ 테스트 모드 — 본인 메일로만 발송")
+            st.warning("⚠️ 테스트 모드 — 본인 메일로만 발송됩니다")
             _tc1, _tc2 = st.columns([1, 2])
             with _tc1:
                 _test_limit = st.number_input(
