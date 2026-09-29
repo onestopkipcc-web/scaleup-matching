@@ -1944,7 +1944,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v0929-17"
+BUILD_TAG = "v0929-18"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -2978,9 +2978,12 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --accent:       #FF0080;
-  --accent-light: #1A0010;
-  --accent-dark:  #CC0066;
+  /* 액센트는 메일 카드와 같은 골드 계열. 예전 핫핑크(#C9A96A)는 채도가 높아
+     승인(초록)·제외(빨강)·경고(노랑) 상태색과 시각적으로 경쟁했다. */
+  --accent:       #C9A96A;
+  --accent-light: #1A150A;
+  --accent-dark:  #A88A4F;
+  --accent-on:    #2A2214;   /* 액센트 배경 위에 얹는 글자색 (골드는 밝아서 어두운 글자) */
   --border:       #2A2A2A;
   --border-2:     #333333;
   --surface:      #151515;
@@ -2988,12 +2991,13 @@ st.markdown("""
   --text-1:       #F0F0F0;
   --text-2:       #AAAAAA;
   --text-3:       #666666;
+  --text-cap:     #9A9A9A;   /* 캡션 전용 — #666 은 배경 대비 3.4:1 로 낮아 읽기 어렵다 */
   --blue:         #3B82F6;
   --yellow:       #F59E0B;
   --red:          #EF4444;
   --radius:       8px;
   --shadow:       0 1px 3px rgba(0,0,0,0.4);
-  --shadow-md:    0 4px 12px rgba(255,0,128,0.1);
+  --shadow-md:    0 4px 12px rgba(201,169,106,0.1);
 }
 
 /* ── 전체 폰트·배경 ── */
@@ -3042,8 +3046,9 @@ code {
 /* ── primary 버튼 ── */
 button[kind="primary"] {
   background: var(--accent) !important;
-  color: #fff !important; border:none !important; font-weight:600 !important;
-  box-shadow: 0 1px 6px rgba(255,0,128,0.4) !important;
+  /* 골드 위 흰 글자는 2.2:1 로 읽기 어렵다 → 어두운 글자 (7.0:1) */
+  color: var(--accent-on) !important; border:none !important; font-weight:700 !important;
+  box-shadow: 0 1px 6px rgba(201,169,106,0.4) !important;
 }
 button[kind="primary"]:hover { background: var(--accent-dark) !important; }
 
@@ -3059,7 +3064,7 @@ button[kind="primary"]:hover { background: var(--accent-dark) !important; }
 .stButton button:hover {
   border-color: var(--accent) !important;
   color: var(--accent) !important;
-  box-shadow: 0 0 8px rgba(255,0,128,0.2) !important;
+  box-shadow: 0 0 8px rgba(201,169,106,0.2) !important;
 }
 
 /* ── 입력창 ── */
@@ -3071,7 +3076,7 @@ button[kind="primary"]:hover { background: var(--accent-dark) !important; }
 }
 .stTextInput input:focus, .stTextArea textarea:focus {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px rgba(255,0,128,0.15) !important;
+  box-shadow: 0 0 0 3px rgba(201,169,106,0.15) !important;
 }
 .stTextInput input::placeholder, .stTextArea textarea::placeholder {
   color: var(--text-3) !important;
@@ -3144,7 +3149,7 @@ button[kind="primary"]:hover { background: var(--accent-dark) !important; }
 hr { border: none !important; border-top: 1px solid var(--border) !important; }
 
 /* ── 캡션 ── */
-.stCaption, [data-testid="stCaptionContainer"] { color: var(--text-3) !important; font-size:12px !important; }
+.stCaption, [data-testid="stCaptionContainer"] { color: var(--text-cap) !important; font-size:12px !important; }
 
 /* ── data editor / dataframe ── */
 [data-testid="stDataFrame"], .stDataFrame,
@@ -3167,12 +3172,12 @@ hr { border: none !important; border-top: 1px solid var(--border) !important; }
   border-radius: 6px !important;
 }
 [data-testid="stElementToolbar"] button svg { fill: var(--text-1) !important; }
-[data-testid="stElementToolbar"] button:hover { background: #FF008033 !important; }
+[data-testid="stElementToolbar"] button:hover { background: #C9A96A33 !important; }
 
 /* ── 사이드바 ── */
 section[data-testid="stSidebar"] {
   background: #0D0D0D !important;
-  border-right: 1px solid #FF008033 !important;
+  border-right: 1px solid #C9A96A33 !important;
 }
 section[data-testid="stSidebar"] * { color: var(--text-1) !important; }
 section[data-testid="stSidebar"] .stRadio label:hover { color: var(--accent) !important; }
@@ -3233,7 +3238,7 @@ section[data-testid="stSidebar"] .stRadio label:hover { color: var(--accent) !im
   [data-testid="stSidebarCollapseButton"] {
     display:flex !important;
   }
-  [data-testid="stSidebarCollapseButton"] svg { fill:#FF0080 !important; }
+  [data-testid="stSidebarCollapseButton"] svg { fill:#C9A96A !important; }
   /* 본문 여백 축소 */
   .main .block-container { padding-left:12px !important; padding-right:12px !important; }
   /* 최소 폰트 보정 */
@@ -3306,7 +3311,7 @@ header    { visibility:hidden; }
   color: #F0F0F0 !important;
 }
 [data-baseweb="menu"] li:hover {
-  background: #FF0080 !important;
+  background: #C9A96A !important;
   color: #000000 !important;
 }
 [data-baseweb="option"] {
@@ -3314,14 +3319,14 @@ header    { visibility:hidden; }
   color: #F0F0F0 !important;
 }
 [data-baseweb="option"]:hover {
-  background: #FF0080 !important;
+  background: #C9A96A !important;
   color: #000000 !important;
 }
 /* 선택된 항목 (드롭다운 옵션에만 적용) */
 [data-baseweb="menu"] [aria-selected="true"],
 [data-baseweb="popover"] [aria-selected="true"] {
-  background: rgba(255,0,128,0.18) !important;
-  color: #FF66B2 !important;
+  background: rgba(201,169,106,0.18) !important;
+  color: #E6D0A3 !important;
   font-weight: 600 !important;
 }
 /* ── 드롭다운 팝오버 강제 (body 최상위 렌더 대응) ── */
@@ -3337,12 +3342,12 @@ li[role="option"] {
 }
 ul[role="listbox"] li:hover,
 li[role="option"]:hover {
-  background: #FF0080 !important;
+  background: #C9A96A !important;
   color: #000000 !important;
 }
 li[role="option"][aria-selected="true"] {
-  background: rgba(255,0,128,0.18) !important;
-  color: #FF66B2 !important;
+  background: rgba(201,169,106,0.18) !important;
+  color: #E6D0A3 !important;
   font-weight: 600 !important;
 }
 
@@ -3372,9 +3377,9 @@ li[role="option"][aria-selected="true"] {
 
 /* ── 타임라인 필터 버튼 명시적 색상 ── */
 .tl-filter-active {
-  background: #FF0080 !important;
-  color: #ffffff !important;
-  border-color: #FF0080 !important;
+  background: var(--accent) !important;
+  color: var(--accent-on) !important;   /* 골드 위 흰 글자는 대비 부족 */
+  border-color: var(--accent) !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -3779,7 +3784,7 @@ if page == "대시보드":
             except:
                 mo_label = month
 
-            st.markdown(f"<p style='font-size:10px;font-weight:900;color:#FF0080;letter-spacing:3px;text-transform:uppercase;margin:16px 0 8px 0;'>{mo_label}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:10px;font-weight:900;color:#C9A96A;letter-spacing:3px;text-transform:uppercase;margin:16px 0 8px 0;'>{mo_label}</p>", unsafe_allow_html=True)
 
             for item in items:
                 t = item.get('type','system')
@@ -3836,7 +3841,7 @@ if page == "대시보드":
   font-size: 13px;
   letter-spacing: 3px;
   font-weight: 900;
-  color: #FF0080 !important;
+  color: #C9A96A !important;
   margin-top: 32px;
   cursor: default;
   user-select: none;
@@ -5456,7 +5461,9 @@ elif page == "공고·매칭":
                                         st.session_state['ai_analysis'][key] = claude_analyze(ci, enrich_for_ai(row.to_dict()))
                                     st.rerun()
 
-                        # ── AI 분석 상세 (항상 펼침) ──
+                        # ── AI 분석 상세 ──
+                        # 예전에는 항상 펼쳐져 있어 카드 하나가 화면을 거의 채웠다.
+                        # 12~16건을 훑어야 하므로 한 줄 요약만 노출하고 접어 둔다.
                         if ai_res and not ai_res.get('error'):
                             rec       = ai_res.get('추천여부','')
                             fit       = ai_res.get('적합도','')
@@ -5481,19 +5488,21 @@ elif page == "공고·매칭":
                                     f"background:rgba(245,158,11,0.12);border:1px solid {bdr};border-radius:6px;"
                                     f"font-size:12px;color:#FCD34D !important;font-weight:500;'>⚠️ {_caution_esc}</div>"
                                 )
-                            st.markdown(
-                                f"<div style='background:{bg};border:1px solid {bdr};"
-                                f"border-left:4px solid {bdr};border-radius:8px;"
-                                f"padding:14px 16px;margin:6px 0;'>"
-                                f"<div style='display:flex;align-items:center;gap:8px;margin-bottom:6px;'>"
-                                f"<span style='font-size:14px;font-weight:700;color:{txt} !important;'>{rec_icon} {rec}</span>"
-                                f"<span style='font-size:12px;color:{txt} !important;opacity:0.8;'>· 적합도 {fit}</span>"
-                                f"</div>"
-                                f"<div style='font-size:13px;line-height:1.6;color:#E8EFF6 !important;'>{_reason_esc}</div>"
-                                f"{_caution_html}"
-                                f"</div>",
-                                unsafe_allow_html=True
-                            )
+                            _ai_sum = (
+                                f"{rec_icon} {rec} · 적합도 {fit or '—'} · "
+                                f"업종 {ai_res.get('업종일치','—')} · 자격 {ai_res.get('자격충족','—')} · "
+                                f"지역 {ai_res.get('지역적합','—')} · 수요 {ai_res.get('수요일치','—')}"
+                                + ("  ⚠️ 확인사항" if _caution_html else ""))
+                            with st.expander(_ai_sum, expanded=False):
+                                st.markdown(
+                                    f"<div style='background:{bg};border:1px solid {bdr};"
+                                    f"border-left:4px solid {bdr};border-radius:8px;"
+                                    f"padding:14px 16px;margin:6px 0;'>"
+                                    f"<div style='font-size:13px;line-height:1.6;color:#E8EFF6 !important;'>{_reason_esc}</div>"
+                                    f"{_caution_html}"
+                                    f"</div>",
+                                    unsafe_allow_html=True
+                                )
 
                         st.divider()
 
