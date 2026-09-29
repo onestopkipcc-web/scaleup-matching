@@ -2002,6 +2002,10 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map):
     </div>"""
 
     today_str = datetime.today().strftime('%Y.%m.%d')
+    # PICKS 뱃지 — 실제로 메일에 실리는 맞춤 공고(🔦+📌) 수.
+    # 승인 건수(len(notices))를 쓰면 마감 경과·업종 강등으로 빠진 공고까지 세어
+    # "5 PICKS"라 써놓고 카드는 3장만 나가는 불일치가 생긴다. 0이면 뱃지를 숨긴다.
+    _pick_n = len(notices_sss) + len(notices_ss)
     html=f"""<!DOCTYPE html>
     <html lang="ko">
     <head>
@@ -2066,16 +2070,16 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map):
         이번 주 맞춤 지원사업 공고
       </p>
     </td>
-    <td align="right" valign="middle" width="72">
+    {f'''<td align="right" valign="middle" width="72">
       <div style="background:linear-gradient(135deg,#C9A96A 0%,#B08D4F 100%);
                   border-radius:12px;padding:11px 0;width:60px;
                   text-align:center;">
         <p style="margin:0;font-size:22px;font-weight:800;color:#1B2A41;
-                   line-height:1;">{len(notices)}</p>
+                   line-height:1;">{_pick_n}</p>
         <p style="margin:3px 0 0;font-size:9px;letter-spacing:1.2px;
                    color:#3A2E15;font-weight:700;text-transform:uppercase;">picks</p>
       </div>
-    </td>
+    </td>''' if _pick_n else ''}
     </tr>
     </table>
     <!-- 기업명 카드 -->
@@ -4183,7 +4187,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0929-1 · 미리보기·발송 HTML 단일 함수(build_match_mail) 통합 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0929-2 · PICKS 숫자 = 실제 안내 공고 수 교정 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
