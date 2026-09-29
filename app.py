@@ -92,6 +92,7 @@ def save_match_state(drive):
             'match_results': st.session_state.get('match_results', []),
             'ai_analysis':   st.session_state.get('ai_analysis', {}),
             'review_state':  st.session_state.get('review_state', {}),
+            'round_id':      st.session_state.get('match_round_id', ''),
             'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M'),
         }
         drive_upload(drive, MATCH_STATE_FILE,
@@ -108,15 +109,75 @@ def load_match_state(drive):
     try:
         saved = load_json(drive, MATCH_STATE_FILE)
         if saved:
+            _rid = saved.get('round_id', '') or ''
+            if _rid and not st.session_state.get('match_round_id'):
+                st.session_state['match_round_id'] = _rid
             if not st.session_state.get('match_results'):
                 st.session_state['match_results'] = saved.get('match_results', [])
             if not st.session_state.get('ai_analysis'):
                 st.session_state['ai_analysis'] = saved.get('ai_analysis', {})
             if not st.session_state.get('review_state'):
-                st.session_state['review_state'] = saved.get('review_state', {})
+                _rv = saved.get('review_state', {}) or {}
+                # 회차 정보가 없는 구버전 저장본이면 승인(○)은 되살리지 않는다
+                st.session_state['review_state'] = _rv if _rid else carry_over_reject(_rv)
         st.session_state['_match_state_loaded'] = True
     except Exception:
         st.session_state['_match_state_loaded'] = True
+
+# ── 매칭 회차 ─────────────────────────────────────────
+# 승인(○)·제외(✕)는 그 회차 안에서만 유효하다. 재매칭하면 승인은 반드시 비워지고,
+# 제외만 옵션에 따라 이월된다. 키 포맷(기업명_공고ID)은 ai_analysis와 공유하므로
+# 건드리지 않고, 저장 파일에 회차 ID를 함께 기록해 회차를 판정한다.
+REVIEW_FILE = "review_state.json"
+
+def new_round_id():
+    """매칭 회차 ID — 매칭을 실행할 때마다 새로 발급한다."""
+    return datetime.today().strftime('%Y%m%d-%H%M')
+
+def current_round_id():
+    return st.session_state.get('match_round_id', '')
+
+def keep_reject_opt():
+    """지난 회차 제외(✕) 이월 옵션 — 기본 켜짐."""
+    return bool(st.session_state.get('round_keep_reject', True))
+
+def carry_over_reject(prev_state, keep_reject=None):
+    """새 회차의 시작 상태를 만든다. 승인(○)은 절대 이월하지 않는다."""
+    if keep_reject is None:
+        keep_reject = keep_reject_opt()
+    if not keep_reject:
+        return {}
+    return {k: v for k, v in (prev_state or {}).items() if v == '✕'}
+
+def save_review_state(drive, state=None, round_id=None):
+    """검토 상태를 회차 ID와 함께 드라이브에 저장."""
+    try:
+        import json as _j
+        payload = {
+            'round_id':     current_round_id() if round_id is None else round_id,
+            'review_state': st.session_state.get('review_state', {}) if state is None else state,
+            'saved_at':     datetime.today().strftime('%Y-%m-%d %H:%M'),
+        }
+        drive_upload(drive, REVIEW_FILE,
+                     _j.dumps(payload, ensure_ascii=False).encode('utf-8'),
+                     "application/json")
+        return True
+    except Exception:
+        return False
+
+def load_review_state(drive, round_id=None, keep_reject=None):
+    """드라이브의 검토 상태를 현재 회차 기준으로 읽는다.
+    회차가 다르거나 회차 정보가 없는 구버전 파일이면 승인(○)은 버린다.
+    반환: (state, saved_round, saved_at, is_same_round)"""
+    saved       = load_json(drive, REVIEW_FILE) or {}
+    state       = saved.get('review_state', {}) or {}
+    saved_round = saved.get('round_id', '') or ''
+    saved_at    = saved.get('saved_at', '') or ''
+    cur  = current_round_id() if round_id is None else round_id
+    same = bool(saved_round) and bool(cur) and saved_round == cur
+    if not same:
+        state = carry_over_reject(state, keep_reject)
+    return state, saved_round, saved_at, same
 
 def track_link(dest_url, company, notice_id, notice_name):
     """공고 링크를 클릭 추적 URL로 감싼다. dest_url이 없으면 원본 그대로."""
@@ -2916,8 +2977,10 @@ if page == "대시보드":
 
     results      = st.session_state.get('match_results', [])
     review_state = st.session_state.get('review_state', {})
-    approved     = sum(1 for v in review_state.values() if v=="○")
-    pending_rev  = len(results) - sum(1 for v in review_state.values() if v in ["○","✕"])
+    # 이번 회차 매칭 결과에 있는 공고만 집계 (이월된 ✕가 숫자를 부풀리지 않도록)
+    _rv_keys     = {f"{r.get('기업명','')}_{r.get('공고ID','')}" for r in results}
+    approved     = sum(1 for k in _rv_keys if review_state.get(k) == "○")
+    pending_rev  = len(results) - sum(1 for k in _rv_keys if review_state.get(k) in ("○", "✕"))
 
     steps_data = [
         {
@@ -3797,6 +3860,11 @@ elif page == "공고·매칭":
             else:
                 st.info("📄 전문 미수집 — API 사업개요만으로 매칭합니다.")
 
+            st.checkbox(
+                "지난 회차 제외(✕) 이월", value=True, key="round_keep_reject",
+                help="이전 회차에서 ✕로 제외한 공고를 새 회차에서도 제외 상태로 유지합니다. "
+                     "승인(○)은 이 옵션과 무관하게 매칭할 때마다 항상 초기화됩니다.")
+
             if st.button("🔍 매칭 실행", type="primary"):
                 with st.spinner("드라이브 데이터 로딩 중..."):
                     df_c    = load_excel(drive, SELECTED_FILE)
@@ -3920,7 +3988,17 @@ elif page == "공고·매칭":
                 enriched_count = len(detail_map)
                 st.session_state['match_results'] = all_results
                 st.session_state['df_companies_cache'] = df_c
-                save_match_state(_get_drive())  # 매칭 직후 자동 저장
+
+                # ── 새 매칭 회차 시작 ──────────────────────────
+                # 승인(○)은 절대 다음 회차로 넘기지 않는다. 제외(✕)만 옵션에 따라 이월.
+                _carried = carry_over_reject(st.session_state.get('review_state', {}))
+                st.session_state['match_round_id'] = new_round_id()
+                st.session_state['review_state']   = _carried
+                save_review_state(_get_drive())   # 새 회차 상태를 드라이브에도 즉시 반영
+                save_match_state(_get_drive())    # 매칭 직후 자동 저장
+                st.caption(
+                    f"🔄 새 회차 {st.session_state['match_round_id']} 시작 — 승인 0건에서 시작합니다"
+                    + (f" · 지난 회차 제외(✕) {len(_carried)}건 이월" if _carried else ""))
                 # 매칭 실행 정보 저장 — session_state + 드라이브 JSON (앱 재시작 후에도 유지)
                 match_info = {
                     'date':         datetime.today().strftime('%Y-%m-%d'),
@@ -3997,29 +4075,35 @@ elif page == "공고·매칭":
                 sv1, sv2, sv3 = st.columns([2, 2, 4])
                 with sv1:
                     if st.button("💾 검토 상태 저장", help="드라이브에 현재 검토 상태를 저장합니다"):
-                        import json
-                        review_data = {
-                            'review_state': st.session_state['review_state'],
-                            'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M')
-                        }
-                        drive_upload(drive, "review_state.json",
-                                     json.dumps(review_data, ensure_ascii=False).encode('utf-8'),
-                                     "application/json")
-                        st.success("검토 상태 저장 완료")
+                        save_review_state(drive)
+                        st.success(f"검토 상태 저장 완료 (회차 {current_round_id() or '—'})")
                 with sv2:
                     if st.button("📂 검토 상태 불러오기", help="드라이브에서 이전에 저장한 검토 상태를 불러옵니다"):
-                        import json
-                        saved = load_json(drive, "review_state.json")
-                        if saved and 'review_state' in saved:
-                            st.session_state['review_state'] = saved['review_state']
-                            st.success(f"불러오기 완료 ({saved.get('saved_at','날짜 미상')} 저장본)")
-                            st.rerun()
-                        else:
+                        _st_l, _rid_l, _at_l, _same_l = load_review_state(drive)
+                        if not _rid_l and not _st_l:
                             st.warning("저장된 검토 상태가 없습니다")
+                        else:
+                            st.session_state['review_state'] = _st_l
+                            if _same_l:
+                                st.session_state['_review_load_msg'] = (
+                                    'ok', f"불러오기 완료 ({_at_l or '날짜 미상'} 저장본)")
+                            else:
+                                st.session_state['_review_load_msg'] = (
+                                    'warn',
+                                    f"지난 회차({_rid_l or '회차 정보 없음'}) 저장본이라 승인(○)은 빼고 "
+                                    f"제외(✕) {len(_st_l)}건만 불러왔습니다.")
+                            st.rerun()
                 with sv3:
-                    saved_json = load_json(drive, "review_state.json")
+                    saved_json = load_json(drive, REVIEW_FILE)
                     if saved_json:
-                        st.caption(f"마지막 저장: {saved_json.get('saved_at','—')}")
+                        _sr = saved_json.get('round_id', '')
+                        st.caption(f"마지막 저장: {saved_json.get('saved_at','—')}"
+                                   + (f" · 회차 {_sr}" if _sr else " · 회차 정보 없음(구버전)"))
+                    st.caption(f"현재 회차: {current_round_id() or '— (매칭 실행 전)'}")
+
+                if st.session_state.get('_review_load_msg'):
+                    _lk, _lm = st.session_state.pop('_review_load_msg')
+                    (st.success if _lk == 'ok' else st.warning)(_lm)
 
                 st.divider()
 
@@ -4071,9 +4155,10 @@ elif page == "공고·매칭":
                         _ai2 = load_json(drive, AI_ANALYSIS_FILE) or {}
                         _ai2.update(st.session_state.get('ai_analysis', {}))
                         st.session_state['ai_analysis'] = _ai2
-                        # 드라이브 승인 상태 병합 — 기존 승인을 덮어쓰지 않도록
+                        # 드라이브 승인 상태 병합 — 기존 승인을 덮어쓰지 않도록.
+                        # 단 지난 회차 저장본이면 승인(○)은 버리고 제외(✕)만 가져온다.
                         try:
-                            _rv_saved = (load_json(drive, "review_state.json") or {}).get('review_state', {})
+                            _rv_saved, _, _, _ = load_review_state(drive)
                         except Exception:
                             _rv_saved = {}
                         _rv2 = dict(_rv_saved); _rv2.update(st.session_state.get('review_state', {}))
@@ -4114,20 +4199,19 @@ elif page == "공고·매칭":
                             for _r2, _k2 in _cands2[:int(_n_auto)]:
                                 _rv2[_k2] = "○"; _f_cnt += 1
                             _f_co += 1
-                        import json as _json2
-                        drive_upload(drive, "review_state.json",
-                                     _json2.dumps({'review_state': _rv2,
-                                                   'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M')},
-                                                  ensure_ascii=False).encode('utf-8'),
-                                     "application/json")
+                        save_review_state(drive, _rv2)
                         _msg = f"자동 보완 완료: {_f_co}개사 / {_f_cnt}건 승인 · 드라이브 저장됨"
                         if _no_cand:
                             _msg += f" · 후보 없음 {len(_no_cand)}개사({', '.join(_no_cand[:4])}…)"
                         st.session_state['auto_fill_msg'] = _msg
                         st.rerun()
 
-                ap      = sum(1 for v in st.session_state['review_state'].values() if v=="○")
-                rj      = sum(1 for v in st.session_state['review_state'].values() if v=="✕")
+                # 이번 회차 매칭 결과에 있는 공고만 집계
+                # (이월된 ✕ 중 이번 회차에 매칭되지 않은 건은 세지 않는다)
+                _rv_now   = st.session_state['review_state']
+                _keys_now = {f"{r['기업명']}_{r.get('공고ID','')}" for _, r in df_show.iterrows()}
+                ap      = sum(1 for k in _keys_now if _rv_now.get(k) == "○")
+                rj      = sum(1 for k in _keys_now if _rv_now.get(k) == "✕")
                 total   = len(df_show)
                 pending = max(0, total - ap - rj)
 
@@ -4145,16 +4229,8 @@ elif page == "공고·매칭":
                             use_container_width=True,
                             help="검토 완료 저장 후 발송 탭으로 이동합니다."
                         ):
-                            # 검토 상태 드라이브 저장
-                            import json as _json
-                            drive_upload(
-                                drive, "review_state.json",
-                                _json.dumps({
-                                    'review_state': st.session_state['review_state'],
-                                    'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M')
-                                }, ensure_ascii=False).encode('utf-8'),
-                                "application/json"
-                            )
+                            # 검토 상태 드라이브 저장 (현재 회차로)
+                            save_review_state(drive)
                             st.session_state['_go_to_send'] = True
                             st.rerun()
                     else:
@@ -4187,7 +4263,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0929-2 · PICKS 숫자 = 실제 안내 공고 수 교정 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0929-3 · 매칭 회차별 승인 상태 분리 (○ 이월 금지) · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
@@ -4896,11 +4972,15 @@ elif page == "발송":
 
     results  = st.session_state.get('match_results', [])
 
-    # review_state 없으면 드라이브에서 불러오기
+    # review_state 없으면 드라이브에서 불러오기 (현재 회차 것만)
     if 'review_state' not in st.session_state or not st.session_state['review_state']:
-        saved = load_json(drive, "review_state.json")
-        if saved and 'review_state' in saved:
-            st.session_state['review_state'] = saved['review_state']
+        _st_r, _rid_r, _, _same_r = load_review_state(drive)
+        if _st_r or _rid_r:
+            st.session_state['review_state'] = _st_r
+            if not _same_r:
+                st.warning(
+                    f"드라이브 검토 상태가 지난 회차({_rid_r or '회차 정보 없음'}) 저장본이라 "
+                    f"승인(○)은 불러오지 않았습니다. '검토 & 승인' 화면에서 다시 승인해 주세요.")
 
     review_state = st.session_state.get('review_state', {})
 
@@ -5286,7 +5366,12 @@ elif page == "발송":
                 except Exception as e:
                     st.warning(f"캘린더 등록 실패 (발송은 완료됨): {e}")
             if not test_mode:
+                # 발송 완료 → 회차 종료. 세션뿐 아니라 드라이브 저장본도 비워야
+                # 앱 재시작 시 발송한 공고가 승인 상태로 되살아나지 않는다.
                 st.session_state['match_results']=[]; st.session_state['review_state']={}
+                st.session_state['match_round_id'] = new_round_id()
+                save_review_state(drive)
+                save_match_state(drive)
             else:
                 st.info("테스트 모드 — 매칭 결과와 승인 상태는 그대로 유지됩니다.")
 
