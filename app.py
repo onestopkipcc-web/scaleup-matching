@@ -2027,6 +2027,13 @@ _RE_NOTICE_DATE = re.compile(r'(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})')
 # (매칭·검토 화면에는 그대로 보이고 메일에만 안 나간다)
 REQUIRE_NOTICE_DATE = True
 
+# 이미 끝났을 수 있는 접수 표기. 빈손 폴백에서도 이건 끝까지 내보내지 않는다.
+_RE_RISKY_PERIOD = re.compile(r'예산\s*소진|모집\s*완료|소진\s*시|선착순|조기\s*마감')
+
+def notice_period_risky(n):
+    """'예산 소진시까지'처럼 이미 마감됐을 수 있는 표기인가."""
+    return bool(_RE_RISKY_PERIOD.search(f"{n.get('마감일','')} {n.get('접수기간','')}"))
+
 def notice_deadline_date(n):
     """공고의 마감일을 date로. 마감일 → 접수기간 끝 순으로 찾고, 없으면 None."""
     from datetime import date as _date
@@ -2061,7 +2068,8 @@ def _notice_open(n, _ref=None):
     _d = notice_deadline_date(n)
     return True if _d is None else _d >= _ref
 
-def can_include_notice(notice, company, ai_cache=None, review_state=None, ref=None):
+def can_include_notice(notice, company, ai_cache=None, review_state=None, ref=None,
+                       allow_undated=False):
     """이 공고를 이 기업 메일에 넣어도 되는가 — 메일 수록 자격의 단일 관문.
 
     승인 카드·참고 공고·업종 강등분·👁 미리보기·🟡 자동 보완 후보가 전부 여기를 거친다.
@@ -2084,8 +2092,13 @@ def can_include_notice(notice, company, ai_cache=None, review_state=None, ref=No
         return False, '자격 미충족'
     if not _notice_open(notice, ref):
         return False, '마감 경과'
-    if REQUIRE_NOTICE_DATE and notice_deadline_date(notice) is None:
-        return False, '접수기간 불명'
+    if notice_deadline_date(notice) is None:
+        # allow_undated 는 '이 기업에게 보낼 카드가 한 장도 없을 때'만 쓴다.
+        # 그 경우에도 소진형·선착순은 내보내지 않는다.
+        if not allow_undated and REQUIRE_NOTICE_DATE:
+            return False, '접수기간 불명'
+        if notice_period_risky(notice):
+            return False, '소진·선착순 마감형'
     return True, ''
 
 def _region_cut_result(row):
@@ -2139,6 +2152,28 @@ _SOFTEN_RULES = [
     (re.compile(r'전부\s+충족'), '충족'),
 ]
 
+# 메일 카드에 넣는 길이 상한. 예전에는 상한에서 그냥 잘라 문장이 뚝 끊겼다
+# (주의사항 736건 중 332건이 90자에서 잘림).
+REASON_MAX = 120
+CAUTION_MAX = 160
+
+def clip_text(text, limit):
+    """limit 안에서 문장 경계로 자른다. 경계를 못 찾으면 자르고 … 을 붙인다."""
+    t = str(text or '').strip()
+    if len(t) <= limit:
+        return t
+    head = t[:limit]
+    for _pat in (r'.*(?:다\.|\.)\s', r'.*[,·]\s'):
+        _m = re.match(_pat, head, re.S)
+        if _m and len(_m.group(0).strip()) >= limit * 0.5:
+            return _m.group(0).strip().rstrip(',·') + ' …'
+    return head.rstrip() + '…'
+
+# AI가 기업명 대신 "기업은 …"으로 문장을 시작하는 경우가 81건 있었다.
+# 받는 쪽에서 남 얘기처럼 읽히므로 '귀사'로 바꾼다.
+_RE_LEAD_CO = re.compile(r'^(?:해당\s*|본\s*|동\s*)?기업(은|이|는|가|의|도)\s*')
+_LEAD_JOSA = {'은': '는', '이': '가'}
+
 def soften_reason(text):
     """단정적 표현 완화. 빈 값은 그대로 돌려준다."""
     t = str(text or '')
@@ -2167,11 +2202,15 @@ def attach_ai_reason(n, company, ai_cache):
         for _nm in sorted(_names, key=len, reverse=True):
             if len(_nm) >= 2:
                 first = first.replace(f"'{_nm}'", '귀사').replace(_nm, '귀사')
+        first = _RE_LEAD_CO.sub(
+            lambda m: '귀사' + _LEAD_JOSA.get(m.group(1), m.group(1)) + ' ', first)
         first = re.sub(r'귀사(은|는)', '귀사는', first)
-        n['_ai_reason'] = _h.escape(soften_reason(first)[:120])
+        n['_ai_reason'] = _h.escape(clip_text(soften_reason(first), REASON_MAX))
     caution = str(res.get('주의사항', '') or '').strip()
     if caution and caution not in ('없음', 'nan'):
-        n['_ai_caution'] = _h.escape(caution[:90])
+        # 주의사항은 경고문이라 '반드시 확인' 같은 표현이 오히려 맞다 — 완화하지 않고
+        # 길이만 문장 경계로 맞춘다.
+        n['_ai_caution'] = _h.escape(clip_text(caution, CAUTION_MAX))
     return n
 
 def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=None):
@@ -2227,6 +2266,17 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
             if _rid not in _approved_ids and _rid not in _seen_r:
                 _cand_uniq.append(r); _seen_r.add(_rid)
         notices_review = _cand_uniq[:_need]
+
+    # ── 빈손 폴백 ──────────────────────────────────────
+    # 보낼 카드가 한 장도 없을 때만, 접수기간이 명시되지 않은 공고를 참고로 허용한다.
+    # 아무것도 못 받는 것보다는 낫되, 소진형·선착순은 여기서도 제외한다.
+    if not (notices_sss or notices_ss or notices_review):
+        _fb = [r for r in _ref_map.get(company, [])
+               if can_include_notice(r, company, _ai_an, review_state,
+                                     allow_undated=True)[0]]
+        for _n_fb in _fb[:2]:
+            _n_fb['_undated_fallback'] = True
+            notices_review.append(_n_fb)
 
     # ── 빈 메일 방지: 승인·참고 공고가 전부 걸러져 보여줄 카드가 없으면 스킵 ──
     if not (notices_sss or notices_ss or notices_review):
@@ -2364,9 +2414,17 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
     # ── 📎 참고 공고 (승인 공고 3건 미만 시 부족분 채움) ──
     if notices_review:
         _has_approved = bool(notices_sss or notices_ss)
-        _ref_desc = ("위 공고와 함께 참고하실 만한 공고입니다."
-                     if _has_approved else
-                     "이번 주 딱 맞는 공고는 없었지만, 귀사와 연관성이 있어 참고용으로 안내드립니다.")
+        # 맞춤 0건일 때는 위쪽에 이미 "딱 맞는 공고를 찾지 못했습니다" 안내가 나가므로
+        # 같은 말을 반복하지 않는다.
+        if any(x.get('_undated_fallback') for x in notices_review):
+            _ref_desc = "접수기간이 공고에 명시되지 않은 사업입니다. 신청 전 공고에서 일정을 직접 확인해 주세요."
+        elif _has_approved:
+            _ref_desc = "위 공고와 함께 참고하실 만한 공고입니다."
+        else:
+            _ref_desc = ""
+        _REF_DESC_HTML = (
+            f'<p style="margin:0 0 10px;font-size:11px;color:#8A8478;">{_ref_desc}</p>'
+            if _ref_desc else '')
         rows_html += f"""
         <div style="border-top:1px solid #E8E2D5;
                     padding-top:16px;margin-top:8px;">
@@ -2375,9 +2433,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
                      text-transform:uppercase;">
             📎 &nbsp;참고해보실 만한 공고
           </p>
-          <p style="margin:0 0 10px;font-size:11px;color:#8A8478;">
-            {_ref_desc}
-          </p>"""
+          {_REF_DESC_HTML}"""
         for i, n in enumerate(notices_review[:3]):
             rows_html += notice_card_simple(n, i)
         rows_html += "</div>"
@@ -4730,7 +4786,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0929-11 · 접수기간 불명 공고 메일 제외 · 마감 표기 정직화 · 추천 이유 완화 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0929-12 · 주의사항 절단 개선 · 문두 '기업은'→'귀사는' · 빈손 폴백 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     # ── 버전이 달라진 판정 — 표시만 하고 자동 실행하지 않는다 ──
                     _ai_now = st.session_state.get('ai_analysis', {})
                     _co_cache = st.session_state.get('df_companies_cache')
@@ -5502,12 +5558,17 @@ elif page == "발송":
     _today_str = datetime.today().strftime('%Y-%m-%d')
     _cut_reason = {}
     _results_live = []
+    _results_lax  = []          # 빈손 폴백용 — 접수기간 불명도 담되 소진형은 뺀다
     for r in results:
         _ok_r, _why_r = can_include_notice(r, r.get('기업명',''), ai_cache, review_state)
         if _ok_r:
-            _results_live.append(r)
+            _results_live.append(r); _results_lax.append(r)
         else:
             _cut_reason[_why_r] = _cut_reason.get(_why_r, 0) + 1
+            if _why_r == '접수기간 불명' and can_include_notice(
+                    r, r.get('기업명',''), ai_cache, review_state,
+                    allow_undated=True)[0]:
+                _results_lax.append(r)
     _n_expired = len(results) - len(_results_live)
 
     approved = [
@@ -5517,8 +5578,10 @@ elif page == "발송":
 
     # 참고 공고: 승인 0건 기업용 — AI가 '검토'로 판정한 것 중 점수 높은 순.
     # _results_live가 이미 관문을 통과했으므로 ✕·자격 미충족·마감 공고는 들어올 수 없다.
+    # 참고 공고 풀은 폴백 후보까지 담는다. build_match_mail 의 정상 경로는
+    # 엄격한 관문으로 다시 거르므로, 접수기간 불명 건은 빈손일 때만 쓰인다.
     _ref_by_co = {}
-    for r in _results_live:
+    for r in _results_lax:
         _rec = ai_cache.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", {}).get('추천여부','')
         if _rec == '검토':
             _ref_by_co.setdefault(r.get('기업명',''), []).append(r)
