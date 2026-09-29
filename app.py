@@ -76,6 +76,8 @@ if not check_password():
 # ── 상수 ──────────────────────────────────────────────
 DRIVE_FOLDER_ID  = "1iWGYjaoslqST45ggDlg-IPMLaUHCYmV_"
 LOGO_URL = "https://raw.githubusercontent.com/onestopkipcc-web/scaleup-matching/main/logo.png"
+# 전체 공고 마감일 공통 캘린더 (메일 본문 버튼 링크)
+CALENDAR_LINK = "https://calendar.google.com/calendar/u/6?cid=OTA3OGE0OTk1MGE0N2I0NmRkYjM1MTEwNDA4ODZmM2EwMTZiNzVjYTE3MTY5ZWMxMTEzZTU2OTJiNzMyNzM3NUBncm91cC5jYWxlbmRhci5nb29nbGUuY29t"
 
 # 클릭 추적 (Apps Script 웹앱) — 메일 링크를 이 URL 경유로 감싸 클릭을 기록
 CLICK_TRACK_URL = "https://script.google.com/macros/s/AKfycbyqjB9JmN6BAHSjBHH7Okup4HJZ8l4ToI-6Y0icbSYWKQn8NJAMpjEcuR4pi0tSOpSH/exec"
@@ -1695,6 +1697,479 @@ def attach_ai_reason(n, company, ai_cache):
     if caution and caution not in ('없음', 'nan'):
         n['_ai_caution'] = _h.escape(caution[:90])
     return n
+
+def build_match_mail(company, notices, co_row, ai_cache, ref_map):
+    """맞춤 공고 메일 HTML 생성 — 👁 미리보기와 실제 발송이 함께 쓰는 단일 진입점.
+
+    공고 선별(마감 재검사 → 업종 강등 → 참고 공고 보완)부터 HTML 조립까지 전부 여기서만
+    한다. 미리보기용 HTML을 따로 만들지 말 것 — 미리보기≠발송 불일치의 원인이었음.
+
+    반환: (html, meta)
+      html — 발송될 HTML 전문. 안내할 공고가 하나도 없으면 None (발송 스킵 대상).
+      meta — {'sss', 'ss', 'review', 'empty'}
+    """
+    # 별점 기준으로 분류 (공고유형 무관)
+    _sss_raw = [n for n in notices if n.get('관련도','')=='★★★' and _notice_open(n)]
+    _ss_raw  = [n for n in notices if n.get('관련도','')=='★★' and _notice_open(n)]
+
+    # 방향1: AI 업종일치가 △/X인 공고는 '맞춤'에서 제외 → 참고로 강등
+    # (업종 안 맞는 걸 맞춤이라 내보내면 신뢰도 하락)
+    _ai_an = ai_cache or {}
+    def _ind_ok(n):
+        _k = f"{company}_{n.get('공고ID','')}"
+        _ind = _ai_an.get(_k, {}).get('업종일치', '')
+        return _ind != '△' and _ind != 'X'  # O이거나 미판정('')은 통과
+    notices_sss    = group_related_notices([n for n in _sss_raw if _ind_ok(n)])
+    notices_ss     = group_related_notices([n for n in _ss_raw if _ind_ok(n)])
+    for _n_dec in notices_sss + notices_ss:
+        attach_ai_reason(_n_dec, company, _ai_an)
+    _demoted       = [n for n in (_sss_raw + _ss_raw) if not _ind_ok(n)]  # 업종△/X → 참고행
+
+    # 참고 공고: 승인 공고가 3건 미만이면 그 기업의 ★★ 검토 공고로 부족분 채움
+    # (최소 3건 보장 — 딸랑 1건만 나가는 허전함 방지)
+    # 업종 불일치로 강등된 공고(_demoted)도 참고 후보에 포함
+    _ref_map = ref_map or {}
+    notices_review = []
+    _approved_cnt = len(notices_sss) + len(notices_ss)
+    if _approved_cnt < 3:
+        _need = 3 - _approved_cnt
+        _approved_ids = {n.get('공고ID','') for n in notices_sss + notices_ss}
+        # 강등된 것 우선, 그다음 검토 공고
+        _cand = _demoted + [r for r in _ref_map.get(company, [])
+                 if r.get('공고ID','') not in _approved_ids and _notice_open(r)]
+        _seen_r = set()
+        _cand_uniq = []
+        for r in _cand:
+            _rid = r.get('공고ID','')
+            if _rid not in _approved_ids and _rid not in _seen_r:
+                _cand_uniq.append(r); _seen_r.add(_rid)
+        notices_review = _cand_uniq[:_need]
+
+    # ── 빈 메일 방지: 승인·참고 공고가 전부 걸러져 보여줄 카드가 없으면 스킵 ──
+    if not (notices_sss or notices_ss or notices_review):
+        return None, {'sss': [], 'ss': [], 'review': [], 'empty': True}
+
+    def notice_card_simple(n, idx):
+        """공통 공고용 심플 카드 (작고 간결하게)"""
+        dl_raw = n.get('마감일','')
+        if not dl_raw and '~' in n.get('접수기간',''):
+            dl_raw = n.get('접수기간','').split('~')[-1].strip()
+        _trk = track_link(n.get('공고링크','#'), company,
+                          n.get('공고ID',''), n.get('공고명',''))
+        return f"""
+        <table width="100%" cellpadding="0" cellspacing="0"
+               style="margin-bottom:6px;">
+          <tr>
+            <td style="padding:10px 14px;
+                       background:#FBF9F5;
+                       border:1px solid #E8E2D5;
+                       border-radius:6px;">
+              <a href="{_trk}"
+                 style="font-size:13px;font-weight:500;color:#5A5548;
+                        text-decoration:none;display:block;">
+                {n.get('공고명','')}
+              </a>
+              <p style="margin:3px 0 0;font-size:11px;color:#9A9488;">
+                {n.get('주관기관','')} &nbsp;·&nbsp; 마감 {dl_raw}
+              </p>
+            </td>
+          </tr>
+        </table>"""
+
+    def notice_card(n, idx):
+        dl_raw = n.get("마감일","")
+        if not dl_raw and "~" in n.get("접수기간",""):
+            dl_raw = n.get("접수기간","").split("~")[-1].strip()
+        hashtags = reason_to_hashtag(n.get("매칭근거",""))
+        tag_html = ""
+        if hashtags:
+            tag_html = "<div style=\'margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;\'>"
+            for _ti, tag in enumerate(hashtags.split()):
+                _tc = ("background:#F3EDE0;color:#9A7B3F" if _ti == 0
+                       else "background:#EDEBE5;color:#7A756A")
+                tag_html += f"<span style=\'font-size:11px;{_tc};padding:3px 8px;border-radius:20px;\'>{tag}</span>"
+            tag_html += "</div>"
+        notice_name = n.get("공고명","")
+        _trk = track_link(n.get("공고링크","#"), company,
+                          n.get("공고ID",""), notice_name)
+        _extra = ""
+        if n.get('_ai_reason'):
+            _extra += (f"<p style=\"margin:7px 0 0;font-size:12px;color:#7A6B45;"
+                       f"line-height:1.65;\">💡 {n['_ai_reason']}</p>")
+        if n.get('_ai_caution'):
+            _extra += (f"<p style=\"margin:4px 0 0;font-size:11px;color:#A08A5C;"
+                       f"line-height:1.6;\">📌 신청 전 확인: {n['_ai_caution']}</p>")
+        if n.get('_related'):
+            _rl = []
+            for _rn in n['_related'][:3]:
+                _m = _RE_NOTICE_VARIANT.search(str(_rn.get('공고명','')))
+                _lb = _m.group(0) if _m else str(_rn.get('공고명',''))[:10]
+                _rtrk = track_link(_rn.get('공고링크','#'), company,
+                                   _rn.get('공고ID',''), _rn.get('공고명',''))
+                _rl.append(f"<a href=\"{_rtrk}\" style=\"color:#B0894A;"
+                           f"text-decoration:none;font-weight:600;\">{_lb}</a>")
+            _extra += (f"<p style=\"margin:5px 0 0;font-size:11px;color:#9A9488;\">"
+                       f"같은 사업 관련 공고: {' · '.join(_rl)}</p>")
+        return f"""
+        <table width="100%" cellpadding="0" cellspacing="0"
+               style="margin-bottom:8px;background:#FFFFFF;
+                      border:1px solid #E8E2D5;border-radius:10px;overflow:hidden;
+                      box-shadow:0 1px 4px rgba(26,35,50,0.05);">
+          <tr>
+            <td style="padding:12px 16px;">
+              <a href="{_trk}"
+                 style="font-size:14px;font-weight:600;color:#1B2A41;
+                        text-decoration:none;line-height:1.5;display:block;">
+                {notice_name}
+              </a>
+              <p style="margin:4px 0 0;font-size:12px;color:#8A8478;">
+                {n.get("주관기관","")} &nbsp;·&nbsp; 마감 {f'<span style="color:#B0894A;font-weight:600;">{dl_raw}</span>' if dl_raw else "상시"}
+              </p>
+              {tag_html}
+              {_extra}
+            </td>
+            <td width="60" align="center" valign="middle"
+                style="padding:14px 12px;border-left:1px solid #EDEBE5;">
+              <a href="{_trk}"
+                 style="display:inline-block;font-size:12px;font-weight:700;
+                        color:#B0894A;text-decoration:none;white-space:nowrap;">
+                보기 →
+              </a>
+            </td>
+          </tr>
+        </table>"""
+
+    rows_html = ""
+
+    # ── 0건 기업 안내 문구 ───────────────────────
+    is_zero = not notices_sss and not notices_ss
+    if is_zero:
+        rows_html += """
+        <div style="background:#F5F0E6;
+                    border:1px solid #E0D5BF;
+                    border-radius:8px;padding:14px 16px;margin-bottom:16px;">
+          <p style="margin:0 0 6px;font-size:13px;font-weight:500;
+                     color:#5A5548;">
+            이번 주 귀사에 딱 맞는 공고를 찾지 못했습니다.
+          </p>
+          <p style="margin:0;font-size:12px;color:#8A7B5A;line-height:1.7;">
+            더 정확한 공고를 드리기 위해 추가 키워드나 관심 분야를
+            아래 답장하기 버튼으로 알려주세요.
+          </p>
+        </div>"""
+
+    # ── 🔦 주목할 만한 공고 (★★★) ────────────
+    if notices_sss:
+        rows_html += """
+        <p style="margin:0 0 12px;font-size:10px;font-weight:700;
+                   color:#9A7B3F;letter-spacing:2px;text-transform:uppercase;">
+          🔦 &nbsp;주목할 만한 공고
+        </p>"""
+        for i, n in enumerate(notices_sss):
+            rows_html += notice_card(n, i)
+
+    # ── 📌 이런 공고도 있어요 (★★) ──────────
+    if notices_ss:
+        rows_html += """
+        <div style="border-top:1px solid #E8E2D5;
+                    padding-top:16px;margin-top:8px;">
+          <p style="margin:0 0 10px;font-size:10px;font-weight:700;
+                     color:#A08A5C;letter-spacing:2px;
+                     text-transform:uppercase;">
+            📌 &nbsp;이런 공고도 있어요
+          </p>"""
+        for i, n in enumerate(notices_ss):
+            rows_html += notice_card_simple(n, i)
+        rows_html += "</div>"
+
+    # ── 📎 참고 공고 (승인 공고 3건 미만 시 부족분 채움) ──
+    if notices_review:
+        _has_approved = bool(notices_sss or notices_ss)
+        _ref_desc = ("위 공고와 함께 참고하실 만한 공고입니다."
+                     if _has_approved else
+                     "이번 주 딱 맞는 공고는 없었지만, 귀사와 연관성이 있어 참고용으로 안내드립니다.")
+        rows_html += f"""
+        <div style="border-top:1px solid #E8E2D5;
+                    padding-top:16px;margin-top:8px;">
+          <p style="margin:0 0 6px;font-size:10px;font-weight:700;
+                     color:#A08A5C;letter-spacing:2px;
+                     text-transform:uppercase;">
+            📎 &nbsp;참고해보실 만한 공고
+          </p>
+          <p style="margin:0 0 10px;font-size:11px;color:#8A8478;">
+            {_ref_desc}
+          </p>"""
+        for i, n in enumerate(notices_review[:3]):
+            rows_html += notice_card_simple(n, i)
+        rows_html += "</div>"
+
+    # ── 전체 반응 버튼 ────────────────────────
+    import urllib.parse as _up_fb
+    fb_subj = _up_fb.quote(f"[원스톱 피드백] {company}")
+    fb_good = _up_fb.quote("[이번 주 공고 안내 피드백]\n반응: 도움됐어요\n\n[추가 의견]\n\n[Gmail 주소]\n")
+    fb_bad  = _up_fb.quote("[이번 주 공고 안내 피드백]\n반응: 별로였어요\n\n[추가 의견]\n어떤 점이 아쉬우셨나요?\n\n[Gmail 주소]\n")
+    fb_msg  = _up_fb.quote("[이번 주 공고 안내 피드백]\n\n[추가 의견]\n\n[더 받고 싶은 분야/키워드]\n\n[Gmail 주소]\n")
+    rows_html += f"""
+    <div style="border-top:1px solid #E8E2D5;
+                margin-top:20px;padding-top:16px;text-align:center;">
+      <p style="margin:0 0 12px;font-size:12px;color:#8A8478;">
+        이번 공고 안내가 도움이 됐나요?
+      </p>
+      <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_good}"
+         style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
+                font-weight:600;color:#9A7B3F;background:#F3EDE0;
+            border:1px solid #E0D5BF;border-radius:8px;text-decoration:none;">
+        👍 도움됐어요
+      </a>
+      <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_bad}"
+         style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
+                font-weight:600;color:#8A8478;background:#EDEBE5;
+            border:1px solid #DDD8CE;border-radius:8px;text-decoration:none;">
+        👎 별로였어요
+      </a>
+      <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_msg}"
+         style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
+                font-weight:600;color:#8A8478;
+                background:#F3F1EC;
+                border:1px solid #DDD8CE;
+                border-radius:8px;text-decoration:none;">
+        💬 의견 남기기
+      </a>
+    </div>"""
+
+
+    import urllib.parse as _up
+    kw_subject = _up.quote(f"[원스톱 피드백] {company}")
+    kw_body    = _up.quote(
+        "[추가 키워드]\n"
+        "더 받고 싶은 분야나 키워드를 적어주세요:\n\n"
+        "[Gmail 주소]\n"
+        "맞춤 캘린더 알림을 받으시려면 Gmail 주소를 알려주세요:\n"
+    )
+
+    keyword_sec = f"""
+    <div style="background:#FFFFFF;
+                border:1.5px solid #D8D0C0;
+                border-radius:10px;padding:16px 18px;margin:16px 0;">
+      <p style="margin:0 0 8px;color:#22344F;font-weight:700;font-size:11px;
+                 letter-spacing:1.5px;text-transform:uppercase;">
+        ✏️ 추가 키워드가 있으신가요?
+      </p>
+      <p style="margin:0 0 12px;font-size:12px;color:#6B6558;line-height:1.7;">
+        더 잘 맞는 공고를 드리기 위해 받고 싶은 분야나 키워드를 답장으로 알려주세요.
+      </p>
+      <a href="mailto:onestop.kipcc@gmail.com?subject={kw_subject}&body={kw_body}"
+         style="display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;
+                color:#FFFFFF;background:#22344F;border-radius:8px;
+                text-decoration:none;">
+        답장하기 →
+      </a>
+    </div>"""
+
+    cal_sec = f"""
+    <div style="background:#FFFFFF;border-radius:10px;
+                padding:16px 18px;border:1.5px solid #D8D0C0;margin:16px 0;">
+      <p style="margin:0 0 4px;color:#9A7B3F;font-weight:700;font-size:11px;
+                 letter-spacing:1.5px;text-transform:uppercase;">
+        📅 공고 마감일 캘린더
+      </p>
+      <p style="margin:0 0 10px;font-size:12px;color:#6B6558;">
+        전체 지원사업 공고 마감일을 한눈에 확인하세요.
+      </p>
+      {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#C9A96A;color:#3A2E15;padding:8px 18px;border-radius:7px;text-decoration:none;font-size:12px;font-weight:700;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK else ""}
+      <p style="margin:10px 0 0;font-size:11px;color:#8A7B5A;line-height:1.7;">
+        💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
+      </p>
+    </div>"""
+
+    together_sec = f"""
+    <div style="background:#22344F;border-radius:10px;
+                padding:16px 18px;border:1.5px solid #C9A96A;margin:16px 0;">
+      <p style="margin:0 0 5px;color:#C9A96A;font-weight:700;font-size:11px;
+                 letter-spacing:1.5px;">
+        🤝 함께하기 · 기업 회원소개
+      </p>
+      <p style="margin:0 0 12px;font-size:12px;color:#C5D0DC;line-height:1.65;">
+        원스톱 스케일업 참여 기업의 제품·기술과 협력 희망 분야를 소개하는 공간입니다.
+        등록하시면 다른 기업·기관이 귀사를 찾아보고 협력을 제안할 수 있습니다.
+      </p>
+      <a href="http://kipcc.eumsvr.com"
+         style="display:inline-block;padding:9px 20px;font-size:12px;font-weight:700;
+                color:#1B2A41;background:#C9A96A;border-radius:6px;
+                text-decoration:none;">
+        회원소개 등록하기 →
+      </a>
+    </div>"""
+
+    today_str = datetime.today().strftime('%Y.%m.%d')
+    html=f"""<!DOCTYPE html>
+    <html lang="ko">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    </head>
+    <body style="margin:0;padding:0;background:#E6E9EE;
+    font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0"
+    style="background:#E6E9EE;padding:36px 0 52px;">
+    <tr><td align="center">
+    <table width="560" cellpadding="0" cellspacing="0">
+
+    <!-- ── 로고 헤더 (흰 배경) ── -->
+    <tr>
+    <td style="background:#FFFFFF;border-radius:14px 14px 0 0;
+    padding:20px 28px;border-bottom:1px solid #E8ECF0;
+    border-top:1px solid #D9DEE5;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+    <td valign="middle">
+    <img src="{LOGO_URL}"
+     alt="혁신제품지원센터"
+     width="160" height="auto"
+     style="display:block;height:auto;max-height:36px;
+            object-fit:contain;object-position:left;">
+    </td>
+    <td align="right" valign="middle">
+    <p style="margin:0;font-size:11px;color:#9CAAB8;letter-spacing:0.3px;">
+    {today_str}
+    </p>
+    </td>
+    </tr>
+    </table>
+    </td>
+    </tr>
+
+    <!-- ── 메인 카드 (아이보리) ── -->
+    <tr>
+    <td style="background:#FBFAF7;
+    box-shadow:0 8px 32px rgba(26,35,50,0.10);">
+
+    <!-- 헤더존 (네이비) -->
+    <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+    <td style="padding:30px 28px 24px;
+         background:#1B2A41;
+         border-bottom:2px solid #C9A96A;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+    <td>
+      <p style="margin:0 0 2px;font-size:10px;font-weight:700;
+                 letter-spacing:2.5px;color:#C9A96A;
+                 text-transform:uppercase;">
+        Scale-Up Program
+      </p>
+      <h1 style="margin:6px 0 4px;font-size:26px;font-weight:800;
+                 color:#FFFFFF;letter-spacing:-0.6px;line-height:1.2;">
+        원스톱 스케일업
+      </h1>
+      <p style="margin:0;font-size:12px;color:#B4C0CE;">
+        이번 주 맞춤 지원사업 공고
+      </p>
+    </td>
+    <td align="right" valign="middle" width="72">
+      <div style="background:linear-gradient(135deg,#C9A96A 0%,#B08D4F 100%);
+                  border-radius:12px;padding:11px 0;width:60px;
+                  text-align:center;">
+        <p style="margin:0;font-size:22px;font-weight:800;color:#1B2A41;
+                   line-height:1;">{len(notices)}</p>
+        <p style="margin:3px 0 0;font-size:9px;letter-spacing:1.2px;
+                   color:#3A2E15;font-weight:700;text-transform:uppercase;">picks</p>
+      </div>
+    </td>
+    </tr>
+    </table>
+    <!-- 기업명 카드 -->
+    <div style="margin-top:20px;padding:14px 18px;
+            background:rgba(255,255,255,0.06);
+            border-radius:8px;border-left:3px solid #C9A96A;">
+    <p style="margin:0 0 3px;font-size:15px;font-weight:700;color:#FFFFFF;">
+    {company}
+    <span style="font-size:13px;font-weight:400;
+                 color:#B4C0CE;margin-left:4px;">담당자님</span>
+    </p>
+    <p style="margin:0;font-size:12px;color:#B4C0CE;line-height:1.6;">
+    기술 키워드 분석을 통해 선별된 공고를 안내드립니다.
+    </p>
+    </div>
+
+    </td>
+    </tr>
+
+    <!-- 기업 정보 카드 (아이보리 존) -->
+    {f"""<tr><td style="padding:20px 28px 0;background:#FBFAF7;">
+    <div style="padding:12px 16px;
+            background:#F5F0E6;
+            border:1px solid #E0D5BF;
+            border-left:4px solid #C9A96A;border-radius:8px;">
+    <p style="margin:0 0 8px;font-size:10px;font-weight:700;color:#9A7B3F;letter-spacing:1.5px;">
+    저희가 파악한 귀사 정보</p>
+    <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
+    기술키워드 <span style="color:#2A2620;font-weight:600;word-break:keep-all;">{str(co_row.get("기술키워드","") or co_row.get("키워드보완","") or "—")[:30]}</span>
+    </p>
+    <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
+    관심분야 <span style="color:#2A2620;font-weight:600;">{str(co_row.get("관심사업분야","") or "—")}</span>
+    </p>
+    <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
+    기업유형 <span style="color:#2A2620;font-weight:600;word-break:keep-all;">{str(co_row.get("기업유형","") or "—")[:25]}</span>
+    </p>
+    <p style="margin:0;font-size:12px;color:#6B6558;">
+    소재지 <span style="color:#2A2620;font-weight:600;">{str(co_row.get("소재지","") or "—")}</span>
+    </p>
+    </div>
+    </td></tr>""" if co_row
+    else ""}
+
+    <!-- 공고 목록 -->
+    <tr>
+    <td style="padding:20px 28px 20px;background:#FBFAF7;">
+    {rows_html}
+    </td>
+    </tr>
+
+    <!-- 캘린더 -->
+    {f'''<tr><td style="padding:0 28px 24px;background:#FBFAF7;">{keyword_sec}</td></tr>''' if keyword_sec else ''}
+    {f'''<tr><td style="padding:0 28px 24px;background:#FBFAF7;">{cal_sec}</td></tr>''' if cal_sec else ''}
+    <tr><td style="padding:0 28px 24px;background:#FBFAF7;">{together_sec}</td></tr>
+    </table>
+    </td>
+    </tr>
+
+    <!-- ── 네이비 푸터 ── -->
+    <tr>
+    <td style="background:#1B2A41;border-radius:0 0 14px 14px;
+    padding:18px 28px;border-top:2px solid #C9A96A;">
+    <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+    <td>
+    <p style="margin:0;font-size:12px;color:#B4C0CE;line-height:1.9;">
+    혁신제품지원센터 원스톱 스케일업 운영팀<br>
+    <a href="mailto:onestop.kipcc@gmail.com"
+     style="color:#C9A96A;text-decoration:none;font-weight:600;">
+    onestop.kipcc@gmail.com
+    </a>
+    </p>
+    <p style="margin:8px 0 0;font-size:11px;color:#7A96B2;">
+    본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.
+    </p>
+    </td>
+    <td align="right" valign="middle">
+    <p style="margin:0;font-size:10px;color:#7A96B2;letter-spacing:0.5px;">
+    수신 동의 기업 대상 발송
+    </p>
+    </td>
+    </tr>
+    </table>
+    </td>
+    </tr>
+
+    </table>
+    </td></tr>
+    </table>
+    </body></html>"""
+
+    return html, {'sss': notices_sss, 'ss': notices_ss,
+                  'review': notices_review, 'empty': False}
+
 
 def claude_call_raw(prompt, max_tokens=1000):
     """단순 텍스트 프롬프트 → Claude 응답 문자열 반환"""
@@ -3708,7 +4183,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0918-4 · 자동보완 마감 공고 제외 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0929-1 · 미리보기·발송 HTML 단일 함수(build_match_mail) 통합 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
@@ -4526,296 +5001,30 @@ elif page == "발송":
 
         st.divider()
         st.subheader("발송 미리보기")
-        st.caption("실제 발송될 메일을 기업별로 확인하세요. 기업마다 공고 구성이 다릅니다.")
+        st.caption("실제 발송과 동일한 함수(build_match_mail)로 만든 HTML입니다.")
 
         preview_co = st.selectbox("기업 선택", sorted(companies))
 
-        # 실제 메일 HTML 생성 (발송 로직과 동일하게)
-        _cal_id_prev   = load_text(drive, CALID_FILE)
-        _ind_cals_prev = load_json(drive, INDCAL_FILE) or {}
-        CALENDAR_LINK_PREV = "https://calendar.google.com/calendar/u/6?cid=OTA3OGE0OTk1MGE0N2I0NmRkYjM1MTEwNDA4ODZmM2EwMTZiNzVjYTE3MTY5ZWMxMTEzZTU2OTJiNzMyNzM3NUBncm91cC5jYWxlbmRhci5nb29nbGUuY29t"
-        _df_c_prev     = load_excel(drive, SELECTED_FILE)
-        _ai_cache_prev = st.session_state.get('ai_analysis', {})
-
-        preview_notices = [r for r in approved if r['기업명'] == preview_co]
-
-        # 기업 정보
+        _df_c_prev = load_excel(drive, SELECTED_FILE)
         _co_info = {}
         if not _df_c_prev.empty:
             _mx = _df_c_prev[_df_c_prev['기업명'] == preview_co]
             if not _mx.empty:
                 _co_info = _mx.iloc[0].to_dict()
 
-        def _check_count_prev(n):
-            k = f"{n.get('기업명','')}_{n.get('공고ID','')}"
-            res = _ai_cache_prev.get(k, {})
-            return sum(1 for f in ['업종일치','자격충족','지역적합','수요일치']
-                       if res.get(f,'') == 'O')
+        _preview_html, _prev_meta = build_match_mail(
+            preview_co,
+            [r for r in approved if r['기업명'] == preview_co],
+            _co_info,
+            st.session_state.get('ai_analysis', {}),
+            st.session_state.get('_ref_notices_by_co', {}))
 
-        # 별점 기준으로 분류 (공고유형 무관)
-        _notices_custom = [n for n in preview_notices if n.get('관련도','') in ['★★★','★★']]
-        _rec_prev  = [n for n in _notices_custom if _check_count_prev(n) >= 3]
-        _rest_prev = [n for n in _notices_custom if _check_count_prev(n) < 3]
-
-        # 기업 정보 카드 HTML
-        _kw   = str(_co_info.get('기술키워드','') or _co_info.get('키워드보완','') or '—')[:30]
-        _area = str(_co_info.get('관심사업분야','') or '—')
-        _type = str(_co_info.get('기업유형','') or '—')
-        _loc  = str(_co_info.get('소재지','') or '—')
-
-        def _prev_mailto(label, name, co):
-            import urllib.parse as _up
-            subj = _up.quote(f"[원스톱 피드백] {co}")
-            body = _up.quote(f"[공고 피드백]\n{label}: {name}\n\n[키워드 보완]\n")
-            return f"mailto:onestop.kipcc@gmail.com?subject={subj}&body={body}"
-
-        def _prev_card(n):
-            dl = n.get('마감일','')
-            if not dl and '~' in n.get('접수기간',''):
-                dl = n.get('접수기간','').split('~')[-1].strip()
-            hashtags = reason_to_hashtag(n.get('매칭근거',''))
-            tag_html = ""
-            if hashtags:
-                tag_html = "<div style=\'margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;\'>"
-                for _ti, tag in enumerate(hashtags.split()):
-                    _tc = ("background:#F3EDE0;color:#9A7B3F" if _ti == 0
-                           else "background:#EDEBE5;color:#7A756A")
-                    tag_html += f"<span style=\'font-size:11px;{_tc};padding:3px 8px;border-radius:20px;\'>{tag}</span>"
-                tag_html += "</div>"
-            nm = n.get('공고명','')
-            _extra_p = ""
-            if n.get('_ai_reason'):
-                _extra_p += (f"<p style=\"margin:7px 0 0;font-size:12px;color:#7A6B45;"
-                             f"line-height:1.65;\">💡 {n['_ai_reason']}</p>")
-            if n.get('_ai_caution'):
-                _extra_p += (f"<p style=\"margin:4px 0 0;font-size:11px;color:#A08A5C;"
-                             f"line-height:1.6;\">📌 신청 전 확인: {n['_ai_caution']}</p>")
-            if n.get('_related'):
-                _rl_p = []
-                for _rn in n['_related'][:3]:
-                    _m = _RE_NOTICE_VARIANT.search(str(_rn.get('공고명','')))
-                    _lb = _m.group(0) if _m else str(_rn.get('공고명',''))[:10]
-                    _rl_p.append(f"<a href=\"{_rn.get('공고링크','#')}\" style=\"color:#B0894A;"
-                                 f"text-decoration:none;font-weight:600;\">{_lb}</a>")
-                _extra_p += (f"<p style=\"margin:5px 0 0;font-size:11px;color:#9A9488;\">"
-                             f"같은 사업 관련 공고: {' · '.join(_rl_p)}</p>")
-            return f"""
-            <table width="100%" cellpadding="0" cellspacing="0"
-                   style="margin-bottom:8px;background:#FFFFFF;border:1px solid #E8E2D5;
-                          border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(26,35,50,0.05);">
-              <tr>
-                <td style="padding:12px 16px;">
-                  <a href="{n.get('공고링크','#')}" style="font-size:14px;font-weight:600;
-                     color:#1B2A41;text-decoration:none;display:block;">{nm}</a>
-                  <p style="margin:3px 0;font-size:12px;color:#8A8478;">
-                    {n.get('주관기관','')} · 마감 {f'<span style="color:#B0894A;font-weight:600;">{dl}</span>' if dl else '상시'}
-                  </p>
-                  {tag_html}
-                  {_extra_p}
-                </td>
-                <td width="60" align="center" valign="middle"
-                    style="padding:14px 12px;border-left:1px solid #EDEBE5;">
-                  <a href="{n.get('공고링크','#')}"
-                     style="font-size:12px;font-weight:700;color:#B0894A;
-                            text-decoration:none;white-space:nowrap;">보기 →</a>
-                </td>
-              </tr>
-            </table>"""
-
-        _today_prev = datetime.today().strftime('%Y.%m.%d')
-        _sss = group_related_notices([n for n in _notices_custom if n.get('관련도','') == '★★★' and _notice_open(n)])
-        _ss  = group_related_notices([n for n in _notices_custom if n.get('관련도','') == '★★' and _notice_open(n)])
-        for _pn_dec in _sss + _ss:
-            attach_ai_reason(_pn_dec, preview_co, _ai_cache_prev)
-        _cards_html = ""
-        if _notices_custom:
-            # ★★★ 주목할 만한 공고
-            if _sss:
-                _cards_html += """<p style="margin:0 0 12px;font-size:10px;font-weight:700;
-                                    color:#9A7B3F;letter-spacing:2px;">🔦 &nbsp;주목할 만한 공고</p>"""
-                for n in _sss: _cards_html += _prev_card(n)
-            if _ss:
-                _cards_html += """<div style="border-top:1px solid #E8E2D5;
-                                    padding-top:14px;margin-top:8px;">
-                  <p style="margin:0 0 10px;font-size:10px;font-weight:700;
-                             color:#A08A5C;letter-spacing:2px;">
-                    📌 &nbsp;이런 공고도 있어요</p>"""
-                for n in _ss: _cards_html += _prev_card(n)
-                _cards_html += "</div>"
-
-        _common_html = ""
-        # 검토 등급 공고 (미리보기용)
-        _review_prev = [
-            r for r in review_grade
-            if r.get('기업명','') == preview_co and _notice_open(r)
-        ]
-
-        # 0건 기업이면 전체 review_grade 공통 공고로 보완
-        _is_zero_prev = not _rec_prev and not _rest_prev
-        if not _review_prev and _is_zero_prev:
-            from collections import Counter as _Counter
-            _nc = _Counter(r.get('공고명','') for r in review_grade)
-            _top = [n for n, _ in _nc.most_common(5)]
-            _seen = set()
-            for r in review_grade:
-                if r.get('공고명','') in _top and r.get('공고명','') not in _seen and _notice_open(r):
-                    _review_prev.append(r)
-                    _seen.add(r.get('공고명',''))
-                if len(_review_prev) >= 3:
-                    break
-
-        # 0건 안내 문구
-        if _is_zero_prev:
-            _common_html += """
-            <div style="background:#F5F0E6;
-                        border:1px solid #E0D5BF;
-                        border-radius:8px;padding:14px 16px;margin-bottom:16px;">
-              <p style="margin:0 0 6px;font-size:13px;font-weight:500;
-                         color:#5A5548;">
-                이번 주 귀사에 딱 맞는 공고를 찾지 못했습니다.
-              </p>
-              <p style="margin:0;font-size:12px;color:#8A7B5A;line-height:1.7;">
-                더 정확한 공고를 드리기 위해 추가 키워드나 관심 분야를
-                아래 답장하기 버튼으로 알려주세요.
-              </p>
-            </div>"""
-
-        if _review_prev:
-            _common_html += """<div style="border-top:1px solid #E8E2D5;
-              padding-top:14px;margin-top:8px;">
-              <p style="margin:0 0 6px;font-size:10px;font-weight:700;
-                         color:#A08A5C;letter-spacing:2px;">
-                📢 &nbsp;다른 기업들이 관심 가진 공고</p>
-              <p style="margin:0 0 10px;font-size:11px;color:#8A8478;">
-                비슷한 업종·분야의 기업들이 추천받은 공고입니다. 참고해보세요.</p>"""
-            for n in _review_prev[:3]:
-                _common_html += f"""<div style="background:#FBF9F5;
-                  border:1px solid #E8E2D5;border-radius:8px;
-                  padding:10px 14px;margin-bottom:6px;
-                  display:flex;justify-content:space-between;align-items:center;">
-                  <div>
-                    <p style="margin:0;font-size:13px;color:#5A5548;">{n.get('공고명','')[:35]}</p>
-                    <p style="margin:2px 0 0;font-size:11px;color:#9A9488;">
-                      {n.get('주관기관','')} · {n.get('마감일','상시')}</p>
-                  </div>
-                  <a href="{n.get('공고링크','#')}" style="font-size:11px;color:#B0894A;font-weight:700;
-                     white-space:nowrap;padding-left:12px;text-decoration:none;">보기 →</a>
-                </div>"""
-            _common_html += "</div>"
-
-        import urllib.parse as _up2
-        _kw_subj = _up2.quote(f"[원스톱 피드백] {preview_co}")
-        _kw_body = _up2.quote("[공고 피드백]\n\n[키워드 보완]\n\n[Gmail 주소]\n")
-
-        _preview_html = f"""
-        <div style="max-width:600px;margin:0 auto;font-family:'Apple SD Gothic Neo',Arial,sans-serif;
-                    border:1px solid #D8D0C0;border-radius:12px;overflow:hidden;">
-          <div style="background:#1B2A41;padding:20px 28px;border-bottom:1px solid #22344F;">
-            <table width="100%" cellpadding="0" cellspacing="0"><tr>
-              <td valign="middle">
-                <p style="margin:0;font-size:14px;font-weight:700;color:#FFFFFF;letter-spacing:0.5px;">◈ 혁신제품지원센터</p>
-              </td>
-              <td align="right" valign="middle">
-                <p style="margin:0;font-size:11px;color:#9CAAB8;letter-spacing:0.3px;">{_today_prev}</p>
-              </td>
-            </tr></table>
-          </div>
-          <div style="background:#22344F;padding:24px 28px 20px;border-bottom:2px solid #C9A96A;">
-            <table width="100%" cellpadding="0" cellspacing="0"><tr>
-              <td>
-                <p style="margin:0 0 4px;font-size:11px;color:#C9A96A;letter-spacing:1.5px;">
-                  원스톱 스케일업</p>
-                <p style="margin:0;font-size:20px;font-weight:600;color:#fff;">이번 주 맞춤 지원사업 공고</p>
-                <p style="margin:4px 0 0;font-size:13px;color:#B4C0CE;">{preview_co} 담당자님께</p>
-              </td>
-              <td align="right" valign="middle" width="72">
-                <div style="background:linear-gradient(135deg,#C9A96A 0%,#B08D4F 100%);border-radius:12px;
-                            padding:11px 0;width:60px;text-align:center;">
-                  <p style="margin:0;font-size:22px;font-weight:800;color:#1B2A41;line-height:1;">{len(_sss)+len(_ss)}</p>
-                  <p style="margin:3px 0 0;font-size:9px;letter-spacing:1.2px;color:#3A2E15;font-weight:700;">PICKS</p>
-                </div>
-              </td>
-            </tr></table>
-          </div>
-          <div style="background:#FBFAF7;padding:0 28px 20px;padding-top:20px;">
-            <div style="background:#F5F0E6;border:1px solid #E0D5BF;
-                        border-left:4px solid #C9A96A;border-radius:8px;padding:12px 16px;">
-              <p style="margin:0 0 8px;font-size:10px;font-weight:700;color:#9A7B3F;letter-spacing:1.5px;">
-                저희가 파악한 귀사 정보</p>
-              <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
-                기술키워드 <span style="color:#2A2620;font-weight:600;word-break:keep-all;">{_kw}</span></p>
-              <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
-                관심분야 <span style="color:#2A2620;font-weight:600;">{_area}</span></p>
-              <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
-                기업유형 <span style="color:#2A2620;font-weight:600;word-break:keep-all;">{_type}</span></p>
-              <p style="margin:0;font-size:12px;color:#6B6558;">
-                소재지 <span style="color:#2A2620;font-weight:600;">{_loc}</span></p>
-            </div>
-          </div>
-          <div style="background:#FBFAF7;padding:0 28px 8px;">{_cards_html}</div>
-          <div style="background:#FBFAF7;padding:8px 28px 20px;">{_common_html}</div>
-          <div style="background:#FBFAF7;padding:0 28px 16px;">
-            <div style="border-top:1px solid #E8E2D5;
-                        padding-top:16px;text-align:center;">
-              <p style="margin:0 0 12px;font-size:12px;color:#8A8478;">
-                이번 공고 안내가 도움이 됐나요?</p>
-              <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_up2.quote('[이번 주 공고 안내 피드백]\\n반응: 도움됐어요\\n\\n[추가 의견]\\n\\n[Gmail 주소]\\n')}"
-                 style="display:inline-block;margin:0 4px;padding:8px 16px;font-size:12px;
-                        font-weight:600;color:#9A7B3F;background:#F3EDE0;
-                        border:1px solid #E0D5BF;border-radius:8px;text-decoration:none;">
-                👍 도움됐어요</a>
-              <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_up2.quote('[이번 주 공고 안내 피드백]\\n반응: 별로였어요\\n\\n[추가 의견]\\n\\n[Gmail 주소]\\n')}"
-                 style="display:inline-block;margin:0 4px;padding:8px 16px;font-size:12px;
-                        font-weight:600;color:#8A8478;background:#EDEBE5;
-                        border:1px solid #DDD8CE;border-radius:8px;text-decoration:none;">
-                👎 별로였어요</a>
-              <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_kw_body}"
-                 style="display:inline-block;margin:0 4px;padding:8px 16px;font-size:12px;
-                        font-weight:600;color:#8A8478;
-                        background:#F3F1EC;
-                        border:1px solid #DDD8CE;
-                        border-radius:8px;text-decoration:none;">
-                💬 의견 남기기</a>
-            </div>
-          </div>
-          <div style="background:#FBFAF7;padding:0 28px 20px;">
-            <div style="background:#FFFFFF;border:1.5px solid #D8D0C0;border-radius:10px;padding:14px 16px;margin-bottom:10px;">
-              <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#22344F;letter-spacing:1px;">
-                ✏️ 추가 키워드가 있으신가요?</p>
-              <p style="margin:0 0 10px;font-size:12px;color:#6B6558;line-height:1.6;">
-                더 잘 맞는 공고를 드리기 위해 받고 싶은 분야나 키워드를 답장으로 알려주세요.</p>
-              <a href="mailto:onestop.kipcc@gmail.com?subject={_kw_subj}&body={_kw_body}"
-                 style="display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;
-                        color:#FFFFFF;background:#22344F;border-radius:6px;text-decoration:none;">
-                답장하기 →</a>
-            </div>
-            <div style="background:#FFFFFF;border:1.5px solid #D8D0C0;border-radius:10px;padding:16px 18px;">
-              <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#9A7B3F;letter-spacing:1px;">
-                📅 공고 마감일 캘린더</p>
-              <p style="margin:0 0 10px;font-size:12px;color:#6B6558;line-height:1.6;">
-                전체 지원사업 공고 마감일을 한눈에 확인하세요.</p>
-              {"<a href='"+CALENDAR_LINK_PREV+"' style='display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;color:#3A2E15;background:#C9A96A;border-radius:7px;text-decoration:none;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK_PREV else ""}
-              <p style="margin:10px 0 0;font-size:11px;color:#8A7B5A;line-height:1.7;">
-                💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
-              </p>
-            </div>
-            <div style="background:#22344F;border:1.5px solid #C9A96A;border-radius:8px;padding:14px 16px;margin-top:10px;">
-              <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#C9A96A;letter-spacing:1px;">
-                🤝 함께하기 · 기업 회원소개</p>
-              <p style="margin:0 0 11px;font-size:12px;color:#C5D0DC;line-height:1.6;">
-                원스톱 스케일업 참여 기업의 제품·기술과 협력 희망 분야를 소개하는 공간입니다. 등록하시면 다른 기업·기관이 귀사를 찾아보고 협력을 제안할 수 있습니다.</p>
-              <a href="http://kipcc.eumsvr.com" style="display:inline-block;padding:8px 18px;font-size:12px;font-weight:700;color:#1B2A41;background:#C9A96A;border-radius:6px;text-decoration:none;">회원소개 등록하기 →</a>
-            </div>
-          </div>
-          <div style="background:#1B2A41;padding:16px 28px;text-align:center;">
-            <p style="margin:0;font-size:12px;color:#A8BDD1;">
-              혁신제품지원센터 원스톱 스케일업 · <a href="mailto:onestop.kipcc@gmail.com" style="color:#C9A96A;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
-              <p style="margin:4px 0 0;font-size:11px;color:#7A96B2;">
-                본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.</p>
-          </div>
-        </div>"""
-
-        st.components.v1.html(_preview_html, height=900, scrolling=True)
+        if _preview_html is None:
+            st.warning(f"{preview_co} — 안내할 공고가 없어 실제 발송에서도 제외됩니다.")
+        else:
+            st.caption(f"🔦 주목 {len(_prev_meta['sss'])}건 · 📌 이런 공고도 {len(_prev_meta['ss'])}건 "
+                       f"· 📎 참고 {len(_prev_meta['review'])}건")
+            st.components.v1.html(_preview_html, height=900, scrolling=True)
 
         st.divider()
         # ── 발송 화면 미리보기 (발송 없이 실제 발송 HTML 렌더) ──
@@ -4838,7 +5047,6 @@ elif page == "발송":
 
             cal_id        = load_text(drive, CALID_FILE)
             ind_cals      = load_json(drive, INDCAL_FILE)
-            CALENDAR_LINK = "https://calendar.google.com/calendar/u/6?cid=OTA3OGE0OTk1MGE0N2I0NmRkYjM1MTEwNDA4ODZmM2EwMTZiNzVjYTE3MTY5ZWMxMTEzZTU2OTJiNzMyNzM3NUBncm91cC5jYWxlbmRhci5nb29nbGUuY29t"
             df_c_cur      = load_excel(drive, SELECTED_FILE)
 
             history_records = []; prog = st.progress(0); log = st.empty(); logs = []
@@ -4905,475 +5113,20 @@ elif page == "발송":
                     if not _mx.empty:
                         co_row = _mx.iloc[0].to_dict()
 
-                # 별점 기준으로 분류 (공고유형 무관)
-                _sss_raw = [n for n in notices if n.get('관련도','')=='★★★' and _notice_open(n)]
-                _ss_raw  = [n for n in notices if n.get('관련도','')=='★★' and _notice_open(n)]
+                html, _mail_meta = build_match_mail(
+                    company, notices, co_row,
+                    st.session_state.get('ai_analysis', {}),
+                    st.session_state.get('_ref_notices_by_co', {}))
+                today_str = datetime.today().strftime('%Y.%m.%d')
 
-                # 방향1: AI 업종일치가 △/X인 공고는 '맞춤'에서 제외 → 참고로 강등
-                # (업종 안 맞는 걸 맞춤이라 내보내면 신뢰도 하락)
-                _ai_an = st.session_state.get('ai_analysis', {})
-                def _ind_ok(n):
-                    _k = f"{company}_{n.get('공고ID','')}"
-                    _ind = _ai_an.get(_k, {}).get('업종일치', '')
-                    return _ind != '△' and _ind != 'X'  # O이거나 미판정('')은 통과
-                notices_sss    = group_related_notices([n for n in _sss_raw if _ind_ok(n)])
-                notices_ss     = group_related_notices([n for n in _ss_raw if _ind_ok(n)])
-                for _n_dec in notices_sss + notices_ss:
-                    attach_ai_reason(_n_dec, company, _ai_an)
-                _demoted       = [n for n in (_sss_raw + _ss_raw) if not _ind_ok(n)]  # 업종△/X → 참고행
-                notices_common = []
-
-                # 참고 공고: 승인 공고가 3건 미만이면 그 기업의 ★★ 검토 공고로 부족분 채움
-                # (최소 3건 보장 — 딸랑 1건만 나가는 허전함 방지)
-                # 업종 불일치로 강등된 공고(_demoted)도 참고 후보에 포함
-                _ref_map = st.session_state.get('_ref_notices_by_co', {})
-                notices_review = []
-                _approved_cnt = len(notices_sss) + len(notices_ss)
-                if _approved_cnt < 3:
-                    _need = 3 - _approved_cnt
-                    _approved_ids = {n.get('공고ID','') for n in notices_sss + notices_ss}
-                    # 강등된 것 우선, 그다음 검토 공고
-                    _cand = _demoted + [r for r in _ref_map.get(company, [])
-                             if r.get('공고ID','') not in _approved_ids and _notice_open(r)]
-                    _seen_r = set()
-                    _cand_uniq = []
-                    for r in _cand:
-                        _rid = r.get('공고ID','')
-                        if _rid not in _approved_ids and _rid not in _seen_r:
-                            _cand_uniq.append(r); _seen_r.add(_rid)
-                    notices_review = _cand_uniq[:_need]
-
-                # ── 빈 메일 방지: 승인·참고 공고가 전부 걸러져 보여줄 카드가 없으면 스킵 ──
-                if not (notices_sss or notices_ss or notices_review or notices_common):
+                # ── 빈 메일 방지: 안내할 카드가 하나도 없으면 발송 스킵 ──
+                if html is None:
                     if st.session_state.get('_send_preview_co'):
                         st.warning(f"{company} — 마감 경과 등으로 안내할 공고가 없어, 실제 발송에서는 이 기업을 건너뜁니다.")
                         st.session_state.pop('_send_preview_co', None)
                         st.stop()
                     _empty_skipped.append(company)
                     continue
-
-                def notice_card_simple(n, idx):
-                    """공통 공고용 심플 카드 (작고 간결하게)"""
-                    dl_raw = n.get('마감일','')
-                    if not dl_raw and '~' in n.get('접수기간',''):
-                        dl_raw = n.get('접수기간','').split('~')[-1].strip()
-                    _trk = track_link(n.get('공고링크','#'), company,
-                                      n.get('공고ID',''), n.get('공고명',''))
-                    return f"""
-                    <table width="100%" cellpadding="0" cellspacing="0"
-                           style="margin-bottom:6px;">
-                      <tr>
-                        <td style="padding:10px 14px;
-                                   background:#FBF9F5;
-                                   border:1px solid #E8E2D5;
-                                   border-radius:6px;">
-                          <a href="{_trk}"
-                             style="font-size:13px;font-weight:500;color:#5A5548;
-                                    text-decoration:none;display:block;">
-                            {n.get('공고명','')}
-                          </a>
-                          <p style="margin:3px 0 0;font-size:11px;color:#9A9488;">
-                            {n.get('주관기관','')} &nbsp;·&nbsp; 마감 {dl_raw}
-                          </p>
-                        </td>
-                      </tr>
-                    </table>"""
-
-                def notice_card(n, idx):
-                    dl_raw = n.get("마감일","")
-                    if not dl_raw and "~" in n.get("접수기간",""):
-                        dl_raw = n.get("접수기간","").split("~")[-1].strip()
-                    hashtags = reason_to_hashtag(n.get("매칭근거",""))
-                    tag_html = ""
-                    if hashtags:
-                        tag_html = "<div style=\'margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;\'>"
-                        for _ti, tag in enumerate(hashtags.split()):
-                            _tc = ("background:#F3EDE0;color:#9A7B3F" if _ti == 0
-                                   else "background:#EDEBE5;color:#7A756A")
-                            tag_html += f"<span style=\'font-size:11px;{_tc};padding:3px 8px;border-radius:20px;\'>{tag}</span>"
-                        tag_html += "</div>"
-                    notice_name = n.get("공고명","")
-                    _trk = track_link(n.get("공고링크","#"), company,
-                                      n.get("공고ID",""), notice_name)
-                    _extra = ""
-                    if n.get('_ai_reason'):
-                        _extra += (f"<p style=\"margin:7px 0 0;font-size:12px;color:#7A6B45;"
-                                   f"line-height:1.65;\">💡 {n['_ai_reason']}</p>")
-                    if n.get('_ai_caution'):
-                        _extra += (f"<p style=\"margin:4px 0 0;font-size:11px;color:#A08A5C;"
-                                   f"line-height:1.6;\">📌 신청 전 확인: {n['_ai_caution']}</p>")
-                    if n.get('_related'):
-                        _rl = []
-                        for _rn in n['_related'][:3]:
-                            _m = _RE_NOTICE_VARIANT.search(str(_rn.get('공고명','')))
-                            _lb = _m.group(0) if _m else str(_rn.get('공고명',''))[:10]
-                            _rtrk = track_link(_rn.get('공고링크','#'), company,
-                                               _rn.get('공고ID',''), _rn.get('공고명',''))
-                            _rl.append(f"<a href=\"{_rtrk}\" style=\"color:#B0894A;"
-                                       f"text-decoration:none;font-weight:600;\">{_lb}</a>")
-                        _extra += (f"<p style=\"margin:5px 0 0;font-size:11px;color:#9A9488;\">"
-                                   f"같은 사업 관련 공고: {' · '.join(_rl)}</p>")
-                    return f"""
-                    <table width="100%" cellpadding="0" cellspacing="0"
-                           style="margin-bottom:8px;background:#FFFFFF;
-                                  border:1px solid #E8E2D5;border-radius:10px;overflow:hidden;
-                                  box-shadow:0 1px 4px rgba(26,35,50,0.05);">
-                      <tr>
-                        <td style="padding:12px 16px;">
-                          <a href="{_trk}"
-                             style="font-size:14px;font-weight:600;color:#1B2A41;
-                                    text-decoration:none;line-height:1.5;display:block;">
-                            {notice_name}
-                          </a>
-                          <p style="margin:4px 0 0;font-size:12px;color:#8A8478;">
-                            {n.get("주관기관","")} &nbsp;·&nbsp; 마감 {f'<span style="color:#B0894A;font-weight:600;">{dl_raw}</span>' if dl_raw else "상시"}
-                          </p>
-                          {tag_html}
-                          {_extra}
-                        </td>
-                        <td width="60" align="center" valign="middle"
-                            style="padding:14px 12px;border-left:1px solid #EDEBE5;">
-                          <a href="{_trk}"
-                             style="display:inline-block;font-size:12px;font-weight:700;
-                                    color:#B0894A;text-decoration:none;white-space:nowrap;">
-                            보기 →
-                          </a>
-                        </td>
-                      </tr>
-                    </table>"""
-
-                rows_html = ""
-
-                # ── 0건 기업 안내 문구 ───────────────────────
-                is_zero = not notices_sss and not notices_ss
-                if is_zero:
-                    rows_html += """
-                    <div style="background:#F5F0E6;
-                                border:1px solid #E0D5BF;
-                                border-radius:8px;padding:14px 16px;margin-bottom:16px;">
-                      <p style="margin:0 0 6px;font-size:13px;font-weight:500;
-                                 color:#5A5548;">
-                        이번 주 귀사에 딱 맞는 공고를 찾지 못했습니다.
-                      </p>
-                      <p style="margin:0;font-size:12px;color:#8A7B5A;line-height:1.7;">
-                        더 정확한 공고를 드리기 위해 추가 키워드나 관심 분야를
-                        아래 답장하기 버튼으로 알려주세요.
-                      </p>
-                    </div>"""
-
-                # ── 🔦 주목할 만한 공고 (★★★) ────────────
-                if notices_sss:
-                    rows_html += """
-                    <p style="margin:0 0 12px;font-size:10px;font-weight:700;
-                               color:#9A7B3F;letter-spacing:2px;text-transform:uppercase;">
-                      🔦 &nbsp;주목할 만한 공고
-                    </p>"""
-                    for i, n in enumerate(notices_sss):
-                        rows_html += notice_card(n, i)
-
-                # ── 📌 이런 공고도 있어요 (★★) ──────────
-                if notices_ss:
-                    rows_html += """
-                    <div style="border-top:1px solid #E8E2D5;
-                                padding-top:16px;margin-top:8px;">
-                      <p style="margin:0 0 10px;font-size:10px;font-weight:700;
-                                 color:#A08A5C;letter-spacing:2px;
-                                 text-transform:uppercase;">
-                        📌 &nbsp;이런 공고도 있어요
-                      </p>"""
-                    for i, n in enumerate(notices_ss):
-                        rows_html += notice_card_simple(n, i)
-                    rows_html += "</div>"
-
-                # ── 📎 참고 공고 (승인 공고 3건 미만 시 부족분 채움) ──
-                if notices_review:
-                    _has_approved = bool(notices_sss or notices_ss)
-                    _ref_desc = ("위 공고와 함께 참고하실 만한 공고입니다."
-                                 if _has_approved else
-                                 "이번 주 딱 맞는 공고는 없었지만, 귀사와 연관성이 있어 참고용으로 안내드립니다.")
-                    rows_html += f"""
-                    <div style="border-top:1px solid #E8E2D5;
-                                padding-top:16px;margin-top:8px;">
-                      <p style="margin:0 0 6px;font-size:10px;font-weight:700;
-                                 color:#A08A5C;letter-spacing:2px;
-                                 text-transform:uppercase;">
-                        📎 &nbsp;참고해보실 만한 공고
-                      </p>
-                      <p style="margin:0 0 10px;font-size:11px;color:#8A8478;">
-                        {_ref_desc}
-                      </p>"""
-                    for i, n in enumerate(notices_review[:3]):
-                        rows_html += notice_card_simple(n, i)
-                    rows_html += "</div>"
-
-                # ── 전체 반응 버튼 ────────────────────────
-                import urllib.parse as _up_fb
-                fb_subj = _up_fb.quote(f"[원스톱 피드백] {company}")
-                fb_good = _up_fb.quote("[이번 주 공고 안내 피드백]\n반응: 도움됐어요\n\n[추가 의견]\n\n[Gmail 주소]\n")
-                fb_bad  = _up_fb.quote("[이번 주 공고 안내 피드백]\n반응: 별로였어요\n\n[추가 의견]\n어떤 점이 아쉬우셨나요?\n\n[Gmail 주소]\n")
-                fb_msg  = _up_fb.quote("[이번 주 공고 안내 피드백]\n\n[추가 의견]\n\n[더 받고 싶은 분야/키워드]\n\n[Gmail 주소]\n")
-                rows_html += f"""
-                <div style="border-top:1px solid #E8E2D5;
-                            margin-top:20px;padding-top:16px;text-align:center;">
-                  <p style="margin:0 0 12px;font-size:12px;color:#8A8478;">
-                    이번 공고 안내가 도움이 됐나요?
-                  </p>
-                  <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_good}"
-                     style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                            font-weight:600;color:#9A7B3F;background:#F3EDE0;
-                        border:1px solid #E0D5BF;border-radius:8px;text-decoration:none;">
-                    👍 도움됐어요
-                  </a>
-                  <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_bad}"
-                     style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                            font-weight:600;color:#8A8478;background:#EDEBE5;
-                        border:1px solid #DDD8CE;border-radius:8px;text-decoration:none;">
-                    👎 별로였어요
-                  </a>
-                  <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_msg}"
-                     style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                            font-weight:600;color:#8A8478;
-                            background:#F3F1EC;
-                            border:1px solid #DDD8CE;
-                            border-radius:8px;text-decoration:none;">
-                    💬 의견 남기기
-                  </a>
-                </div>"""
-
-                ind_link=""
-                if company in ind_cals and ind_cals[company].get('calendar_id'):
-                    ind_link=f"""<div style="margin-top:8px">
-                      <a href="https://calendar.google.com/calendar?cid={ind_cals[company]['calendar_id']}"
-                         style="color:#2E75B6;font-size:13px">📅 {company} 전용 캘린더 구독</a></div>"""
-
-                import urllib.parse as _up
-                kw_subject = _up.quote(f"[원스톱 피드백] {company}")
-                kw_body    = _up.quote(
-                    "[추가 키워드]\n"
-                    "더 받고 싶은 분야나 키워드를 적어주세요:\n\n"
-                    "[Gmail 주소]\n"
-                    "맞춤 캘린더 알림을 받으시려면 Gmail 주소를 알려주세요:\n"
-                )
-
-                keyword_sec = f"""
-                <div style="background:#FFFFFF;
-                            border:1.5px solid #D8D0C0;
-                            border-radius:10px;padding:16px 18px;margin:16px 0;">
-                  <p style="margin:0 0 8px;color:#22344F;font-weight:700;font-size:11px;
-                             letter-spacing:1.5px;text-transform:uppercase;">
-                    ✏️ 추가 키워드가 있으신가요?
-                  </p>
-                  <p style="margin:0 0 12px;font-size:12px;color:#6B6558;line-height:1.7;">
-                    더 잘 맞는 공고를 드리기 위해 받고 싶은 분야나 키워드를 답장으로 알려주세요.
-                  </p>
-                  <a href="mailto:onestop.kipcc@gmail.com?subject={kw_subject}&body={kw_body}"
-                     style="display:inline-block;padding:7px 16px;font-size:12px;font-weight:600;
-                            color:#FFFFFF;background:#22344F;border-radius:8px;
-                            text-decoration:none;">
-                    답장하기 →
-                  </a>
-                </div>"""
-
-                cal_sec = f"""
-                <div style="background:#FFFFFF;border-radius:10px;
-                            padding:16px 18px;border:1.5px solid #D8D0C0;margin:16px 0;">
-                  <p style="margin:0 0 4px;color:#9A7B3F;font-weight:700;font-size:11px;
-                             letter-spacing:1.5px;text-transform:uppercase;">
-                    📅 공고 마감일 캘린더
-                  </p>
-                  <p style="margin:0 0 10px;font-size:12px;color:#6B6558;">
-                    전체 지원사업 공고 마감일을 한눈에 확인하세요.
-                  </p>
-                  {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#C9A96A;color:#3A2E15;padding:8px 18px;border-radius:7px;text-decoration:none;font-size:12px;font-weight:700;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK else ""}
-                  <p style="margin:10px 0 0;font-size:11px;color:#8A7B5A;line-height:1.7;">
-                    💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
-                  </p>
-                </div>"""
-
-                together_sec = f"""
-                <div style="background:#22344F;border-radius:10px;
-                            padding:16px 18px;border:1.5px solid #C9A96A;margin:16px 0;">
-                  <p style="margin:0 0 5px;color:#C9A96A;font-weight:700;font-size:11px;
-                             letter-spacing:1.5px;">
-                    🤝 함께하기 · 기업 회원소개
-                  </p>
-                  <p style="margin:0 0 12px;font-size:12px;color:#C5D0DC;line-height:1.65;">
-                    원스톱 스케일업 참여 기업의 제품·기술과 협력 희망 분야를 소개하는 공간입니다.
-                    등록하시면 다른 기업·기관이 귀사를 찾아보고 협력을 제안할 수 있습니다.
-                  </p>
-                  <a href="http://kipcc.eumsvr.com"
-                     style="display:inline-block;padding:9px 20px;font-size:12px;font-weight:700;
-                            color:#1B2A41;background:#C9A96A;border-radius:6px;
-                            text-decoration:none;">
-                    회원소개 등록하기 →
-                  </a>
-                </div>"""
-
-                today_str = datetime.today().strftime('%Y.%m.%d')
-                html=f"""<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-</head>
-<body style="margin:0;padding:0;background:#E6E9EE;
-             font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0"
-       style="background:#E6E9EE;padding:36px 0 52px;">
-<tr><td align="center">
-<table width="560" cellpadding="0" cellspacing="0">
-
-  <!-- ── 로고 헤더 (흰 배경) ── -->
-  <tr>
-    <td style="background:#FFFFFF;border-radius:14px 14px 0 0;
-               padding:20px 28px;border-bottom:1px solid #E8ECF0;
-               border-top:1px solid #D9DEE5;">
-      <table width="100%" cellpadding="0" cellspacing="0">
-        <tr>
-          <td valign="middle">
-            <img src="{LOGO_URL}"
-                 alt="혁신제품지원센터"
-                 width="160" height="auto"
-                 style="display:block;height:auto;max-height:36px;
-                        object-fit:contain;object-position:left;">
-          </td>
-          <td align="right" valign="middle">
-            <p style="margin:0;font-size:11px;color:#9CAAB8;letter-spacing:0.3px;">
-              {today_str}
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-
-  <!-- ── 메인 카드 (아이보리) ── -->
-  <tr>
-    <td style="background:#FBFAF7;
-               box-shadow:0 8px 32px rgba(26,35,50,0.10);">
-
-      <!-- 헤더존 (네이비) -->
-      <table width="100%" cellpadding="0" cellspacing="0">
-        <tr>
-          <td style="padding:30px 28px 24px;
-                     background:#1B2A41;
-                     border-bottom:2px solid #C9A96A;">
-            <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td>
-                  <p style="margin:0 0 2px;font-size:10px;font-weight:700;
-                             letter-spacing:2.5px;color:#C9A96A;
-                             text-transform:uppercase;">
-                    Scale-Up Program
-                  </p>
-                  <h1 style="margin:6px 0 4px;font-size:26px;font-weight:800;
-                             color:#FFFFFF;letter-spacing:-0.6px;line-height:1.2;">
-                    원스톱 스케일업
-                  </h1>
-                  <p style="margin:0;font-size:12px;color:#B4C0CE;">
-                    이번 주 맞춤 지원사업 공고
-                  </p>
-                </td>
-                <td align="right" valign="middle" width="72">
-                  <div style="background:linear-gradient(135deg,#C9A96A 0%,#B08D4F 100%);
-                              border-radius:12px;padding:11px 0;width:60px;
-                              text-align:center;">
-                    <p style="margin:0;font-size:22px;font-weight:800;color:#1B2A41;
-                               line-height:1;">{len(notices)}</p>
-                    <p style="margin:3px 0 0;font-size:9px;letter-spacing:1.2px;
-                               color:#3A2E15;font-weight:700;text-transform:uppercase;">picks</p>
-                  </div>
-                </td>
-              </tr>
-            </table>
-            <!-- 기업명 카드 -->
-            <div style="margin-top:20px;padding:14px 18px;
-                        background:rgba(255,255,255,0.06);
-                        border-radius:8px;border-left:3px solid #C9A96A;">
-              <p style="margin:0 0 3px;font-size:15px;font-weight:700;color:#FFFFFF;">
-                {company}
-                <span style="font-size:13px;font-weight:400;
-                             color:#B4C0CE;margin-left:4px;">담당자님</span>
-              </p>
-              <p style="margin:0;font-size:12px;color:#B4C0CE;line-height:1.6;">
-                기술 키워드 분석을 통해 선별된 공고를 안내드립니다.
-              </p>
-            </div>
-
-          </td>
-        </tr>
-
-        <!-- 기업 정보 카드 (아이보리 존) -->
-        {f"""<tr><td style="padding:20px 28px 0;background:#FBFAF7;">
-            <div style="padding:12px 16px;
-                        background:#F5F0E6;
-                        border:1px solid #E0D5BF;
-                        border-left:4px solid #C9A96A;border-radius:8px;">
-              <p style="margin:0 0 8px;font-size:10px;font-weight:700;color:#9A7B3F;letter-spacing:1.5px;">
-                저희가 파악한 귀사 정보</p>
-              <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
-                기술키워드 <span style="color:#2A2620;font-weight:600;word-break:keep-all;">{str(co_row.get("기술키워드","") or co_row.get("키워드보완","") or "—")[:30]}</span>
-              </p>
-              <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
-                관심분야 <span style="color:#2A2620;font-weight:600;">{str(co_row.get("관심사업분야","") or "—")}</span>
-              </p>
-              <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
-                기업유형 <span style="color:#2A2620;font-weight:600;word-break:keep-all;">{str(co_row.get("기업유형","") or "—")[:25]}</span>
-              </p>
-              <p style="margin:0;font-size:12px;color:#6B6558;">
-                소재지 <span style="color:#2A2620;font-weight:600;">{str(co_row.get("소재지","") or "—")}</span>
-              </p>
-            </div>
-          </td></tr>""" if not df_c_cur.empty and not df_c_cur[df_c_cur["기업명"]==company].empty
-            else ""}
-
-        <!-- 공고 목록 -->
-        <tr>
-          <td style="padding:20px 28px 20px;background:#FBFAF7;">
-            {rows_html}
-          </td>
-        </tr>
-
-        <!-- 캘린더 -->
-        {f'''<tr><td style="padding:0 28px 24px;background:#FBFAF7;">{keyword_sec}</td></tr>''' if keyword_sec else ''}
-        {f'''<tr><td style="padding:0 28px 24px;background:#FBFAF7;">{cal_sec}</td></tr>''' if cal_sec else ''}
-        <tr><td style="padding:0 28px 24px;background:#FBFAF7;">{together_sec}</td></tr>
-      </table>
-    </td>
-  </tr>
-
-  <!-- ── 네이비 푸터 ── -->
-  <tr>
-    <td style="background:#1B2A41;border-radius:0 0 14px 14px;
-               padding:18px 28px;border-top:2px solid #C9A96A;">
-      <table width="100%" cellpadding="0" cellspacing="0">
-        <tr>
-          <td>
-            <p style="margin:0;font-size:12px;color:#B4C0CE;line-height:1.9;">
-              혁신제품지원센터 원스톱 스케일업 운영팀<br>
-              <a href="mailto:onestop.kipcc@gmail.com"
-                 style="color:#C9A96A;text-decoration:none;font-weight:600;">
-                onestop.kipcc@gmail.com
-              </a>
-            </p>
-            <p style="margin:8px 0 0;font-size:11px;color:#7A96B2;">
-              본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.
-            </p>
-          </td>
-          <td align="right" valign="middle">
-            <p style="margin:0;font-size:10px;color:#7A96B2;letter-spacing:0.5px;">
-              수신 동의 기업 대상 발송
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-
-</table>
-</td></tr>
-</table>
-</body></html>"""
 
                 co_email=""; cc_list=[]; _optout=False
                 if not df_c_cur.empty and '이메일' in df_c_cur.columns:

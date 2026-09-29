@@ -18,6 +18,12 @@ NOTICES_FILE    = "notices_db.xlsx"
 DETAIL_FILE     = "notices_detail.xlsx"
 SCOPES          = ['https://www.googleapis.com/auth/drive']
 
+# 기업마당 공고목록 API
+API_KEY  = "Nt604D"
+BASE_URL = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do"
+REALM_CODES = ["01","02","03","04","05","06","07","09"]  # 금융·기술개발·인력·수출·내수·창업·경영·기타
+REALM_NAMES = {"01":"금융","02":"기술개발","03":"인력","04":"수출","05":"내수","06":"창업","07":"경영","09":"기타"}
+
 # ── 운영 파라미터 (환경변수로 조정 가능) ──────────────
 def _env_int(key, default):
     """빈 문자열/미설정/오타 모두 안전하게 처리."""
@@ -96,6 +102,100 @@ def drive_upload(creds, filename, content_bytes):
     if not resp.ok:
         print(f"    드라이브 업로드 실패: {resp.status_code} {resp.text[:200]}")
     return resp.ok
+
+# ── 기업마당에서 공고목록 수집 → notices_db 갱신 ──────
+def _strip_html(s):
+    """HTML 태그 제거 (간단)."""
+    if not s: return ""
+    s = re.sub(r'<[^>]+>', ' ', str(s))
+    s = re.sub(r'&nbsp;|&lt;|&gt;|&amp;|&quot;', ' ', s)
+    return re.sub(r'\s+', ' ', s).strip()
+
+def collect_notices(creds):
+    """기업마당 API로 8개 분야 공고목록을 수집해 notices_db.xlsx를 갱신·업로드.
+    로컬(국내) 실행 전제 — Streamlit Cloud(해외)는 차단됨."""
+    print("\n── 공고목록 수집 시작 (기업마당 API) ──")
+    # 기존 DB 로드
+    content = drive_download(creds, NOTICES_FILE)
+    if content:
+        df_n = pd.read_excel(io.BytesIO(content), dtype=str).fillna('')
+    else:
+        df_n = pd.DataFrame()
+    ex_map = {r['pblancId']: r.get('수정일','') for _, r in df_n.iterrows()} if not df_n.empty else {}
+
+    all_items, seen = [], set()
+    for code in REALM_CODES:
+        name = REALM_NAMES.get(code, code)
+        ok = False
+        for retry in range(3):
+            try:
+                time.sleep(0.8 if retry == 0 else 2)
+                resp = requests.get(BASE_URL,
+                    params={"crtfcKey":API_KEY,"dataType":"json","searchCnt":"0","searchLclasId":code},
+                    timeout=40)
+                items = resp.json().get('jsonArray', [])
+                for item in items:
+                    pid = item.get('pblancId','')
+                    if pid and pid not in seen:
+                        seen.add(pid); all_items.append(item)
+                print(f"  ✅ {name}: {len(items)}건")
+                ok = True
+                break
+            except Exception as e:
+                if retry < 2:
+                    print(f"  ⚠️ {name}: 재시도 {retry+1}/3")
+                else:
+                    print(f"  ❌ {name}: 수집 실패 ({str(e)[:60]})")
+        if not ok:
+            continue
+
+    def pdl(s):
+        try:
+            return datetime.strptime(re.sub(r'\.', '-', s.split('~')[-1].strip()), "%Y-%m-%d").strftime("%Y-%m-%d")
+        except Exception:
+            return ""
+    today = datetime.today().strftime("%Y-%m-%d")
+
+    def to_row(item):
+        return {"pblancId":item.get('pblancId',''),"공고명":item.get('pblancNm',''),
+                "주관기관":item.get('jrsdInsttNm',''),"분야":item.get('pldirSportRealmLclasCodeNm',''),
+                "세부분야":item.get('pldirSportRealmMlsfcCodeNm',''),
+                "접수기간":item.get('reqstBeginEndDe',''),"마감일":pdl(item.get('reqstBeginEndDe','')),
+                "지원대상":item.get('trgetNm',''),"사업개요":_strip_html(item.get('bsnsSumryCn','')),
+                "해시태그":item.get('hashtags',''),"공고링크":item.get('pblancUrl',''),
+                "전문내용":"","수정일":item.get('updtPnttm',''),"수집일":today}
+
+    new_rows, upd_rows, dup = [], [], 0
+    for item in all_items:
+        pid = item.get('pblancId','')
+        if not pid: continue
+        row = to_row(item)
+        if pid not in ex_map:
+            new_rows.append(row)
+        elif ex_map[pid] != item.get('updtPnttm',''):
+            upd_rows.append(row)
+        else:
+            dup += 1
+
+    if not df_n.empty:
+        upd_ids = {r['pblancId'] for r in upd_rows}
+        df_base = df_n[~df_n['pblancId'].isin(upd_ids)].copy()
+        df_base['수집일'] = today   # 기존 공고도 '오늘 확인함'으로 갱신
+        df_final = pd.concat([df_base, pd.DataFrame(new_rows+upd_rows)], ignore_index=True)
+    else:
+        df_final = pd.DataFrame(new_rows)
+
+    # 업로드
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine='openpyxl') as w:
+        df_final.to_excel(w, index=False, sheet_name='공고DB')
+    if drive_upload(creds, NOTICES_FILE, buf.getvalue()):
+        print(f"  💾 공고 DB 저장 완료 — 총 {len(df_final):,}건 "
+              f"(신규 {len(new_rows)} / 업데이트 {len(upd_rows)} / 유지 {dup})")
+    else:
+        print("  ⚠️ 공고 DB 저장 실패")
+    return df_final
+
 
 # ── 텍스트에서 지원금액·규모 추출 ────────────────────
 def extract_meta(text):
@@ -189,11 +289,14 @@ def main():
     creds = get_creds()
     print("✅ 구글 인증 완료")
 
-    content = drive_download(creds, NOTICES_FILE)
-    if not content:
-        print("❌ notices_db.xlsx 없음"); return
-
-    df_n = pd.read_excel(io.BytesIO(content), dtype=str).fillna('')
+    # 1단계: 공고목록 수집 (기업마당 API) → notices_db 갱신
+    df_n = collect_notices(creds)
+    if df_n is None or df_n.empty:
+        # 수집 실패 시 기존 DB로 폴백
+        content = drive_download(creds, NOTICES_FILE)
+        if not content:
+            print("❌ notices_db.xlsx 없음"); return
+        df_n = pd.read_excel(io.BytesIO(content), dtype=str).fillna('')
     print(f"✅ 공고 DB: {len(df_n):,}건")
 
     detail_content = drive_download(creds, DETAIL_FILE)
@@ -225,6 +328,7 @@ def main():
 
     from playwright.sync_api import sync_playwright
     records = []; success = fail = done = 0
+    consec_fail = 0
     stopped_early = False
 
     with sync_playwright() as p:
@@ -235,11 +339,22 @@ def main():
         page = browser.new_page(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         )
-        page.set_default_timeout(20000)
-        try:
-            page.goto("https://www.bizinfo.go.kr/", timeout=20000)  # 세션 1회만
-        except Exception:
-            pass
+        page.set_default_timeout(30000)
+        # 사전 연결 확인 — 여기서 실패하면 차단/네트워크 문제이므로 즉시 중단
+        reachable = False
+        for attempt in range(3):
+            try:
+                page.goto("https://www.bizinfo.go.kr/", timeout=30000)
+                reachable = True
+                break
+            except Exception as e:
+                print(f"⚠️ bizinfo 접속 시도 {attempt+1}/3 실패: {str(e)[:80]}")
+                time.sleep(10 * (attempt + 1))
+        if not reachable:
+            print("❌ bizinfo.go.kr 접속 불가 — 서버 점검이거나 실행 환경 IP가 차단된 것으로 보입니다.\n"
+                  "   (같은 URL이 로컬/앱에서는 되는데 여기서만 안 되면 IP 차단일 가능성이 큽니다)")
+            browser.close()
+            return
 
         for i, (_, row) in enumerate(df_target.iterrows()):
             if budget_exceeded():
@@ -257,10 +372,19 @@ def main():
             records.append(res); done += 1
             if res['크롤링성공'] == 'Y':
                 success += 1
+                consec_fail = 0
                 print(f"  [{i+1}/{len(df_target)}] ✅ {name} ({len(res['전문내용'])}자)")
             else:
                 fail += 1
+                consec_fail += 1
                 print(f"  [{i+1}/{len(df_target)}] ❌ {name}")
+
+            # 연속 실패가 쌓이면 차단으로 간주하고 중단 (계속 두드리면 역효과)
+            if consec_fail >= 8:
+                print(f"\n🛑 연속 {consec_fail}건 실패 — 차단 또는 서버 이상으로 판단해 중단합니다.\n"
+                      f"   진행분은 저장되며, 다음 실행에서 이어서 처리됩니다.")
+                stopped_early = True
+                break
 
             if len(records) >= BATCH_SIZE:
                 df_detail = merge_and_upload(creds, df_detail, records)
