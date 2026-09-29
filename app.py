@@ -156,6 +156,7 @@ def save_review_state(drive, state=None, round_id=None):
         payload = {
             'round_id':     current_round_id() if round_id is None else round_id,
             'review_state': st.session_state.get('review_state', {}) if state is None else state,
+            'decision_src': st.session_state.get('decision_src', {}),
             'saved_at':     datetime.today().strftime('%Y-%m-%d %H:%M'),
         }
         drive_upload(drive, REVIEW_FILE,
@@ -177,7 +178,25 @@ def load_review_state(drive, round_id=None, keep_reject=None):
     same = bool(saved_round) and bool(cur) and saved_round == cur
     if not same:
         state = carry_over_reject(state, keep_reject)
+    # 결정 출처도 함께 복원 — 남아 있는 상태의 키만 (회차 규칙은 review_state와 동일)
+    _srcs = saved.get('decision_src', {}) or {}
+    st.session_state['decision_src'] = {k: v for k, v in _srcs.items() if k in state}
     return state, saved_round, saved_at, same
+
+def set_decision(key, value, source):
+    """승인(○)·제외(✕)를 찍으면서 그 결정이 어디서 나왔는지 함께 남긴다.
+    source: 'AI 자동 승인' / 'AI 자동 제외' / '담당자' / '🟡 자동 보완'
+    담당자가 AI 자동 결정을 뒤집으면 출처가 '담당자'로 덮어써진다 —
+    AI 판단과 사람 결정이 갈린 지점이 판단 기록에 그대로 남는다."""
+    if 'review_state' not in st.session_state:
+        st.session_state['review_state'] = {}
+    if 'decision_src' not in st.session_state:
+        st.session_state['decision_src'] = {}
+    st.session_state['review_state'][key] = value
+    if value in ('○', '✕'):
+        st.session_state['decision_src'][key] = source
+    else:
+        st.session_state['decision_src'].pop(key, None)
 
 # ── 발송 진행 기록 ────────────────────────────────────
 # 기업 한 곳의 Gmail 발송이 성공하면 즉시 여기에 기록한다. 발송이 중간에 멈춰도
@@ -232,6 +251,205 @@ def flush_send_history(drive, prog):
             return False, 0
         prog['pending'] = []
         return True, len(rows)
+    except Exception:
+        return False, 0
+
+# ── 회차별 판단 기록 ──────────────────────────────────
+# 규칙 점수·AI 판정·최종 결정(과 그 출처)·발송·클릭·반응을 기업-공고 짝마다 한 줄로
+# 남긴다. 나중에 규칙과 AI 판단이 실제로 맞았는지 되짚는 데이터.
+# 기록 실패가 발송이나 저장 흐름을 막으면 안 되므로 전부 예외를 삼킨다.
+DECISION_LOG_FILE = "decision_log.json"
+
+def _ai_cache_version(res):
+    """AI 판정 캐시 버전 — 판정 내용의 해시 앞 8자리.
+    ai_analysis에 버전 필드가 없어서, 같은 판정이면 같은 값이 나오도록 만든다.
+    🔁 재분석으로 내용이 바뀌면 값도 바뀐다. 미분석·오류면 빈 문자열."""
+    if not isinstance(res, dict) or not res or res.get('error'):
+        return ''
+    try:
+        import hashlib as _hl, json as _j
+        _payload = {k: v for k, v in res.items() if not str(k).startswith('_')}
+        return _hl.md5(_j.dumps(_payload, ensure_ascii=False, sort_keys=True)
+                       .encode('utf-8')).hexdigest()[:8]
+    except Exception:
+        return ''
+
+def build_click_map(df_click):
+    """클릭 로그 → {(기업명, 공고ID 또는 공고명): {'count', 'last'}}.
+    공고ID 컬럼이 없는 시트를 위해 공고명으로도 같이 색인한다."""
+    out = {}
+    try:
+        if df_click is None or df_click.empty:
+            return out
+        cols = list(df_click.columns)
+        def pick(*keys):
+            for c in cols:
+                if any(k in str(c).lower() for k in keys):
+                    return c
+            return None
+        co_col = pick('기업', 'co')
+        id_col = pick('공고id', 'notice', 'pblanc')
+        nm_col = pick('공고명', 'name')
+        tm_col = pick('시각', '시간', 'time', 'date') or cols[0]
+        if not co_col:
+            return out
+        for _, r in df_click.iterrows():
+            co = str(r.get(co_col, '') or '').strip()
+            if not co:
+                continue
+            _t = str(r.get(tm_col, '') or '')
+            for _c in (id_col, nm_col):
+                if not _c:
+                    continue
+                v = str(r.get(_c, '') or '').strip()
+                if not v:
+                    continue
+                e = out.setdefault((co, v), {'count': 0, 'last': ''})
+                e['count'] += 1
+                if _t > e['last']:
+                    e['last'] = _t
+    except Exception:
+        pass
+    return out
+
+def collect_reactions(days=90, max_results=200):
+    """메일 하단 반응 버튼의 회신을 Gmail에서 모은다 → {기업명: {'value','at'}}.
+    반응 링크가 mailto라 클릭 자체는 추적되지 않고 회신이 와야 알 수 있다.
+    버튼이 메일당 하나라 공고별 구분은 되지 않는다 — 기업 단위 값이다."""
+    out = {}
+    try:
+        import base64 as _b64
+        after = (datetime.today() - timedelta(days=int(days))).strftime('%Y/%m/%d')
+        resp = gapi('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/messages',
+                    params={'q': f'subject:"[원스톱 피드백]" after:{after}',
+                            'maxResults': max_results})
+        if not resp.ok:
+            return out
+        def _body(p):
+            if p.get('body', {}).get('data'):
+                return _b64.urlsafe_b64decode(p['body']['data'] + '==').decode('utf-8', errors='ignore')
+            for part in p.get('parts', []):
+                r = _body(part)
+                if r:
+                    return r
+            return ''
+        for ref in resp.json().get('messages', []):
+            try:
+                d = gapi('GET',
+                         f'https://gmail.googleapis.com/gmail/v1/users/me/messages/{ref["id"]}',
+                         params={'format': 'full'}).json()
+                hs   = d.get('payload', {}).get('headers', [])
+                subj = next((h['value'] for h in hs if h['name'] == 'Subject'), '')
+                m    = re.search(r'\[원스톱 피드백\]\s*(.+?)\s*$', subj.strip())
+                co   = m.group(1).strip() if m else ''
+                if not co:
+                    continue
+                txt = _body(d.get('payload', {}))[:3000]
+                mv  = re.search(r'반응\s*:\s*(도움됐어요|별로였어요)', txt)
+                at  = ''
+                if d.get('internalDate'):
+                    at = datetime.fromtimestamp(int(d['internalDate']) / 1000).strftime('%Y-%m-%d %H:%M')
+                prev = out.get(co)
+                if not prev or at > prev.get('at', ''):
+                    out[co] = {'value': mv.group(1) if mv else '의견 회신', 'at': at}
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return out
+
+def build_decision_rows(round_id, results, ai_cache, review_state, decision_src,
+                        sent_map=None, click_map=None, reaction_map=None):
+    """이번 회차의 판단 기록 행 (기업-공고 짝마다 1행)."""
+    rows = []
+    _stat = {'○': '승인', '✕': '제외'}
+    _now  = datetime.today().strftime('%Y-%m-%d %H:%M')
+    sent_map     = sent_map or {}
+    click_map    = click_map or {}
+    reaction_map = reaction_map or {}
+    for r in (results or []):
+        co  = str(r.get('기업명', '') or '').strip()
+        pid = str(r.get('공고ID', '') or '').strip()
+        if not co or not pid:
+            continue
+        key = f"{co}_{pid}"
+        ai  = (ai_cache or {}).get(key, {}) or {}
+        if not isinstance(ai, dict) or ai.get('error'):
+            ai = {}
+        dec  = (review_state or {}).get(key, '')
+        _s   = sent_map.get(co) or {}
+        if not _s:
+            _sent = ''
+        elif pid in (_s.get('pids') or []):
+            _sent = 'Y'
+        elif pid in (_s.get('ref_pids') or []):
+            _sent = '참고'
+        else:
+            _sent = 'N'
+        _nm  = str(r.get('공고명', '') or '')
+        _ck  = click_map.get((co, pid)) or click_map.get((co, _nm)) or {}
+        _rx  = reaction_map.get(co) or {}
+        rows.append({
+            '회차ID': round_id, '기업명': co, '공고ID': pid, '공고명': _nm,
+            '규칙점수': r.get('점수', ''), '등급': r.get('관련도', ''),
+            'AI추천여부': ai.get('추천여부', ''), 'AI적합도': ai.get('적합도', ''),
+            'AI업종일치': ai.get('업종일치', ''), 'AI자격충족': ai.get('자격충족', ''),
+            'AI지역적합': ai.get('지역적합', ''), 'AI수요일치': ai.get('수요일치', ''),
+            'AI캐시버전': _ai_cache_version(ai),
+            'AI전문반영': ('Y' if ai.get('_전문반영') else 'N') if ai else '',
+            '최종결정': _stat.get(dec, '미결정'),
+            '결정출처': (decision_src or {}).get(key, '') if dec in ('○', '✕') else '',
+            '발송여부': _sent, '발송시각': _s.get('at', ''),
+            '클릭여부': 'Y' if _ck.get('count') else ('N' if _sent in ('Y', '참고') else ''),
+            '클릭시각': _ck.get('last', ''), '클릭수': _ck.get('count', 0) or '',
+            '반응버튼': _rx.get('value', ''), '반응시각': _rx.get('at', ''),
+            '기록시각': _now,
+        })
+    return rows
+
+def load_decision_log(drive):
+    """누적 판단 기록 전체."""
+    try:
+        d = load_json(drive, DECISION_LOG_FILE) or {}
+        return d.get('rows', []) if isinstance(d, dict) else list(d or [])
+    except Exception:
+        return []
+
+def save_decision_log(drive, rows, round_id):
+    """이번 회차 행을 통째로 교체하고 다른 회차 행은 그대로 둔다.
+    담당자가 ○/✕를 바꾸면 다음 기록 때 최종 결정·출처가 자동 갱신된다."""
+    try:
+        import json as _j
+        keep = [r for r in load_decision_log(drive) if r.get('회차ID') != round_id]
+        allr = keep + list(rows)
+        ok = drive_upload(drive, DECISION_LOG_FILE,
+                          _j.dumps({'rows': allr,
+                                    'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M')},
+                                   ensure_ascii=False).encode('utf-8'),
+                          "application/json")
+        return bool(ok), len(allr)
+    except Exception:
+        return False, 0
+
+def record_decision_log(drive, round_id=None, sent_map=None,
+                        click_map=None, reaction_map=None):
+    """현재 세션 상태로 이번 회차 판단 기록을 갱신한다.
+    예외를 절대 밖으로 내보내지 않는다 — 기록 실패가 발송을 막으면 안 된다."""
+    try:
+        rid = round_id or current_round_id()
+        if not rid:
+            return False, 0
+        rows = build_decision_rows(
+            rid,
+            st.session_state.get('match_results', []),
+            st.session_state.get('ai_analysis', {}),
+            st.session_state.get('review_state', {}),
+            st.session_state.get('decision_src', {}),
+            sent_map, click_map, reaction_map)
+        if not rows:
+            return False, 0
+        st.session_state.pop('_declog_cache', None)
+        return save_decision_log(drive, rows, rid)
     except Exception:
         return False, 0
 
@@ -2998,6 +3216,52 @@ with st.sidebar:
     else:
         st.caption("매칭 결과 없음 — 먼저 매칭·AI 분석을 실행하세요")
 
+    # ── 판단 기록 ─────────────────────────────────────────
+    st.divider()
+    st.caption("📊 판단 기록 (회차별 판단·반응 누적)")
+    if st.button("🔄 갱신 (클릭·반응 수집)", key="declog_refresh", use_container_width=True):
+        with st.spinner("클릭 로그·반응 회신 수집 중..."):
+            _dd   = _get_drive()
+            _drid = current_round_id()
+            _cmap = build_click_map(load_click_log())
+            _rmap = collect_reactions()
+            _smap = load_send_progress(_dd, _drid).get('sent', {}) if _drid else {}
+            _ok_d, _cnt_d = record_decision_log(_dd, _drid, _smap, _cmap, _rmap)
+        if _ok_d:
+            st.success(f"갱신 완료 — 누적 {_cnt_d}행")
+        else:
+            st.warning("갱신할 매칭 결과가 없거나 저장에 실패했습니다.")
+
+    if '_declog_cache' not in st.session_state:
+        st.session_state['_declog_cache'] = load_decision_log(_get_drive())
+    _rows_d = st.session_state.get('_declog_cache') or []
+    if _rows_d:
+        import io as _io2
+        _dfd  = pd.DataFrame(_rows_d)
+        _bufd = _io2.BytesIO()
+        with pd.ExcelWriter(_bufd, engine='openpyxl') as _wd:
+            _dfd.to_excel(_wd, index=False, sheet_name='전체')
+            if '회차ID' in _dfd.columns:
+                _sm_d = _dfd.groupby('회차ID').agg(
+                    매칭건수=('공고ID', 'count'),
+                    승인=('최종결정', lambda s: (s == '승인').sum()),
+                    제외=('최종결정', lambda s: (s == '제외').sum()),
+                    발송=('발송여부', lambda s: s.isin(['Y', '참고']).sum()),
+                    클릭=('클릭여부', lambda s: (s == 'Y').sum()),
+                ).reset_index()
+                _sm_d.to_excel(_wd, index=False, sheet_name='회차별 요약')
+        st.download_button(
+            "📥 판단 기록 다운로드",
+            data=_bufd.getvalue(),
+            file_name=f"판단기록_{datetime.today().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+        _nr = _dfd['회차ID'].nunique() if '회차ID' in _dfd.columns else 0
+        st.caption(f"누적 {len(_dfd)}행 · 회차 {_nr}개")
+    else:
+        st.caption("아직 기록 없음 — 검토 완료 저장·발송 후 쌓입니다")
+
 # 구글 서비스 — 필요할 때 get_creds()로 직접 인증
 
 
@@ -4285,6 +4549,7 @@ elif page == "공고·매칭":
                                 _no_cand.append(_co2); continue
                             for _r2, _k2 in _cands2[:int(_n_auto)]:
                                 _rv2[_k2] = "○"; _f_cnt += 1
+                                st.session_state.setdefault('decision_src', {})[_k2] = '🟡 자동 보완'
                             _f_co += 1
                         save_review_state(drive, _rv2)
                         _msg = f"자동 보완 완료: {_f_co}개사 / {_f_cnt}건 승인 · 드라이브 저장됨"
@@ -4350,7 +4615,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0929-5 · 발송 이력 기업별 즉시 저장 (중단 후 재발송 방지) · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0929-6 · 회차별 판단 기록 (결정 출처·클릭·반응 누적) · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
@@ -4450,9 +4715,9 @@ elif page == "공고·매칭":
 
                                     rec_g = st.session_state['ai_analysis'].get(gkey, {}).get('추천여부', '')
                                     if auto_approve and rec_g == '추천':
-                                        st.session_state['review_state'][gkey] = '○'; ap_g += 1
+                                        set_decision(gkey, '○', 'AI 자동 승인'); ap_g += 1
                                     elif auto_reject and rec_g == '비추천':
-                                        st.session_state['review_state'][gkey] = '✕'; rj_g += 1
+                                        set_decision(gkey, '✕', 'AI 자동 제외'); rj_g += 1
 
                                     prog_g.progress(
                                         (gi+1)/total_g,
@@ -4490,7 +4755,7 @@ elif page == "공고·매칭":
                                 gkey = f"{r['기업명']}_{r.get('공고ID','')}"
                                 rec  = st.session_state.get('ai_analysis', {}).get(gkey, {}).get('추천여부','')
                                 if rec == '추천':
-                                    st.session_state['review_state'][gkey] = '○'
+                                    set_decision(gkey, '○', 'AI 자동 승인')
                             save_match_state(_get_drive())  # 일괄 승인 후 자동 저장
                             st.success(f"✅ AI 추천 공고 일괄 승인 완료")
                             st.rerun()
@@ -4680,8 +4945,8 @@ elif page == "공고·매칭":
                             if st.button(f"✅ AI 추천 {len(display_rows)}건 일괄 승인",
                                          type="primary", key="bulk_ai_approve"):
                                 for _, r in display_rows.iterrows():
-                                    st.session_state['review_state'][
-                                        f"{r['기업명']}_{r.get('공고ID','')}"] = "○"
+                                    set_decision(f"{r['기업명']}_{r.get('공고ID','')}",
+                                                 "○", 'AI 자동 승인')
                                 st.rerun()
                         else:
                             st.info("AI 추천 공고가 없습니다.")
@@ -4695,8 +4960,8 @@ elif page == "공고·매칭":
                         if st.button(f"🔴 AI 비추천 {len(ai_bad_rows)}건 일괄 제외",
                                      key="bulk_ai_reject"):
                             for _, r in ai_bad_rows.iterrows():
-                                st.session_state['review_state'][
-                                    f"{r['기업명']}_{r.get('공고ID','')}"] = "✕"
+                                set_decision(f"{r['기업명']}_{r.get('공고ID','')}",
+                                             "✕", 'AI 자동 제외')
                             st.rerun()
 
                     st.divider()
@@ -4891,13 +5156,13 @@ elif page == "공고·매칭":
                             lbl = "✅ 승인" if current != "○" else "↩ 승인취소"
                             btn_type = "primary" if current != "○" else "secondary"
                             if st.button(lbl, key=f"o_{key}_{i}", use_container_width=True, type=btn_type):
-                                st.session_state['review_state'][key] = "" if current=="○" else "○"
+                                set_decision(key, "" if current=="○" else "○", '담당자')
                                 # rerun 대신 상태만 변경 → 전체 재렌더링 없이 버튼 상태만 반영
                                 st.rerun()
                         with b2:
                             lbl = "❌ 제외" if current != "✕" else "↩ 제외취소"
                             if st.button(lbl, key=f"x_{key}_{i}", use_container_width=True):
-                                st.session_state['review_state'][key] = "" if current=="✕" else "✕"
+                                set_decision(key, "" if current=="✕" else "✕", '담당자')
                                 st.rerun()
                         with b3:
                             if row.get('공고링크',''):
@@ -4968,6 +5233,7 @@ elif page == "공고·매칭":
                                 f"{r['기업명']}_{r.get('공고ID','')}", "")
                         st.session_state['match_results'] = results
                         save_match_state(_get_drive())
+                        record_decision_log(_get_drive())   # 판단 기록 갱신 (실패해도 흐름 유지)
                         st.success(f"저장 완료 — 승인 {ap}건 → '발송 관리' 메뉴로 이동")
                 with c2:
                     if st.button("📥 매칭결과 엑셀 저장"):
@@ -5396,6 +5662,8 @@ elif page == "발송":
                         'at':    datetime.today().strftime('%Y-%m-%d %H:%M:%S'),
                         'round': _send_rid,
                         'pids':  [n.get('공고ID','') for n in notices],
+                        # 참고 공고도 메일에 실렸으므로 판단 기록에서 구분할 수 있게 남긴다
+                        'ref_pids': [x.get('공고ID','') for x in (_mail_meta or {}).get('review', [])],
                         'count': len(_co_rows),
                     }
                     _sprog['pending'].extend(_co_rows)
@@ -5433,6 +5701,8 @@ elif page == "발송":
                                  "이미 보낸 기업은 건너뛰고 미반영분만 기록합니다.")
                         st.stop()
                     save_send_progress(drive, _sprog)
+                    # 판단 기록에 발송 결과 반영 — 실패해도 발송 흐름을 막지 않는다
+                    record_decision_log(drive, _send_rid, _sprog.get('sent', {}))
                 prog.progress(1.0)
                 st.success(f"발송 완료 — {len(history_records)}건 → send_history.xlsx 저장 "
                            f"(회차 {_send_rid} · {len(_sprog['sent'])}개사)")
