@@ -1699,6 +1699,31 @@ def _notice_open(n, _ref=None):
             break
     return True if _d is None else _d >= _ref
 
+def can_include_notice(notice, company, ai_cache=None, review_state=None, ref=None):
+    """이 공고를 이 기업 메일에 넣어도 되는가 — 메일 수록 자격의 단일 관문.
+
+    승인 카드·참고 공고·업종 강등분·👁 미리보기·🟡 자동 보완 후보가 전부 여기를 거친다.
+    메일에 공고가 들어가는 경로를 새로 만들면 반드시 이 함수를 통과시킬 것.
+
+    검사: ① 공고ID 있음 ② 현재 회차에서 ✕가 아님 ③ AI 자격충족이 X가 아님
+          ④ _notice_open()으로 마감이 지나지 않음
+    반환: (ok, reason) — reason은 제외 사유(진단·집계용), 통과면 ''.
+    """
+    _pid = str(notice.get('공고ID', '') or notice.get('pblancId', '')).strip()
+    if not _pid:
+        return False, '공고ID 없음'
+    _co = str(company or notice.get('기업명', '') or '').strip()
+    _key = f"{_co}_{_pid}"
+    _rv = st.session_state.get('review_state', {}) if review_state is None else review_state
+    if (_rv or {}).get(_key, '') == '✕':
+        return False, '담당자 제외(✕)'
+    _ai = st.session_state.get('ai_analysis', {}) if ai_cache is None else ai_cache
+    if (_ai or {}).get(_key, {}).get('자격충족', '') == 'X':
+        return False, '자격 미충족'
+    if not _notice_open(notice, ref):
+        return False, '마감 경과'
+    return True, ''
+
 def _region_cut_result(row):
     """타지역 한정 공고 — AI 호출 없이 규칙으로 비추천 처리."""
     _rg = str(row.get('공고지역', '') or '해당 지역')
@@ -1759,7 +1784,7 @@ def attach_ai_reason(n, company, ai_cache):
         n['_ai_caution'] = _h.escape(caution[:90])
     return n
 
-def build_match_mail(company, notices, co_row, ai_cache, ref_map):
+def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=None):
     """맞춤 공고 메일 HTML 생성 — 👁 미리보기와 실제 발송이 함께 쓰는 단일 진입점.
 
     공고 선별(마감 재검사 → 업종 강등 → 참고 공고 보완)부터 HTML 조립까지 전부 여기서만
@@ -1769,13 +1794,19 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map):
       html — 발송될 HTML 전문. 안내할 공고가 하나도 없으면 None (발송 스킵 대상).
       meta — {'sss', 'ss', 'review', 'empty'}
     """
+    _ai_an = ai_cache or {}
+
+    # ── 메일 수록 자격 관문 ────────────────────────────
+    # 승인(○) 공고도 예외 없이 통과시킨다 — ✕ · 자격 미충족 · 마감 경과를 차단.
+    def _may(n):
+        return can_include_notice(n, company, _ai_an, review_state)[0]
+
     # 별점 기준으로 분류 (공고유형 무관)
-    _sss_raw = [n for n in notices if n.get('관련도','')=='★★★' and _notice_open(n)]
-    _ss_raw  = [n for n in notices if n.get('관련도','')=='★★' and _notice_open(n)]
+    _sss_raw = [n for n in notices if n.get('관련도','')=='★★★' and _may(n)]
+    _ss_raw  = [n for n in notices if n.get('관련도','')=='★★' and _may(n)]
 
     # 방향1: AI 업종일치가 △/X인 공고는 '맞춤'에서 제외 → 참고로 강등
     # (업종 안 맞는 걸 맞춤이라 내보내면 신뢰도 하락)
-    _ai_an = ai_cache or {}
     def _ind_ok(n):
         _k = f"{company}_{n.get('공고ID','')}"
         _ind = _ai_an.get(_k, {}).get('업종일치', '')
@@ -1795,9 +1826,10 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map):
     if _approved_cnt < 3:
         _need = 3 - _approved_cnt
         _approved_ids = {n.get('공고ID','') for n in notices_sss + notices_ss}
-        # 강등된 것 우선, 그다음 검토 공고
-        _cand = _demoted + [r for r in _ref_map.get(company, [])
-                 if r.get('공고ID','') not in _approved_ids and _notice_open(r)]
+        # 강등된 것 우선, 그다음 검토 공고 — 양쪽 다 같은 관문을 통과해야 한다
+        _cand = [x for x in _demoted if _may(x)] + [
+            r for r in _ref_map.get(company, [])
+            if r.get('공고ID','') not in _approved_ids and _may(r)]
         _seen_r = set()
         _cand_uniq = []
         for r in _cand:
@@ -4174,19 +4206,18 @@ elif page == "공고·매칭":
                             _by_co[_r2.get('기업명', '')].append(_r2)
                         _f_co = 0; _f_cnt = 0; _no_cand = []
                         for _co2, _rows2 in _by_co.items():
-                            if any(_rv2.get(f"{_co2}_{_r2.get('공고ID','')}") == "○" and _notice_open(_r2)
+                            if any(_rv2.get(f"{_co2}_{_r2.get('공고ID','')}") == "○"
+                                   and can_include_notice(_r2, _co2, _ai2, _rv2)[0]
                                    for _r2 in _rows2):
-                                continue   # 접수 중인 승인 보유
+                                continue   # 메일에 실릴 수 있는 승인 공고를 이미 보유
                             _cands2 = []
                             for _r2 in _rows2:
                                 _k2 = f"{_co2}_{_r2.get('공고ID','')}"
-                                if _rv2.get(_k2) == "✕":
+                                # 메일 수록 자격(✕ · 자격 미충족 · 마감 경과)은 관문에서 한 번에
+                                if not can_include_notice(_r2, _co2, _ai2, _rv2)[0]:
                                     continue
-                                _a2 = _ai2.get(_k2, {})
-                                if _a2.get('추천여부') != '검토' or _a2.get('자격충족') == 'X':
-                                    continue
-                                if not _notice_open(_r2):
-                                    continue   # 마감 경과 공고는 보완 후보에서 제외
+                                if _ai2.get(_k2, {}).get('추천여부') != '검토':
+                                    continue   # '검토' 등급만 보완 대상 (자동 보완 고유 규칙)
                                 try:
                                     if float(_r2.get('소재지점수', 0) or 0) < 0:
                                         continue
@@ -4263,7 +4294,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0929-3 · 매칭 회차별 승인 상태 분리 (○ 이월 금지) · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0929-4 · 메일 수록 자격 단일 관문(can_include_notice) 통합 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
@@ -4992,40 +5023,27 @@ elif page == "발송":
 
     ai_cache = st.session_state.get('ai_analysis', {})
 
-    # ── 마감 지난 공고 제외 (발송 시점 기준) ──────────────
+    # ── 메일 수록 자격 검사 (발송 시점 기준) ──────────────
+    # 마감 경과·담당자 제외(✕)·자격 미충족을 can_include_notice() 한 곳에서 판정한다.
+    # 승인 공고와 참고 공고 후보가 모두 이 관문을 지난 뒤에만 아래로 내려간다.
     _today_str = datetime.today().strftime('%Y-%m-%d')
-    def _not_expired(r):
-        """마감일이 없으면(상시) 통과, 있으면 오늘 이후만 통과."""
-        _dl = str(r.get('마감일','') or '').strip()
-        if not _dl or _dl.lower() in ('nan','none','상시'):
-            # 마감일 컬럼이 비면 접수기간 끝부분으로 재확인
-            _rp = str(r.get('접수기간','') or '')
-            if '~' in _rp:
-                _dl = _rp.split('~')[-1].strip()
-            else:
-                return True
-        _dl = _dl[:10]
-        try:
-            return datetime.strptime(_dl, '%Y-%m-%d').date() >= datetime.today().date()
-        except Exception:
-            return True   # 날짜 형식이 아니면(차수별 상이 등) 통과
-
-    _results_live = [r for r in results if _not_expired(r)]
+    _cut_reason = {}
+    _results_live = []
+    for r in results:
+        _ok_r, _why_r = can_include_notice(r, r.get('기업명',''), ai_cache, review_state)
+        if _ok_r:
+            _results_live.append(r)
+        else:
+            _cut_reason[_why_r] = _cut_reason.get(_why_r, 0) + 1
     _n_expired = len(results) - len(_results_live)
 
     approved = [
         r for r in _results_live
         if review_state.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", '') == '○'
     ]
-    # AI 검토 등급 공고 (미검토 상태 + AI검토 판정)
-    review_grade = [
-        r for r in _results_live
-        if review_state.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", '') == ''
-        and ai_cache.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", {}).get('추천여부','') == '검토'
-    ]
 
-    # 참고 공고: 승인 0건 기업용 — 그 기업의 ★★ 검토 공고 상위 3건 (제외 여부 무관)
-    # AI가 '검토'로 판정한 것 중 점수 높은 순. 승인 공고 없는 기업의 빈자리를 채움.
+    # 참고 공고: 승인 0건 기업용 — AI가 '검토'로 판정한 것 중 점수 높은 순.
+    # _results_live가 이미 관문을 통과했으므로 ✕·자격 미충족·마감 공고는 들어올 수 없다.
     _ref_by_co = {}
     for r in _results_live:
         _rec = ai_cache.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", {}).get('추천여부','')
@@ -5042,7 +5060,9 @@ elif page == "발송":
     else:
         st.info(f"📌 현재 매칭 대상 그룹: **{matched_group}** (다른 그룹 발송 시 '매칭 결과'에서 그룹 변경 후 재매칭 필요)")
         if _n_expired:
-            st.warning(f"⏰ 마감 지난 공고 {_n_expired}건은 발송 대상에서 자동 제외되었습니다. (기준일 {_today_str})")
+            _cut_detail = " · ".join(f"{_k} {_v}건" for _k, _v in
+                                     sorted(_cut_reason.items(), key=lambda x: -x[1]))
+            st.warning(f"⏰ 발송 대상에서 자동 제외 {_n_expired}건 — {_cut_detail} (기준일 {_today_str})")
         # 전체 기업 목록 로드 (선정 기업만)
         _df_c_top = load_excel(drive, SELECTED_FILE)
         if not _df_c_top.empty and '기업명' in _df_c_top.columns:
@@ -5101,7 +5121,8 @@ elif page == "발송":
             [r for r in approved if r['기업명'] == preview_co],
             _co_info,
             st.session_state.get('ai_analysis', {}),
-            st.session_state.get('_ref_notices_by_co', {}))
+            st.session_state.get('_ref_notices_by_co', {}),
+            st.session_state.get('review_state', {}))
 
         if _preview_html is None:
             st.warning(f"{preview_co} — 안내할 공고가 없어 실제 발송에서도 제외됩니다.")
@@ -5140,7 +5161,7 @@ elif page == "발송":
             for r in approved:
                 grouped.setdefault(r['기업명'],[]).append(r)
 
-            # 0건 기업도 발송 대상에 추가 (review_grade 공고로 채움)
+            # 0건 기업도 발송 대상에 추가 (참고 공고로 채움)
             if '선정구분' in df_c_cur.columns:
                 all_companies = df_c_cur[df_c_cur['선정구분']=='선정']['기업명'].dropna().tolist()
             else:
@@ -5200,7 +5221,8 @@ elif page == "발송":
                 html, _mail_meta = build_match_mail(
                     company, notices, co_row,
                     st.session_state.get('ai_analysis', {}),
-                    st.session_state.get('_ref_notices_by_co', {}))
+                    st.session_state.get('_ref_notices_by_co', {}),
+                    st.session_state.get('review_state', {}))
                 today_str = datetime.today().strftime('%Y.%m.%d')
 
                 # ── 빈 메일 방지: 안내할 카드가 하나도 없으면 발송 스킵 ──
