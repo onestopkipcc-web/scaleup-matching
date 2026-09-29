@@ -2183,6 +2183,32 @@ def soften_reason(text):
         t = _pat.sub(_to, t)
     return re.sub(r'\s{2,}', ' ', t).strip()
 
+# 🟡 자동 보완으로 승인된 공고는 AI가 '검토'로 판정한 것이라, 판단근거 첫 문장이
+# "핵심 정보가 누락되어 판단이 불가능합니다" 같은 내용일 수 있다.
+# 그걸 그대로 💡 추천 이유로 내보내면 "귀사 정보가 없어 판단을 못 하겠다"를
+# 추천 이유로 받는 꼴이 된다. 이런 문장은 아예 붙이지 않는다(카드에서 💡 줄만 빠짐).
+_RE_NO_REASON = re.compile(
+    r'판단이?\s*(?:어렵|불가)|판단\s*불가|누락|명시되지\s*않|제공되지\s*않|'
+    r'확인\s*불가|정보가\s*없|알\s*수\s*없')
+
+# 기업명을 '귀사'로 바꾸면 조사가 안 맞는 경우가 생긴다 ("귀사으로", "귀사이").
+_JOSA_FIX = [
+    (re.compile(r"기업명\s*'?귀사'?"), '귀사'),
+    (re.compile(r'귀사으로'), '귀사로'),
+    (re.compile(r'귀사은'), '귀사는'),
+    (re.compile(r'귀사이(?=\s)'), '귀사가'),
+    (re.compile(r'귀사을'), '귀사를'),
+    (re.compile(r'귀사과'), '귀사와'),
+    (re.compile(r'귀사와의'), '귀사의'),
+]
+
+def fix_josa(text):
+    """'귀사' 치환 뒤 어긋난 조사를 바로잡는다."""
+    t = str(text or '')
+    for _pat, _to in _JOSA_FIX:
+        t = _pat.sub(_to, t)
+    return re.sub(r'\s{2,}', ' ', t).strip()
+
 def attach_ai_reason(n, company, ai_cache):
     """공고 dict에 수신자용 추천 이유(_ai_reason)·주의사항(_ai_caution)을 부착.
     AI_판단근거 첫 문장에서 기업명을 '귀사'로 치환."""
@@ -2194,6 +2220,9 @@ def attach_ai_reason(n, company, ai_cache):
     reason = str(res.get('판단근거', '') or '').strip()
     if reason and reason.lower() != 'nan':
         first = re.split(r'(?<=다\.)\s+', reason)[0]
+        if _RE_NO_REASON.search(first):
+            # 판단불가·정보누락을 말하는 문장은 추천 이유가 될 수 없다
+            first = ''
         _names = {str(company or ''), str(n.get('기업명', '') or '')}
         for _nm in list(_names):
             _core = re.sub(r'\(주\)|\(유\)|주식회사|\s', '', _nm)
@@ -2204,8 +2233,9 @@ def attach_ai_reason(n, company, ai_cache):
                 first = first.replace(f"'{_nm}'", '귀사').replace(_nm, '귀사')
         first = _RE_LEAD_CO.sub(
             lambda m: '귀사' + _LEAD_JOSA.get(m.group(1), m.group(1)) + ' ', first)
-        first = re.sub(r'귀사(은|는)', '귀사는', first)
-        n['_ai_reason'] = _h.escape(clip_text(soften_reason(first), REASON_MAX))
+        first = fix_josa(first)
+        if first:
+            n['_ai_reason'] = _h.escape(clip_text(soften_reason(first), REASON_MAX))
     caution = str(res.get('주의사항', '') or '').strip()
     if caution and caution not in ('없음', 'nan'):
         # 주의사항은 경고문이라 '반드시 확인' 같은 표현이 오히려 맞다 — 완화하지 않고
@@ -4786,7 +4816,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0929-12 · 주의사항 절단 개선 · 문두 '기업은'→'귀사는' · 빈손 폴백 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0929-13 · 판단불가 문구는 추천 이유에서 제외 · '귀사' 조사 정리 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     # ── 버전이 달라진 판정 — 표시만 하고 자동 실행하지 않는다 ──
                     _ai_now = st.session_state.get('ai_analysis', {})
                     _co_cache = st.session_state.get('df_companies_cache')
