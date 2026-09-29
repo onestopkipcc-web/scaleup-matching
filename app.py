@@ -1601,11 +1601,18 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=
     }
     seg_boost = SEGMENT_BOOST.get(segment, {})
 
-    # ── TRL 필터: 8-9단계 기업은 R&D 공고 제외 ──────
+    # ── TRL 필터: 8-9단계 기업과 R&D 공고 ──────────────
+    # 예전에는 R&D 단어만 보이면 무조건 탈락시켰다. 접수 중 공고 1,750건을 재보니
+    # R&D 계열 단어가 걸리는 137건 중 69건(절반)이 사업화·상용화·판로도 함께 다룬다.
+    # 순수 R&D 공고만 탈락시키고, 사업화를 겸하면 감점만 준다.
+    rd_penalty = 0
     trl = str(row.get('TRL단계',''))
     if any(t in trl for t in ['8','9']):
         if any(kw in text for kw in ['R&D','연구개발','기술개발과제','기초연구','원천기술']):
-            return None
+            if any(kw in text for kw in ['사업화','상용화','판로','마케팅','수출']):
+                rd_penalty = -4      # 사업화 겸용 → 순위만 낮춘다
+            else:
+                return None          # 순수 R&D 공고 → 종전대로 제외
 
     # ── 소재지 필터: 지역 공고 판단 ─────────────────
     location = str(row.get('소재지',''))
@@ -1802,7 +1809,7 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=
         len(matched_co)     * W_KW    +
         len(matched_demand) * W_DEMAND +
         ind_score * W_IND   +
-        xs + (location_score * W_LOC // 3) + seg_score + feedback_penalty
+        xs + (location_score * W_LOC // 3) + seg_score + feedback_penalty + rd_penalty
     )
     if matched_demand: score += 8   # 핵심수요 직접매칭 강력 보너스
     if score <= 0: return None
@@ -4636,7 +4643,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0929-7 · 공고 본문 정리(네비·푸터 제거) + AI 투입 절단 해제 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0929-8 · TRL 8~9 기업의 R&D 하드컷을 감점으로 완화 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
