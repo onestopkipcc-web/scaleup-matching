@@ -1945,6 +1945,10 @@ def get_detail_map_cached():
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 NOTICE_TEXT_CAP = 8000
 
+# ⚡ 일괄 AI 분석을 시작하려면 매칭 공고 중 이 비율 이상이 전문을 갖고 있어야 한다.
+# 예전에는 1건만 겹쳐도 통과해서, 전문 없는 공고가 요약(300자)만으로 판정됐다.
+FULLTEXT_MIN_COVERAGE = 0.7
+
 # 기업마당 페이지를 통째로 긁은 탓에 모든 전문 앞에 메뉴가, 39%에 푸터가 붙어 있다.
 # 실측: 앞 네비 10.6% + 뒤 푸터 4.9% = 전체 분량의 15.5%가 공고와 무관한 문자열.
 _RE_NOTICE_HEAD = re.compile(r'소관부처|사업개요|신청기간')
@@ -4643,7 +4647,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0929-8 · TRL 8~9 기업의 R&D 하드컷을 감점으로 완화 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0929-9 · 전문 가드를 보유율 기준으로 강화 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
@@ -4676,17 +4680,23 @@ elif page == "공고·매칭":
                             _dm_err = st.session_state.get('_detail_map_ai_err', '')
                             _pid_col = df_show['공고ID'].astype(str).str.strip() if '공고ID' in df_show.columns else pd.Series([], dtype=str)
                             _hit_chk = int(_pid_col.isin(set(_dm_chk.keys())).sum())
-                            if _dm_err or _hit_chk == 0:
-                                _why = _dm_err or "전문 DB는 열렸으나 현재 매칭 공고와 겹치는 전문이 0건"
+                            # 예전에는 1건만 겹쳐도 통과시켜, 전문 없는 공고가 요약만으로
+                            # 판정되는 걸 막지 못했다. 보유율 기준으로 바꾼다.
+                            _cov = _hit_chk / max(len(df_show), 1)
+                            if _dm_err or _cov < FULLTEXT_MIN_COVERAGE:
+                                _why = _dm_err or (
+                                    f"현재 매칭 {len(df_show)}건 중 전문 보유가 {_hit_chk}건"
+                                    f"({_cov*100:.0f}%)뿐 — 기준 {FULLTEXT_MIN_COVERAGE*100:.0f}% 미달")
                                 st.error(f"⛔ 분석 중단: {_why}\n\n"
                                          f"요약(300자)만으로 분석하면 '검토' 판정이 과다 발생해 비용만 낭비됩니다. "
-                                         f"전문 DB 문제를 해결한 뒤 다시 실행하세요. "
+                                         f"공고 전문 크롤링을 먼저 돌린 뒤 다시 실행하세요. "
                                          f"(부득이하게 강행하려면 아래 체크 후 재실행)")
                                 if not st.session_state.get('force_no_fulltext', False):
                                     st.checkbox("⚠️ 전문 없이 강행 (권장 안 함)", key="force_no_fulltext")
                                     st.stop()
                             else:
-                                st.caption(f"📄 AI용 전문 DB {len(_dm_chk)}건 로드 · 현재 매칭 {len(df_show)}건 중 전문 반영 가능 {_hit_chk}건")
+                                st.caption(f"📄 AI용 전문 DB {len(_dm_chk)}건 로드 · 현재 매칭 {len(df_show)}건 중 "
+                                           f"전문 반영 가능 {_hit_chk}건 ({_cov*100:.0f}%)")
 
                             # 드라이브 캐시 먼저 로드 → 세션에 병합
                             cached = load_json(_drive, AI_ANALYSIS_FILE) or {}
