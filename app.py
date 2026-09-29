@@ -179,6 +179,62 @@ def load_review_state(drive, round_id=None, keep_reject=None):
         state = carry_over_reject(state, keep_reject)
     return state, saved_round, saved_at, same
 
+# ── 발송 진행 기록 ────────────────────────────────────
+# 기업 한 곳의 Gmail 발송이 성공하면 즉시 여기에 기록한다. 발송이 중간에 멈춰도
+# 재실행 시 이 기록을 보고 이미 보낸 기업을 건너뛴다.
+# send_history.xlsx는 구조·기존 기록을 그대로 두고, pending을 모아 반영한다
+# (셀마다 서식을 입히는 save_excel을 기업마다 돌리면 너무 느리기 때문).
+SEND_PROGRESS_FILE  = "send_progress.json"
+HISTORY_FLUSH_EVERY = 10   # 이 개수만큼 발송할 때마다 엑셀 중간 저장
+
+def send_round_id():
+    """발송 회차 ID — 매칭 회차를 그대로 쓴다. 발송이 중단돼도 매칭 회차는
+    그대로라 재실행 시 같은 회차로 이어진다."""
+    _r = current_round_id()
+    if _r:
+        return _r
+    if not st.session_state.get('_fallback_send_round'):
+        st.session_state['_fallback_send_round'] = new_round_id()
+    return st.session_state['_fallback_send_round']
+
+def load_send_progress(drive, round_id):
+    """현재 발송 회차의 진행 기록. 회차가 다르면 빈 기록으로 시작한다."""
+    d = load_json(drive, SEND_PROGRESS_FILE) or {}
+    if d.get('round_id') != round_id:
+        return {'round_id': round_id, 'sent': {}, 'pending': []}
+    d.setdefault('sent', {})
+    d.setdefault('pending', [])
+    d['round_id'] = round_id
+    return d
+
+def save_send_progress(drive, prog):
+    """진행 기록 즉시 저장. False를 돌려주면 호출부는 발송을 중단해야 한다."""
+    try:
+        import json as _j
+        prog['saved_at'] = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+        return bool(drive_upload(drive, SEND_PROGRESS_FILE,
+                                 _j.dumps(prog, ensure_ascii=False).encode('utf-8'),
+                                 "application/json"))
+    except Exception:
+        return False
+
+def flush_send_history(drive, prog):
+    """pending을 send_history.xlsx에 합쳐 저장하고 비운다.
+    엑셀의 컬럼 구조와 기존 기록은 그대로 둔다. 반환: (ok, 반영건수)"""
+    rows = prog.get('pending', [])
+    if not rows:
+        return True, 0
+    try:
+        df_h   = load_excel(drive, HISTORY_FILE)
+        df_new = pd.DataFrame(rows)
+        df_fin = pd.concat([df_h, df_new], ignore_index=True) if not df_h.empty else df_new
+        if not save_excel(drive, df_fin, HISTORY_FILE, "발송이력", "375623"):
+            return False, 0
+        prog['pending'] = []
+        return True, len(rows)
+    except Exception:
+        return False, 0
+
 def track_link(dest_url, company, notice_id, notice_name):
     """공고 링크를 클릭 추적 URL로 감싼다. dest_url이 없으면 원본 그대로."""
     import urllib.parse as _up
@@ -4294,7 +4350,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0929-4 · 메일 수록 자격 단일 관문(can_include_notice) 통합 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0929-5 · 발송 이력 기업별 즉시 저장 (중단 후 재발송 방지) · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     rq_col1, _rq_sp = st.columns([2, 2])
                     with rq_col1:
                         _rq_clicked = st.button("🔁 '검토' 판정 재분석 준비 (전문 반영)",
@@ -5179,6 +5235,32 @@ elif page == "발송":
                     st.session_state.pop('_send_preview_co', None)
                     st.stop()
 
+            # ── 발송 진행 기록 — 중단 후 재실행 시 중복 발송 방지 ──
+            # 테스트 모드와 👁 미리보기는 실제 이력을 남기지 않으므로 건드리지 않는다.
+            _record_history = (not test_mode) and (not _pv_only)
+            _send_rid = send_round_id()
+            _sprog    = {'round_id': _send_rid, 'sent': {}, 'pending': []}
+            if _record_history:
+                _sprog = load_send_progress(drive, _send_rid)
+                # 지난 실행이 중간에 멈춰 엑셀에 못 들어간 기록부터 복구
+                _ok_f, _n_f = flush_send_history(drive, _sprog)
+                if not _ok_f:
+                    st.error("⛔ 이전 발송의 미기록분을 send_history.xlsx에 저장하지 못했습니다.\n\n"
+                             "드라이브 연결을 확인한 뒤 다시 실행하세요. (이번에는 발송하지 않았습니다)")
+                    st.stop()
+                if _n_f:
+                    save_send_progress(drive, _sprog)
+                    st.info(f"🔁 이전 발송의 미기록분 {_n_f}건을 발송 이력에 반영했습니다.")
+                _already_co = [c for c in grouped if c in _sprog['sent']]
+                if _already_co:
+                    grouped = {k: v for k, v in grouped.items() if k not in _sprog['sent']}
+                    st.info(f"⏭️ 이번 회차({_send_rid})에 이미 발송된 {len(_already_co)}개사 건너뜀 — "
+                            + ", ".join(_already_co[:8])
+                            + (" 외" if len(_already_co) > 8 else ""))
+                if not grouped:
+                    st.success(f"이번 회차({_send_rid})는 대상 {len(_already_co)}개사가 모두 발송 완료된 상태입니다.")
+                    st.stop()
+
             # ── 테스트 모드: 지정 개수만 추출 ──────────────
             if test_mode and _test_limit and _test_limit < len(grouped):
                 _items = list(grouped.items())
@@ -5299,12 +5381,37 @@ elif page == "발송":
                                 'extendedProperties':{'private':{'pblancId':pid}},
                             })
 
-                for n in notices:
-                    history_records.append({"기업명":company,"pblancId":n.get('공고ID',''),
+                _co_rows = [{"기업명":company,"pblancId":n.get('공고ID',''),
                         "공고명":n.get('공고명',''),"발송일":datetime.today().strftime("%Y-%m-%d"),
                         "마감일":n.get('마감일',''),"공고링크":n.get('공고링크',''),
                         "매칭점수":n.get('점수',''),"담당자검토":"○",
-                        "검토의견":n.get('검토의견',''),"신청여부":"","선정결과":""})
+                        "검토의견":n.get('검토의견',''),"신청여부":"","선정결과":""}
+                    for n in notices]
+                history_records.extend(_co_rows)
+
+                # ── 발송 성공 → 이 기업 이력을 즉시 저장 ──────────
+                # 기록에 실패하면 다음 기업으로 절대 넘어가지 않는다 (중복 발송 위험).
+                if _record_history:
+                    _sprog['sent'][company] = {
+                        'at':    datetime.today().strftime('%Y-%m-%d %H:%M:%S'),
+                        'round': _send_rid,
+                        'pids':  [n.get('공고ID','') for n in notices],
+                        'count': len(_co_rows),
+                    }
+                    _sprog['pending'].extend(_co_rows)
+                    if not save_send_progress(drive, _sprog):
+                        st.error(f"⛔ {company} 메일은 나갔지만 발송 기록 저장에 실패했습니다.\n\n"
+                                 f"기록 없이 계속 보내면 중복 발송 위험이 있어 여기서 중단합니다. "
+                                 f"드라이브 연결을 확인한 뒤 다시 실행하면 이미 보낸 기업은 건너뜁니다.")
+                        st.stop()
+                    # 엑셀 중간 저장 — 셀 서식 때문에 매번 쓰기엔 느려서 묶어서 반영
+                    if len(_sprog['sent']) % HISTORY_FLUSH_EVERY == 0:
+                        _ok_m, _n_m = flush_send_history(drive, _sprog)
+                        if not _ok_m:
+                            st.error("⛔ send_history.xlsx 중간 저장에 실패했습니다. "
+                                     "중복 발송을 막기 위해 중단합니다.")
+                            st.stop()
+                        save_send_progress(drive, _sprog)
 
                 logs.append(f"✅ {company} — {len(notices)}건 발송 완료")
                 log.code("\n".join(logs)); prog.progress((idx+1)/len(grouped))
@@ -5317,13 +5424,18 @@ elif page == "발송":
                 st.info("테스트 모드에서는 발송 이력 저장과 캘린더 등록이 모두 생략됩니다. "
                         "실제 발송 시에만 기록·등록됩니다.")
             else:
-                with st.spinner("발송 이력 드라이브 저장 중..."):
-                    df_h   = load_excel(drive, HISTORY_FILE)
-                    df_new = pd.DataFrame(history_records)
-                    df_fin = pd.concat([df_h,df_new],ignore_index=True) if not df_h.empty else df_new
-                    save_excel(drive, df_fin, HISTORY_FILE, "발송이력", "375623")
+                if _record_history:
+                    with st.spinner("발송 이력 드라이브 저장 중..."):
+                        _ok_e, _n_e = flush_send_history(drive, _sprog)
+                    if not _ok_e:
+                        st.error("⛔ send_history.xlsx 최종 저장에 실패했습니다.\n\n"
+                                 "진행 기록은 남아 있으니 드라이브 연결을 확인한 뒤 다시 실행하세요. "
+                                 "이미 보낸 기업은 건너뛰고 미반영분만 기록합니다.")
+                        st.stop()
+                    save_send_progress(drive, _sprog)
                 prog.progress(1.0)
-                st.success(f"발송 완료 — {len(history_records)}건 → send_history.xlsx 저장")
+                st.success(f"발송 완료 — {len(history_records)}건 → send_history.xlsx 저장 "
+                           f"(회차 {_send_rid} · {len(_sprog['sent'])}개사)")
                 if _empty_skipped:
                     st.info(f"⏭️ 안내할 공고가 없어 발송 제외: {len(_empty_skipped)}개사 — {', '.join(_empty_skipped[:8])}{' 외' if len(_empty_skipped)>8 else ''}")
 
@@ -7817,6 +7929,8 @@ elif page == "설정":
                 "매칭점수","담당자검토","검토의견","신청여부","선정결과"
             ])
             if save_excel(drive, empty_df, HISTORY_FILE, "발송이력", "375623"):
+                # 진행 기록도 함께 비운다 — 남겨두면 다음 발송이 계속 건너뛴다
+                save_send_progress(drive, {'round_id': '', 'sent': {}, 'pending': []})
                 st.success("✅ 발송 이력 초기화 완료 — 다음 매칭부터 모든 공고가 다시 추천됩니다.")
             else:
                 st.error("초기화 실패 — 드라이브 연결을 확인하세요.")
