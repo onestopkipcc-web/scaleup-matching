@@ -1959,7 +1959,7 @@ _RE_NOTICE_FOOT = re.compile(r'자료이용 및 저작권보호|웹접근성정�
 # 캐시 키(기업명_공고ID)는 그대로 두고, 판정 결과 안에 어떤 입력으로 뽑았는지를
 # 기록한다. 프로필·전문·프롬프트가 바뀌면 '재분석 대상'으로 표시만 하고
 # 자동 실행하지 않는다 (비용이 나가는 일은 담당자가 누를 때만).
-AI_PROMPT_VER = "2026-09-29"          # claude_analyze 프롬프트를 고칠 때 올린다
+AI_PROMPT_VER = "2026-09-29b"          # claude_analyze 프롬프트를 고칠 때 올린다
 _PROFILE_KEYS = ('소재지', '기업유형', '관심사업분야', '제품분야', '기술키워드',
                  '핵심수요태그', '수출실적', 'TRL단계', '매출규모', '설립연도')
 
@@ -2018,24 +2018,47 @@ def enrich_for_ai(nd):
         pass
     return nd
 
+_RE_NOTICE_DATE = re.compile(r'(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})')
+
+# 접수기간에서 날짜를 못 찾는 공고를 메일에 실을지.
+# 실측(800건): 56%가 날짜 없음 — '예산 소진시까지' 152 · '상시 접수' 99 ·
+# '세부사업별 상이' 67 · '모집 완료시' 33 · '선착순 접수' 27 · '추후 공지' 24 등.
+# 이미 예산이 소진됐거나 아직 열리지 않았을 수 있어 메일에서는 제외한다.
+# (매칭·검토 화면에는 그대로 보이고 메일에만 안 나간다)
+REQUIRE_NOTICE_DATE = True
+
+def notice_deadline_date(n):
+    """공고의 마감일을 date로. 마감일 → 접수기간 끝 순으로 찾고, 없으면 None."""
+    from datetime import date as _date
+    for _src in (n.get('마감일', ''), n.get('접수기간', '')):
+        _ms = _RE_NOTICE_DATE.findall(str(_src or ''))
+        if _ms:
+            _y, _mo, _dd = _ms[-1]
+            try:
+                return _date(int(_y), int(_mo), int(_dd))
+            except ValueError:
+                return None
+    return None
+
+def deadline_label(n):
+    """카드에 찍을 접수기간 문구. 날짜가 없을 때 '상시'로 뭉개면
+    '예산 소진시까지'인 공고가 상시 접수처럼 보인다 — 원문을 그대로 쓴다."""
+    _d = notice_deadline_date(n)
+    if _d:
+        return f"마감 {_d.strftime('%Y-%m-%d')}"
+    _rp = str(n.get('접수기간', '') or '').strip()
+    return f"접수 {_rp}" if _rp else "접수기간 확인 필요"
+
 def _notice_open(n, _ref=None):
     """발송 시점 기준으로 접수 중인 공고인지 검사.
-    마감일 → 접수기간 종료일 순으로 날짜를 찾고, 날짜가 없으면(상시 등) 통과."""
+    날짜가 없으면(상시 등) 여기서는 통과시키고, 제외 여부는
+    can_include_notice()가 REQUIRE_NOTICE_DATE로 따로 판단한다."""
     from datetime import date as _date
     _ref = _ref or _date.today()
     _dl_txt = str(n.get('마감일', '') or '').strip()
     if _dl_txt in ('마감', '종료', '접수마감', '모집마감', '마감됨'):
         return False
-    _d = None
-    for _src in (n.get('마감일', ''), n.get('접수기간', '')):
-        _ms = re.findall(r'(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})', str(_src or ''))
-        if _ms:
-            _y, _mo, _dd = _ms[-1]
-            try:
-                _d = _date(int(_y), int(_mo), int(_dd))
-            except ValueError:
-                _d = None
-            break
+    _d = notice_deadline_date(n)
     return True if _d is None else _d >= _ref
 
 def can_include_notice(notice, company, ai_cache=None, review_state=None, ref=None):
@@ -2061,6 +2084,8 @@ def can_include_notice(notice, company, ai_cache=None, review_state=None, ref=No
         return False, '자격 미충족'
     if not _notice_open(notice, ref):
         return False, '마감 경과'
+    if REQUIRE_NOTICE_DATE and notice_deadline_date(notice) is None:
+        return False, '접수기간 불명'
     return True, ''
 
 def _region_cut_result(row):
@@ -2097,6 +2122,32 @@ def group_related_notices(notices):
     out.sort(key=lambda x: -float(x.get('점수', 0) or 0))
     return out
 
+# 메일에 나가는 추천 이유에서 단정적 표현을 걷어낸다.
+# 공고 본문에 자격 조건이 21.6%만 있는 상황이라 '정확히·완벽히'라고 쓸 근거가 약하다.
+# 부사만 지우므로 문장 구조는 그대로 남는다.
+#   "분야와 정확히 일치합니다"  → "분야와 일치합니다"
+#   "목적과 완벽히 부합합니다"  → "목적과 부합합니다"
+_SOFTEN_RULES = [
+    (re.compile(r'정확히\s*'), ''),
+    (re.compile(r'완벽(?:히|하게)\s*'), ''),
+    (re.compile(r'확실히\s*'), ''),
+    (re.compile(r'반드시\s*'), ''),
+    (re.compile(r'매우\s*'), ''),
+    (re.compile(r'완벽한\s*'), '적합한 '),
+    (re.compile(r'최적의\s*'), '적합한 '),
+    (re.compile(r'모두\s+충족'), '충족'),
+    (re.compile(r'전부\s+충족'), '충족'),
+]
+
+def soften_reason(text):
+    """단정적 표현 완화. 빈 값은 그대로 돌려준다."""
+    t = str(text or '')
+    if not t:
+        return t
+    for _pat, _to in _SOFTEN_RULES:
+        t = _pat.sub(_to, t)
+    return re.sub(r'\s{2,}', ' ', t).strip()
+
 def attach_ai_reason(n, company, ai_cache):
     """공고 dict에 수신자용 추천 이유(_ai_reason)·주의사항(_ai_caution)을 부착.
     AI_판단근거 첫 문장에서 기업명을 '귀사'로 치환."""
@@ -2117,7 +2168,7 @@ def attach_ai_reason(n, company, ai_cache):
             if len(_nm) >= 2:
                 first = first.replace(f"'{_nm}'", '귀사').replace(_nm, '귀사')
         first = re.sub(r'귀사(은|는)', '귀사는', first)
-        n['_ai_reason'] = _h.escape(first[:120])
+        n['_ai_reason'] = _h.escape(soften_reason(first)[:120])
     caution = str(res.get('주의사항', '') or '').strip()
     if caution and caution not in ('없음', 'nan'):
         n['_ai_caution'] = _h.escape(caution[:90])
@@ -2183,9 +2234,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
 
     def notice_card_simple(n, idx):
         """공통 공고용 심플 카드 (작고 간결하게)"""
-        dl_raw = n.get('마감일','')
-        if not dl_raw and '~' in n.get('접수기간',''):
-            dl_raw = n.get('접수기간','').split('~')[-1].strip()
+        _dl_txt = deadline_label(n)
         _trk = track_link(n.get('공고링크','#'), company,
                           n.get('공고ID',''), n.get('공고명',''))
         return f"""
@@ -2202,16 +2251,14 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
                 {n.get('공고명','')}
               </a>
               <p style="margin:3px 0 0;font-size:11px;color:#9A9488;">
-                {n.get('주관기관','')} &nbsp;·&nbsp; 마감 {dl_raw}
+                {n.get('주관기관','')} &nbsp;·&nbsp; {_dl_txt}
               </p>
             </td>
           </tr>
         </table>"""
 
     def notice_card(n, idx):
-        dl_raw = n.get("마감일","")
-        if not dl_raw and "~" in n.get("접수기간",""):
-            dl_raw = n.get("접수기간","").split("~")[-1].strip()
+        _dl_txt = deadline_label(n)
         hashtags = reason_to_hashtag(n.get("매칭근거",""))
         tag_html = ""
         if hashtags:
@@ -2255,7 +2302,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
                 {notice_name}
               </a>
               <p style="margin:4px 0 0;font-size:12px;color:#8A8478;">
-                {n.get("주관기관","")} &nbsp;·&nbsp; 마감 {f'<span style="color:#B0894A;font-weight:600;">{dl_raw}</span>' if dl_raw else "상시"}
+                {n.get("주관기관","")} &nbsp;·&nbsp; <span style="color:#B0894A;font-weight:600;">{_dl_txt}</span>
               </p>
               {tag_html}
               {_extra}
@@ -2706,7 +2753,7 @@ JSON 형식으로만 답하세요:
   "자격충족": "O 또는 X 또는 △",
   "지역적합": "O 또는 X 또는 △",
   "수요일치": "O 또는 X 또는 △",
-  "판단근거": "3~4문장으로 구체적 근거 (기업의 어떤 특성이 공고의 어떤 조건과 맞거나 안 맞는지)",
+  "판단근거": "3~4문장으로 구체적 근거 (기업의 어떤 특성이 공고의 어떤 조건과 맞거나 안 맞는지). 공고 본문에서 확인한 사실만 담담하게 쓰고 '정확히·완벽히·확실히·반드시' 같은 단정적 표현은 쓰지 마세요. 본문에서 확인되지 않은 조건은 단정하지 말고 확인이 필요하다고 적으세요.",
   "주의사항": "신청 전 반드시 확인할 사항 (없으면 없음)"
 }}"""
 
@@ -4683,7 +4730,7 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0929-10 · AI 판정 버전 기록 (프로필·전문·프롬프트) · 불일치는 표시만 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0929-11 · 접수기간 불명 공고 메일 제외 · 마감 표기 정직화 · 추천 이유 완화 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     # ── 버전이 달라진 판정 — 표시만 하고 자동 실행하지 않는다 ──
                     _ai_now = st.session_state.get('ai_analysis', {})
                     _co_cache = st.session_state.get('df_companies_cache')
