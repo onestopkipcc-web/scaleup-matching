@@ -2774,6 +2774,37 @@ def claude_call_raw(prompt, max_tokens=1000):
     return ''
 
 
+def get_companies_df():
+    """기업 프로필 표. 세션 캐시가 없으면 드라이브에서 읽어 채운다.
+
+    예전에는 「🔍 매칭 실행」 버튼 안에서만 df_companies_cache 를 채웠다.
+    앱이 재시작되거나 다른 세션에서 ⚡ 분석을 돌리면 기업 정보가 통째로 빠진 채
+    claude_analyze 가 호출돼, 판정이 '검토'(79%)와 자격충족 '△'(89%)로 몰렸다.
+    실측: 버전 추적 가능한 438건 중 82건이 빈 프로필로 분석됨."""
+    df = st.session_state.get('df_companies_cache')
+    try:
+        if df is None or df.empty:
+            df = load_excel(_get_drive(), SELECTED_FILE)
+            if not df.empty:
+                st.session_state['df_companies_cache'] = df
+    except Exception:
+        df = pd.DataFrame()
+    return df if df is not None else pd.DataFrame()
+
+def company_profile(name):
+    """기업명 → AI에 넘길 프로필 dict. 못 찾으면 기업명만 담아 돌려준다."""
+    try:
+        df = get_companies_df()
+        if df is not None and not df.empty and '기업명' in df.columns:
+            m = df[df['기업명'] == name]
+            if not m.empty:
+                d = m.iloc[0].to_dict()
+                d['기업명'] = name
+                return d
+    except Exception:
+        pass
+    return {'기업명': name}
+
 def claude_analyze(company_info, notice_info):
     """Claude API로 공고-기업 적합성 분석"""
     api_key = ""
@@ -4816,10 +4847,10 @@ elif page == "공고·매칭":
                                            in st.session_state.get('ai_analysis', {}))
                         st.metric("분석 완료", f"{already_done}/{len(filtered)}건")
 
-                    st.caption("🏷️ 빌드 v0929-13 · 판단불가 문구는 추천 이유에서 제외 · '귀사' 조사 정리 · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
+                    st.caption("🏷️ 빌드 v0929-14 · 기업 프로필을 드라이브에서 자동 복구 (AI 판정 오염 방지) · 아래 🔁 버튼: 요약만 보고 '검토'로 미뤄진 판정을 지우고, ⚡ 실행 시 공고 전문을 반영해 다시 분석합니다.")
                     # ── 버전이 달라진 판정 — 표시만 하고 자동 실행하지 않는다 ──
                     _ai_now = st.session_state.get('ai_analysis', {})
-                    _co_cache = st.session_state.get('df_companies_cache')
+                    _co_cache = get_companies_df()
                     _stale_ver = []
                     if _co_cache is not None and not _co_cache.empty:
                         _co_map = {r['기업명']: r.to_dict() for _, r in _co_cache.iterrows()}
@@ -4924,12 +4955,7 @@ elif page == "공고·매칭":
                                             st.session_state['ai_analysis'][gkey] = _region_cut_result(gr)
                                             cut_g += 1
                                         else:
-                                            ci = {}
-                                            if 'df_companies_cache' in st.session_state:
-                                                df_co_g = st.session_state['df_companies_cache']
-                                                mx_g = df_co_g[df_co_g['기업명']==gr['기업명']]
-                                                if not mx_g.empty: ci = mx_g.iloc[0].to_dict()
-                                            ci['기업명'] = gr['기업명']
+                                            ci = company_profile(gr['기업명'])
                                             _nd_g = enrich_for_ai(gr.to_dict())
                                             if len(str(_nd_g.get('전문내용','') or '')) >= 200:
                                                 enr_g += 1
@@ -5079,11 +5105,7 @@ elif page == "공고·매칭":
                     # ── 기업 정보 패널 ──────────────────────────
                     st.divider()
                     with st.expander(f"🏢 {selected_co} 기업 정보", expanded=True):
-                        co_info_panel = {}
-                        if 'df_companies_cache' in st.session_state:
-                            df_co2 = st.session_state['df_companies_cache']
-                            m = df_co2[df_co2['기업명']==selected_co]
-                            if not m.empty: co_info_panel = m.iloc[0].to_dict()
+                        co_info_panel = company_profile(selected_co)
 
                         # 상단 핵심 지표
                         pi1, pi2, pi3, pi4 = st.columns(4)
@@ -5225,12 +5247,7 @@ elif page == "공고·매칭":
                                         if st.session_state.get('bulk_skip_region', True) and _loc_c <= -5:
                                             st.session_state['ai_analysis'][ai_key] = _region_cut_result(ai_row)
                                         else:
-                                            ci = {}
-                                            if 'df_companies_cache' in st.session_state:
-                                                df_co3 = st.session_state['df_companies_cache']
-                                                mx = df_co3[df_co3['기업명']==ai_row['기업명']]
-                                                if not mx.empty: ci = mx.iloc[0].to_dict()
-                                            ci['기업명'] = ai_row['기업명']
+                                            ci = company_profile(ai_row['기업명'])
                                             _res_c = claude_analyze(ci, enrich_for_ai(ai_row.to_dict()))
                                             if not _res_c.get('error'):
                                                 st.session_state['ai_analysis'][ai_key] = _res_c
@@ -5410,12 +5427,7 @@ elif page == "공고·매칭":
                                 _ai_btn_lbl = "🔁 재분석" if (ai_res and ai_res.get('error')) else "🤖 AI 분석"
                                 if st.button(_ai_btn_lbl, key=f"ai_{key}_{i}", use_container_width=True):
                                     with st.spinner("분석 중..."):
-                                        ci = {}
-                                        if 'df_companies_cache' in st.session_state:
-                                            df_co3 = st.session_state['df_companies_cache']
-                                            mx = df_co3[df_co3['기업명']==row['기업명']]
-                                            if not mx.empty: ci = mx.iloc[0].to_dict()
-                                        ci['기업명'] = row['기업명']
+                                        ci = company_profile(row['기업명'])
                                         if 'ai_analysis' not in st.session_state:
                                             st.session_state['ai_analysis'] = {}
                                         st.session_state['ai_analysis'][key] = claude_analyze(ci, enrich_for_ai(row.to_dict()))
