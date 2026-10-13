@@ -188,6 +188,31 @@ def collect_notices(creds):
         upd_ids = {r['pblancId'] for r in upd_rows}
         df_base = df_n[~df_n['pblancId'].isin(upd_ids)].copy()
         df_base['수집일'] = today   # 기존 공고도 '오늘 확인함'으로 갱신
+
+        # 공고문·첨부 파일 필드는 '유지' 행에도 채운다.
+        # to_row() 는 신규·업데이트 행에만 적용되므로, 그대로 두면 기존 행이 계속
+        # 빈칸으로 남는다(실측: 접수 중 1,669건 중 213건만 채워져 있었다).
+        # API 응답에 이미 들어 있어 추가 호출은 없다.
+        _fmap = {str(it.get('pblancId', '')): it for it in all_items}
+        _filled = 0
+        for _col, _key in (('공고문파일명', 'printFileNm'), ('공고문파일URL', 'printFlpthNm'),
+                           ('첨부파일명', 'fileNm'), ('첨부파일URL', 'flpthNm')):
+            if _col not in df_base.columns:
+                df_base[_col] = ''
+            _vals = []
+            for _pid, _old in zip(df_base['pblancId'].astype(str), df_base[_col].astype(str)):
+                _it = _fmap.get(_pid)
+                if _it is None:
+                    _vals.append(_old)          # 이번 응답에 없는 공고는 그대로 둔다
+                    continue
+                _new = str(_it.get(_key, '') or '')
+                if _new and _new != _old:
+                    _filled += 1
+                _vals.append(_new or _old)
+            df_base[_col] = _vals
+        if _filled:
+            print(f"  📎 기존 공고 파일 정보 보정 {_filled:,}칸")
+
         df_final = pd.concat([df_base, pd.DataFrame(new_rows+upd_rows)], ignore_index=True)
     else:
         df_final = pd.DataFrame(new_rows)
