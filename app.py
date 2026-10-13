@@ -2332,7 +2332,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v0929-28"
+BUILD_TAG = "v0929-29"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -8635,23 +8635,29 @@ elif page == "교육 신청 집계":
 
         # 엑셀 다운로드
         st.divider()
-        if st.button("📥 엑셀 다운로드"):
-            import openpyxl as _xl_edu
-            wb_edu = _xl_edu.Workbook()
-            ws_edu = wb_edu.active
-            ws_edu.title = '교육신청현황'
-            ws_edu.append(['기업명','담당자명','연락처','인원','수신일','비고'])
-            for r in edu_data:
-                ws_edu.append([
-                    r.get('기업명',''), r.get('담당자명',''),
-                    r.get('연락처',''), r.get('인원',1),
-                    r.get('수신일',''), r.get('비고','')
-                ])
-            path = '/mnt/user-data/outputs/교육신청현황.xlsx'
-            wb_edu.save(path)
-            st.success("다운로드 준비 완료")
-            import subprocess
-            present_files([path])
+        # 예전에는 '/mnt/user-data/outputs/' 에 파일을 쓰고 present_files() 를 불렀다.
+        # 그 경로도 그 함수도 이 앱에는 없어서 버튼을 누르면 터졌다(2026-07-14부터).
+        # 진단 다운로드와 같은 방식 — 메모리에서 만들어 바로 내려준다.
+        import io as _io_edu
+        _df_edu = pd.DataFrame([{
+            '기업명':   r.get('기업명', ''),
+            '담당자명': r.get('담당자명', ''),
+            '연락처':   r.get('연락처', ''),
+            '인원':     r.get('인원', 1),
+            '수신일':   r.get('수신일', ''),
+            '비고':     r.get('비고', ''),
+        } for r in edu_data])
+        _buf_edu = _io_edu.BytesIO()
+        with pd.ExcelWriter(_buf_edu, engine='openpyxl') as _w_edu:
+            _df_edu.to_excel(_w_edu, index=False, sheet_name='교육신청현황')
+        st.download_button(
+            "📥 엑셀 다운로드",
+            data=_buf_edu.getvalue(),
+            file_name=f"교육신청현황_{datetime.today().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+        st.caption(f"{len(_df_edu)}개사 · 총 {pd.to_numeric(_df_edu['인원'], errors='coerce').fillna(0).sum():.0f}명")
     else:
         st.info("아직 신청 데이터가 없습니다. Gmail 회신 파싱을 실행해주세요.")
 
