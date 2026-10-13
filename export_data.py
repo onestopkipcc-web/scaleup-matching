@@ -193,20 +193,25 @@ def main():
 
         # 매칭 산출물은 매칭 회차 폴더에
         print(f"03_회차 / {rid}  (매칭)")
-        rdir = os.path.join(OUT, "03_회차", str(rid))
-        os.makedirs(rdir, exist_ok=True)
-        if results:
-            summary, detail = build_diag(results, ai, rv)
-            save(detail, os.path.join(rdir, "매칭결과.xlsx"))
-            save(detail, os.path.join(rdir, "진단.xlsx"),
-                 sheets={'기업별요약': summary, '매칭상세': detail})
+        if not results and not rv:
+            # 발송이 끝나면 매칭 상태가 비워지고 새 회차 ID만 잡힌다. 그대로 두면
+            # 내용 없는 폴더가 회차마다 쌓여 어느 게 실제 회차인지 헷갈린다.
+            print("    매칭 결과·승인 상태가 모두 비어 있음 — 폴더를 만들지 않습니다")
         else:
-            print("    매칭 결과가 비어 있음 — 발송 후 초기화된 상태일 수 있습니다")
-        with open(os.path.join(rdir, "승인상태.json"), 'w', encoding='utf-8') as fp:
-            json.dump({'round_id': rid, 'review_state': rv,
-                       'decision_src': rv_f.get('decision_src', {})},
-                      fp, ensure_ascii=False, indent=2)
-        print(f"    저장  03_회차/{rid}/승인상태.json  ({len(rv):,}건)")
+            rdir = os.path.join(OUT, "03_회차", str(rid))
+            os.makedirs(rdir, exist_ok=True)
+            if results:
+                summary, detail = build_diag(results, ai, rv)
+                save(detail, os.path.join(rdir, "매칭결과.xlsx"))
+                save(detail, os.path.join(rdir, "진단.xlsx"),
+                     sheets={'기업별요약': summary, '매칭상세': detail})
+            else:
+                print("    매칭 결과가 비어 있음 — 승인 상태만 저장합니다")
+            with open(os.path.join(rdir, "승인상태.json"), 'w', encoding='utf-8') as fp:
+                json.dump({'round_id': rid, 'review_state': rv,
+                           'decision_src': rv_f.get('decision_src', {})},
+                          fp, ensure_ascii=False, indent=2)
+            print(f"    저장  03_회차/{rid}/승인상태.json  ({len(rv):,}건)")
 
         # 발송 산출물은 '발송이 일어난 회차' 폴더에 넣는다.
         # send_progress 는 매칭 회차보다 뒤처질 수 있다(이번 회차는 아직 발송 전).

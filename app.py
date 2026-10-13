@@ -3607,7 +3607,10 @@ li[role="option"][aria-selected="true"] {
 # ── 사이드바 ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("### 📢 원스톱 스케일업")
-    st.caption("혁신제품지원센터")
+    # 빌드 태그는 배포 확인용이라 늘 보이는 자리에 둔다.
+    # 예전에는 '⚡ 전 기업 일괄 AI 분석' 접힌 메뉴 안에 있어, 정작 배포가 끝났는지
+    # 확인하려 할 때 찾지 못했다.
+    st.caption(f"혁신제품지원센터 · 빌드 {BUILD_TAG}")
     st.divider()
 
     # 메뉴 그룹핑
@@ -5090,8 +5093,6 @@ elif page == "공고·매칭":
                                   help="⚡ 일괄 실행이 실제로 도는 범위입니다 (화면 필터와 무관).")
                         st.caption(f"화면 표시분 {_done_view:,}/{len(filtered):,}건")
 
-                    # 빌드 태그는 배포 검증용이라 짧게 둔다 (설명은 각 버튼의 help 로)
-                    st.caption(f"🏷️ 빌드 {BUILD_TAG}")
                     # ── 버전이 달라진 판정 — 표시만 하고 자동 실행하지 않는다 ──
                     _ai_now = st.session_state.get('ai_analysis', {})
                     _co_cache = get_companies_df()
