@@ -1944,7 +1944,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v0929-19"
+BUILD_TAG = "v0929-20"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -2246,6 +2246,16 @@ def attach_ai_reason(n, company, ai_cache):
         n['_ai_caution'] = _h.escape(clip_text(caution, CAUTION_MAX))
     return n
 
+# 메일용 한글 폰트 스택.
+# Gmail은 수신 메일에서 <body>와 그 style을 통째로 걷어낸다. body에만 선언하면
+# 폰트가 사라지고 클라이언트 기본값(한글 글리프 없음 → 폴백)으로 그려져
+# 본문이 굴림 계열로 떨어진다 — 작은 크기에서 비트맵처럼 깨져 보이는 원인이었다.
+# 그래서 아래 스택을 모든 <td>에 직접 건다(자식 요소는 상속받는다).
+# 더존 그룹웨어 편집기도 폰트가 비면 '굴림체 9pt'를 밀어넣으므로 같은 처리로 막힌다.
+MAIL_FONT = ("font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',"
+             "-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;")
+
+
 def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=None):
     """맞춤 공고 메일 HTML 생성 — 👁 미리보기와 실제 발송이 함께 쓰는 단일 진입점.
 
@@ -2324,7 +2334,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
         <table width="100%" cellpadding="0" cellspacing="0"
                style="margin-bottom:6px;">
           <tr>
-            <td style="padding:10px 14px;
+            <td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;padding:10px 14px;
                        background:#FBF9F5;
                        border:1px solid #E8E2D5;
                        border-radius:6px;">
@@ -2333,7 +2343,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
                         text-decoration:none;display:block;">
                 {n.get('공고명','')}
               </a>
-              <p style="margin:3px 0 0;font-size:11px;color:#9A9488;">
+              <p style="margin:3px 0 0;font-size:12px;color:#78736A;">
                 {n.get('주관기관','')} &nbsp;·&nbsp; {_dl_txt}
               </p>
             </td>
@@ -2347,8 +2357,8 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
         if hashtags:
             tag_html = "<div style=\'margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;\'>"
             for _ti, tag in enumerate(hashtags.split()):
-                _tc = ("background:#F3EDE0;color:#9A7B3F" if _ti == 0
-                       else "background:#EDEBE5;color:#7A756A")
+                _tc = ("background:#F3EDE0;color:#7E6433" if _ti == 0
+                       else "background:#EDEBE5;color:#797469")
                 tag_html += f"<span style=\'font-size:11px;{_tc};padding:3px 8px;border-radius:20px;\'>{tag}</span>"
             tag_html += "</div>"
         notice_name = n.get("공고명","")
@@ -2356,10 +2366,10 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
                           n.get("공고ID",""), notice_name)
         _extra = ""
         if n.get('_ai_reason'):
-            _extra += (f"<p style=\"margin:7px 0 0;font-size:12px;color:#7A6B45;"
+            _extra += (f"<p style=\"margin:7px 0 0;font-size:13px;color:#7A6B45;"
                        f"line-height:1.65;\">💡 {n['_ai_reason']}</p>")
         if n.get('_ai_caution'):
-            _extra += (f"<p style=\"margin:4px 0 0;font-size:11px;color:#A08A5C;"
+            _extra += (f"<p style=\"margin:4px 0 0;font-size:13px;color:#7E6C47;"
                        f"line-height:1.6;\">📌 신청 전 확인: {n['_ai_caution']}</p>")
         if n.get('_related'):
             _rl = []
@@ -2370,7 +2380,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
                                    _rn.get('공고ID',''), _rn.get('공고명',''))
                 _rl.append(f"<a href=\"{_rtrk}\" style=\"color:#B0894A;"
                            f"text-decoration:none;font-weight:600;\">{_lb}</a>")
-            _extra += (f"<p style=\"margin:5px 0 0;font-size:11px;color:#9A9488;\">"
+            _extra += (f"<p style=\"margin:5px 0 0;font-size:12px;color:#78736A;\">"
                        f"같은 사업 관련 공고: {' · '.join(_rl)}</p>")
         return f"""
         <table width="100%" cellpadding="0" cellspacing="0"
@@ -2378,20 +2388,20 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
                       border:1px solid #E8E2D5;border-radius:10px;overflow:hidden;
                       box-shadow:0 1px 4px rgba(26,35,50,0.05);">
           <tr>
-            <td style="padding:12px 16px;">
+            <td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;padding:12px 16px;">
               <a href="{_trk}"
                  style="font-size:14px;font-weight:600;color:#1B2A41;
                         text-decoration:none;line-height:1.5;display:block;">
                 {notice_name}
               </a>
-              <p style="margin:4px 0 0;font-size:12px;color:#8A8478;">
+              <p style="margin:4px 0 0;font-size:13px;color:#757066;">
                 {n.get("주관기관","")} &nbsp;·&nbsp; <span style="color:#B0894A;font-weight:600;">{_dl_txt}</span>
               </p>
               {tag_html}
               {_extra}
             </td>
             <td width="60" align="center" valign="middle"
-                style="padding:14px 12px;border-left:1px solid #EDEBE5;">
+                style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;padding:14px 12px;border-left:1px solid #EDEBE5;">
               <a href="{_trk}"
                  style="display:inline-block;font-size:12px;font-weight:700;
                         color:#B0894A;text-decoration:none;white-space:nowrap;">
@@ -2414,7 +2424,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
                      color:#5A5548;">
             이번 주 귀사에 딱 맞는 공고를 찾지 못했습니다.
           </p>
-          <p style="margin:0;font-size:12px;color:#8A7B5A;line-height:1.7;">
+          <p style="margin:0;font-size:12px;color:#786B4E;line-height:1.7;">
             더 정확한 공고를 드리기 위해 추가 키워드나 관심 분야를
             아래 답장하기 버튼으로 알려주세요.
           </p>
@@ -2423,8 +2433,8 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
     # ── 🔦 주목할 만한 공고 (★★★) ────────────
     if notices_sss:
         rows_html += """
-        <p style="margin:0 0 12px;font-size:10px;font-weight:700;
-                   color:#9A7B3F;letter-spacing:2px;text-transform:uppercase;">
+        <p style="margin:0 0 12px;font-size:11px;font-weight:700;
+                   color:#7E6433;">
           🔦 &nbsp;주목할 만한 공고
         </p>"""
         for i, n in enumerate(notices_sss):
@@ -2435,9 +2445,8 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
         rows_html += """
         <div style="border-top:1px solid #E8E2D5;
                     padding-top:16px;margin-top:8px;">
-          <p style="margin:0 0 10px;font-size:10px;font-weight:700;
-                     color:#A08A5C;letter-spacing:2px;
-                     text-transform:uppercase;">
+          <p style="margin:0 0 10px;font-size:11px;font-weight:700;
+                     color:#7E6C47;">
             📌 &nbsp;이런 공고도 있어요
           </p>"""
         for i, n in enumerate(notices_ss):
@@ -2456,14 +2465,13 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
         else:
             _ref_desc = ""
         _REF_DESC_HTML = (
-            f'<p style="margin:0 0 10px;font-size:11px;color:#8A8478;">{_ref_desc}</p>'
+            f'<p style="margin:0 0 12px;font-size:12px;color:#757066;">{_ref_desc}</p>'
             if _ref_desc else '')
         rows_html += f"""
         <div style="border-top:1px solid #E8E2D5;
                     padding-top:16px;margin-top:8px;">
-          <p style="margin:0 0 6px;font-size:10px;font-weight:700;
-                     color:#A08A5C;letter-spacing:2px;
-                     text-transform:uppercase;">
+          <p style="margin:0 0 6px;font-size:11px;font-weight:700;
+                     color:#7E6C47;">
             📎 &nbsp;참고해보실 만한 공고
           </p>
           {_REF_DESC_HTML}"""
@@ -2480,24 +2488,24 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
     rows_html += f"""
     <div style="border-top:1px solid #E8E2D5;
                 margin-top:20px;padding-top:16px;text-align:center;">
-      <p style="margin:0 0 12px;font-size:12px;color:#8A8478;">
+      <p style="margin:0 0 12px;font-size:12px;color:#757066;">
         이번 공고 안내가 도움이 됐나요?
       </p>
       <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_good}"
          style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                font-weight:600;color:#9A7B3F;background:#F3EDE0;
+                font-weight:600;color:#7E6433;background:#F3EDE0;
             border:1px solid #E0D5BF;border-radius:8px;text-decoration:none;">
         👍 도움됐어요
       </a>
       <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_bad}"
          style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                font-weight:600;color:#8A8478;background:#EDEBE5;
+                font-weight:600;color:#757066;background:#EDEBE5;
             border:1px solid #DDD8CE;border-radius:8px;text-decoration:none;">
         👎 별로였어요
       </a>
       <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_msg}"
          style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                font-weight:600;color:#8A8478;
+                font-weight:600;color:#757066;
                 background:#F3F1EC;
                 border:1px solid #DDD8CE;
                 border-radius:8px;text-decoration:none;">
@@ -2519,8 +2527,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
     <div style="background:#FFFFFF;
                 border:1.5px solid #D8D0C0;
                 border-radius:10px;padding:16px 18px;margin:16px 0;">
-      <p style="margin:0 0 8px;color:#22344F;font-weight:700;font-size:11px;
-                 letter-spacing:1.5px;text-transform:uppercase;">
+      <p style="margin:0 0 8px;color:#22344F;font-weight:700;font-size:11px;">
         ✏️ 추가 키워드가 있으신가요?
       </p>
       <p style="margin:0 0 12px;font-size:12px;color:#6B6558;line-height:1.7;">
@@ -2537,15 +2544,14 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
     cal_sec = f"""
     <div style="background:#FFFFFF;border-radius:10px;
                 padding:16px 18px;border:1.5px solid #D8D0C0;margin:16px 0;">
-      <p style="margin:0 0 4px;color:#9A7B3F;font-weight:700;font-size:11px;
-                 letter-spacing:1.5px;text-transform:uppercase;">
+      <p style="margin:0 0 4px;color:#7E6433;font-weight:700;font-size:11px;">
         📅 공고 마감일 캘린더
       </p>
       <p style="margin:0 0 10px;font-size:12px;color:#6B6558;">
         전체 지원사업 공고 마감일을 한눈에 확인하세요.
       </p>
       {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#C9A96A;color:#3A2E15;padding:8px 18px;border-radius:7px;text-decoration:none;font-size:12px;font-weight:700;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK else ""}
-      <p style="margin:10px 0 0;font-size:11px;color:#8A7B5A;line-height:1.7;">
+      <p style="margin:10px 0 0;font-size:11px;color:#786B4E;line-height:1.7;">
         💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
       </p>
     </div>"""
@@ -2553,8 +2559,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
     together_sec = f"""
     <div style="background:#22344F;border-radius:10px;
                 padding:16px 18px;border:1.5px solid #C9A96A;margin:16px 0;">
-      <p style="margin:0 0 5px;color:#C9A96A;font-weight:700;font-size:11px;
-                 letter-spacing:1.5px;">
+      <p style="margin:0 0 5px;color:#C9A96A;font-weight:700;font-size:11px;">
         🤝 함께하기 · 기업 회원소개
       </p>
       <p style="margin:0 0 12px;font-size:12px;color:#C5D0DC;line-height:1.65;">
@@ -2581,27 +2586,27 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     </head>
     <body style="margin:0;padding:0;background:#E6E9EE;
-    font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
+    font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;">
     <table width="100%" cellpadding="0" cellspacing="0"
     style="background:#E6E9EE;padding:36px 0 52px;">
-    <tr><td align="center">
+    <tr><td align="center" style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;">
     <table width="560" cellpadding="0" cellspacing="0">
 
     <!-- ── 로고 헤더 (흰 배경) ── -->
     <tr>
-    <td style="background:#FFFFFF;border-radius:14px 14px 0 0;
+    <td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;background:#FFFFFF;border-radius:14px 14px 0 0;
     padding:20px 28px;border-bottom:1px solid #E8ECF0;
     border-top:1px solid #D9DEE5;">
     <table width="100%" cellpadding="0" cellspacing="0">
     <tr>
-    <td valign="middle">
+    <td valign="middle" style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;">
     <img src="{LOGO_URL}"
      alt="혁신제품지원센터"
      width="160" height="auto"
      style="display:block;height:auto;max-height:36px;
             object-fit:contain;object-position:left;">
     </td>
-    <td align="right" valign="middle">
+    <td align="right" valign="middle" style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;">
     <p style="margin:0;font-size:11px;color:#9CAAB8;letter-spacing:0.3px;">
     {today_str}
     </p>
@@ -2613,18 +2618,18 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
 
     <!-- ── 메인 카드 (아이보리) ── -->
     <tr>
-    <td style="background:#FBFAF7;
+    <td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;background:#FBFAF7;
     box-shadow:0 8px 32px rgba(26,35,50,0.10);">
 
     <!-- 헤더존 (네이비) -->
     <table width="100%" cellpadding="0" cellspacing="0">
     <tr>
-    <td style="padding:30px 28px 24px;
+    <td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;padding:30px 28px 24px;
          background:#1B2A41;
          border-bottom:2px solid #C9A96A;">
     <table width="100%" cellpadding="0" cellspacing="0">
     <tr>
-    <td>
+    <td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;">
       <p style="margin:0 0 2px;font-size:10px;font-weight:700;
                  letter-spacing:2.5px;color:#C9A96A;
                  text-transform:uppercase;">
@@ -2638,7 +2643,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
         이번 주 맞춤 지원사업 공고
       </p>
     </td>
-    {f'''<td align="right" valign="middle" width="72">
+    {f'''<td align="right" valign="middle" width="72" style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;">
       <div style="background:linear-gradient(135deg,#C9A96A 0%,#B08D4F 100%);
                   border-radius:12px;padding:11px 0;width:60px;
                   text-align:center;">
@@ -2668,12 +2673,12 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
     </tr>
 
     <!-- 기업 정보 카드 (아이보리 존) -->
-    {f"""<tr><td style="padding:20px 28px 0;background:#FBFAF7;">
+    {f"""<tr><td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;padding:20px 28px 0;background:#FBFAF7;">
     <div style="padding:12px 16px;
             background:#F5F0E6;
             border:1px solid #E0D5BF;
             border-left:4px solid #C9A96A;border-radius:8px;">
-    <p style="margin:0 0 8px;font-size:10px;font-weight:700;color:#9A7B3F;letter-spacing:1.5px;">
+    <p style="margin:0 0 11px;font-size:11px;font-weight:700;color:#7E6433;">
     저희가 파악한 귀사 정보</p>
     <p style="margin:0 0 4px;font-size:12px;color:#6B6558;">
     기술키워드 <span style="color:#2A2620;font-weight:600;word-break:keep-all;">{str(co_row.get("기술키워드","") or co_row.get("키워드보완","") or "—")[:30]}</span>
@@ -2693,26 +2698,26 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
 
     <!-- 공고 목록 -->
     <tr>
-    <td style="padding:20px 28px 20px;background:#FBFAF7;">
+    <td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;padding:20px 28px 20px;background:#FBFAF7;">
     {rows_html}
     </td>
     </tr>
 
     <!-- 캘린더 -->
-    {f'''<tr><td style="padding:0 28px 24px;background:#FBFAF7;">{keyword_sec}</td></tr>''' if keyword_sec else ''}
-    {f'''<tr><td style="padding:0 28px 24px;background:#FBFAF7;">{cal_sec}</td></tr>''' if cal_sec else ''}
-    <tr><td style="padding:0 28px 24px;background:#FBFAF7;">{together_sec}</td></tr>
+    {f'''<tr><td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;padding:0 28px 24px;background:#FBFAF7;">{keyword_sec}</td></tr>''' if keyword_sec else ''}
+    {f'''<tr><td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;padding:0 28px 24px;background:#FBFAF7;">{cal_sec}</td></tr>''' if cal_sec else ''}
+    <tr><td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;padding:0 28px 24px;background:#FBFAF7;">{together_sec}</td></tr>
     </table>
     </td>
     </tr>
 
     <!-- ── 네이비 푸터 ── -->
     <tr>
-    <td style="background:#1B2A41;border-radius:0 0 14px 14px;
+    <td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;background:#1B2A41;border-radius:0 0 14px 14px;
     padding:18px 28px;border-top:2px solid #C9A96A;">
     <table width="100%" cellpadding="0" cellspacing="0">
     <tr>
-    <td>
+    <td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;">
     <p style="margin:0;font-size:12px;color:#B4C0CE;line-height:1.9;">
     혁신제품지원센터 원스톱 스케일업 운영팀<br>
     <a href="mailto:onestop.kipcc@gmail.com"
@@ -2720,12 +2725,12 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
     onestop.kipcc@gmail.com
     </a>
     </p>
-    <p style="margin:8px 0 0;font-size:11px;color:#7A96B2;">
+    <p style="margin:8px 0 0;font-size:11px;color:#83A0BE;">
     본 메일은 원스톱 스케일업 프로그램 참여 시 수신에 동의하신 기업에 발송됩니다.
     </p>
     </td>
-    <td align="right" valign="middle">
-    <p style="margin:0;font-size:10px;color:#7A96B2;letter-spacing:0.5px;">
+    <td align="right" valign="middle" style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;">
+    <p style="margin:0;font-size:11px;color:#83A0BE;">
     수신 동의 기업 대상 발송
     </p>
     </td>
