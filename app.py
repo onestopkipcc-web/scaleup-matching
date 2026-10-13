@@ -92,6 +92,11 @@ def save_match_state(drive):
             'match_results': st.session_state.get('match_results', []),
             'ai_analysis':   st.session_state.get('ai_analysis', {}),
             'review_state':  st.session_state.get('review_state', {}),
+            # 결정 출처는 review_state 와 같은 곳에 저장해야 한다.
+            # 예전에는 save_review_state 에만 있었는데, ⚡ 일괄 분석은 save_ai_analysis 를,
+            # 일괄 승인은 save_match_state 를 부르므로 출처가 드라이브에 올라가지 않았다.
+            # 결과: 앱이 재시작되면 결정은 남고 출처만 사라졌다(10/13 회차 617건 중 592건 공백).
+            'decision_src':  st.session_state.get('decision_src', {}),
             'round_id':      st.session_state.get('match_round_id', ''),
             'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M'),
         }
@@ -119,7 +124,11 @@ def load_match_state(drive):
             if not st.session_state.get('review_state'):
                 _rv = saved.get('review_state', {}) or {}
                 # 회차 정보가 없는 구버전 저장본이면 승인(○)은 되살리지 않는다
-                st.session_state['review_state'] = _rv if _rid else carry_over_reject(_rv)
+                _rv = _rv if _rid else carry_over_reject(_rv)
+                st.session_state['review_state'] = _rv
+                # 출처도 같이 되살린다 — 남아 있는 결정의 키만
+                _sr = saved.get('decision_src', {}) or {}
+                st.session_state['decision_src'] = {k: v for k, v in _sr.items() if k in _rv}
         st.session_state['_match_state_loaded'] = True
     except Exception:
         st.session_state['_match_state_loaded'] = True
@@ -412,6 +421,32 @@ def reattach_clicks(rows, df_click):
     return rows
 
 
+def backfill_decision_src(rows):
+    """출처가 비어 있는 행을 AI 판정으로 되짚어 채운다.
+
+    v0929-23 이전에는 decision_src 가 save_match_state 경로로 저장되지 않아 앱이
+    재시작되면 사라졌다. 10/13 회차는 결정 617건 중 592건이 공백이었다.
+    결정과 AI 판정이 맞아떨어지면 자동 처리로 보고 '(추정)'을 붙인다 — 실제 기록과
+    구분되게 둔다. 같은 회차 검증: 제외 537 ≡ AI비추천 537, 승인 55 ≡ AI추천 55,
+    규칙에서 벗어난 결정 0건이었으므로 이 되짚기는 추측이 아니라 확정에 가깝다.
+    맞아떨어지지 않는 건(담당자가 뒤집었거나 🟡 자동 보완) 은 구분이 불가능하므로
+    '기록 없음'으로 남겨 솔직히 표시한다."""
+    for r in (rows or []):
+        if r.get('결정출처'):
+            continue
+        dec = r.get('최종결정', '')
+        if dec not in ('승인', '제외'):
+            continue
+        rec = r.get('AI추천여부', '')
+        if dec == '승인' and rec == '추천':
+            r['결정출처'] = 'AI 자동 승인(추정)'
+        elif dec == '제외' and rec == '비추천':
+            r['결정출처'] = 'AI 자동 제외(추정)'
+        else:
+            r['결정출처'] = '기록 없음'
+    return rows
+
+
 def collect_reactions(days=90, max_results=200):
     """메일 하단 반응 버튼의 회신을 Gmail에서 모은다 → {기업명: {'value','at'}}.
     반응 링크가 mailto라 클릭 자체는 추적되지 않고 회신이 와야 알 수 있다.
@@ -528,7 +563,7 @@ def save_decision_log(drive, rows, round_id, df_click=None):
     try:
         import json as _j
         keep = [r for r in load_decision_log(drive) if r.get('회차ID') != round_id]
-        allr = reattach_clicks(keep + list(rows), df_click)
+        allr = backfill_decision_src(reattach_clicks(keep + list(rows), df_click))
         ok = drive_upload(drive, DECISION_LOG_FILE,
                           _j.dumps({'rows': allr,
                                     'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M')},
