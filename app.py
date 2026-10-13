@@ -636,6 +636,81 @@ def collect_reactions(days=90, max_results=200):
         pass
     return out
 
+def round_stats(rows):
+    """판단 기록 → 회차별 성과 요약 (오래된 회차부터).
+
+    대시보드가 수기 타임라인 대신 보여줄 수치. 발송한 행만 분모로 쓴다 —
+    보내지도 않은 공고를 클릭률 분모에 넣으면 숫자가 의미를 잃는다."""
+    from collections import defaultdict
+    by = defaultdict(list)
+    for r in (rows or []):
+        if str(r.get('발송여부', '')) in ('Y', '참고'):
+            by[str(r.get('회차ID', ''))].append(r)
+    out = []
+    for rid in sorted(by):
+        g = by[rid]
+        cos = {}
+        for r in g:
+            co = str(r.get('기업명', '') or '')
+            e = cos.setdefault(co, {'click': False, 'open': False})
+            e['click'] = e['click'] or r.get('클릭여부') == 'Y'
+            e['open'] = e['open'] or r.get('오픈여부') == 'Y'
+        _n_co = len(cos) or 1
+        _main = [r for r in g if r.get('발송여부') == 'Y']
+        _ref = [r for r in g if r.get('발송여부') == '참고']
+        out.append({
+            '회차ID': rid,
+            '발송일': str(next((r.get('발송시각', '') for r in g if r.get('발송시각')), ''))[:10],
+            '발송기업': len(cos), '발송공고': len(g),
+            '클릭기업': sum(1 for v in cos.values() if v['click']),
+            '열람기업': sum(1 for v in cos.values() if v['open']),
+            '클릭기업비율': sum(1 for v in cos.values() if v['click']) / _n_co * 100,
+            '열람기업비율': sum(1 for v in cos.values() if v['open']) / _n_co * 100,
+            '공고클릭률': sum(1 for r in g if r.get('클릭여부') == 'Y') / (len(g) or 1) * 100,
+            '본공고클릭률': (sum(1 for r in _main if r.get('클릭여부') == 'Y')
+                        / (len(_main) or 1) * 100) if _main else 0.0,
+            '참고클릭률': (sum(1 for r in _ref if r.get('클릭여부') == 'Y')
+                       / (len(_ref) or 1) * 100) if _ref else 0.0,
+        })
+    return out
+
+
+def silent_companies(rows, last_n=3, min_age_days=2):
+    """최근 last_n 회차 동안 한 번도 클릭하지 않은 기업 → 연락 대상.
+
+    메일을 고쳐서 풀릴 문제가 아닐 수 있다(담당자 변경·주소 오류·스팸함).
+    전화 한 통이 빠른 쪽을 골라내려는 목록이다.
+
+    보낸 지 min_age_days 가 안 된 회차는 뺀다. 클릭은 발송 당일 오후와 다음 날
+    오전에 몰리는데, 갓 보낸 회차를 넣으면 아직 열어보지도 않은 기업이 '무반응'으로
+    잡혀 엉뚱한 곳에 전화하게 된다."""
+    from datetime import date as _date
+    stats = round_stats(rows)
+    _today = _date.today()
+
+    def _old_enough(s):
+        try:
+            y, m, d = (int(x) for x in str(s.get('발송일', ''))[:10].split('-'))
+            return (_today - _date(y, m, d)).days >= int(min_age_days)
+        except Exception:
+            return True          # 발송일을 모르면 그냥 포함한다
+    stats = [x for x in stats if _old_enough(x)]
+    rids = [s['회차ID'] for s in stats][-int(last_n):]
+    if not rids:
+        return []
+    sent, clicked = {}, set()
+    for r in (rows or []):
+        if str(r.get('회차ID', '')) not in rids:
+            continue
+        if str(r.get('발송여부', '')) not in ('Y', '참고'):
+            continue
+        co = str(r.get('기업명', '') or '')
+        sent[co] = sent.get(co, 0) + 1
+        if r.get('클릭여부') == 'Y':
+            clicked.add(co)
+    return sorted(co for co in sent if co not in clicked)
+
+
 def build_decision_rows(round_id, results, ai_cache, review_state, decision_src,
                         sent_map=None, click_map=None, reaction_map=None):
     """이번 회차의 판단 기록 행 (기업-공고 짝마다 1행)."""
@@ -1012,6 +1087,9 @@ NOTICES_FILE     = "notices_db.xlsx"
 HISTORY_FILE     = "send_history.xlsx"
 KEYWORDS_FILE    = "keywords.json"
 DETAIL_FILE      = "notices_detail.xlsx"  # 크롤링 전문 DB
+# 전문 DB는 3MB가 넘는데 대시보드가 쓰는 건 '몇 건 수집됐나' 뿐이라, 크롤러가
+# 돌 때 이 요약만 따로 남긴다. 없으면 대시보드가 전문 파일을 직접 읽는다(구버전 호환).
+DETAIL_SUMMARY_FILE = "notices_detail_summary.json"
 AI_ANALYSIS_FILE = "ai_analysis.json"     # AI 분석 결과 영구 저장
 CALID_FILE       = "calendar_id.txt"
 CATCAL_FILE      = "category_calendars.json"
@@ -1697,6 +1775,25 @@ def load_excel(drive, filename):
         except: return pd.DataFrame()
     return pd.DataFrame()
 
+@st.cache_data(ttl=600, show_spinner=False)
+def read_excel_cached(filename):
+    """읽기 전용 화면을 위한 10분 캐시.
+
+    Streamlit 은 위젯을 하나 누를 때마다 스크립트를 처음부터 다시 돌린다. 그런데
+    load_excel 에 캐시가 없어 대시보드는 렌더링마다 드라이브에서 6MB 가까이
+    (공고목록 2.7MB + 공고전문 3.2MB) 다시 내려받고 있었다 — 타임라인 필터 버튼
+    하나만 눌러도 그랬다.
+    쓰기 경로는 그대로 두고 읽기 전용 화면에서만 쓴다. 저장 직후 최신값이 필요한
+    화면에 영향을 주지 않기 위해서다. 강제로 비우려면 read_excel_cached.clear()."""
+    return load_excel(_get_drive(), filename)
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def read_json_cached(filename):
+    """읽기 전용 화면을 위한 JSON 캐시 (판단 기록 등)."""
+    return load_json(_get_drive(), filename) or {}
+
+
 def save_excel(drive, df, filename, sheet="데이터", hcolor="1F4E79", star_col=None):
     from openpyxl import Workbook
     from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
@@ -2235,7 +2332,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v0929-26"
+BUILD_TAG = "v0929-27"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -3942,11 +4039,22 @@ if page == "대시보드":
     drive = _get_drive()
     st.title("📊 운영 대시보드")
 
+    _c1, _c2 = st.columns([5, 1])
+    _c2.caption("")
+    if _c2.button("🔄 새로고침", key="dash_refresh", use_container_width=True,
+                  help="캐시를 비우고 드라이브에서 다시 읽습니다 (기본 10분 캐시)"):
+        read_excel_cached.clear()
+        read_json_cached.clear()
+        st.rerun()
+
     with st.spinner("데이터 로딩 중..."):
-        df_c  = load_excel(drive, SELECTED_FILE)
-        df_n  = load_excel(drive, NOTICES_FILE)
-        df_h  = load_excel(drive, HISTORY_FILE)
-        df_det = load_excel(drive, DETAIL_FILE)
+        df_c  = read_excel_cached(SELECTED_FILE)
+        df_n  = read_excel_cached(NOTICES_FILE)
+        df_h  = read_excel_cached(HISTORY_FILE)
+        # 공고전문(3.2MB)은 '크롤링 몇 건 남았나'에만 쓰인다. 크롤러가 남기는
+        # 가벼운 요약이 있으면 그걸 쓰고, 없을 때만 전문 파일을 읽는다.
+        _det_sum = read_json_cached(DETAIL_SUMMARY_FILE)
+        df_det = pd.DataFrame() if _det_sum else read_excel_cached(DETAIL_FILE)
 
     # ── 상단 핵심 지표 4개 ─────────────────────────────
     m1, m2, m3, m4 = st.columns(4)
@@ -3964,13 +4072,16 @@ if page == "대시보드":
         active_n = (df_n['마감일'] >= today_str).sum()
     m2.metric("활성 공고", f"{active_n:,}건", f"전체 {len(df_n):,}건")
 
-    # 전문 크롤링
-    crawl_ok = 0
-    crawl_fail = 0
-    if not df_det.empty and '크롤링성공' in df_det.columns:
-        crawl_ok   = (df_det['크롤링성공']=='Y').sum()
-        crawl_fail = (df_det['크롤링성공']!='Y').sum()
-    m3.metric("전문 수집", f"{crawl_ok}건", f"실패 {crawl_fail}건")
+    # 최근 회차 반응 — 판단 기록에서 자동 집계
+    _dl_rows = (read_json_cached(DECISION_LOG_FILE) or {}).get('rows', [])
+    _stats   = round_stats(_dl_rows)
+    if _stats:
+        _last = _stats[-1]
+        m3.metric("최근 회차 반응",
+                  f"{_last['클릭기업비율']:.0f}%",
+                  f"열람 {_last['열람기업비율']:.0f}% · 발송 {_last['발송기업']}개사")
+    else:
+        m3.metric("최근 회차 반응", "—", "판단 기록 없음")
 
     # 발송 이력
     this_month_h = 0
@@ -3991,11 +4102,15 @@ if page == "대시보드":
 
     last_crawl = "—"
     need_crawl_cnt = 0
-    if not df_det.empty and '크롤링일' in df_det.columns:
-        last_crawl = df_det['크롤링일'].max()[:10] if df_det['크롤링일'].max() else "—"
-    if not df_n.empty and not df_det.empty and 'pblancId' in df_n.columns and 'pblancId' in df_det.columns:
-        crawled_pids = set(df_det[df_det.get('크롤링성공',pd.Series(''))=='Y']['pblancId']) if '크롤링성공' in df_det.columns else set()
-        need_crawl_cnt = len(set(df_n['pblancId']) - crawled_pids)
+    if _det_sum:
+        last_crawl = str(_det_sum.get('마지막크롤링일', '') or '—')[:10]
+        need_crawl_cnt = max(0, int(_det_sum.get('미수집', 0) or 0))
+    else:
+        if not df_det.empty and '크롤링일' in df_det.columns:
+            last_crawl = df_det['크롤링일'].max()[:10] if df_det['크롤링일'].max() else "—"
+        if not df_n.empty and not df_det.empty and 'pblancId' in df_n.columns and 'pblancId' in df_det.columns:
+            crawled_pids = set(df_det[df_det.get('크롤링성공',pd.Series(''))=='Y']['pblancId']) if '크롤링성공' in df_det.columns else set()
+            need_crawl_cnt = len(set(df_n['pblancId']) - crawled_pids)
 
     results      = st.session_state.get('match_results', [])
     review_state = st.session_state.get('review_state', {})
@@ -4067,243 +4182,300 @@ if page == "대시보드":
 
     st.divider()
 
-    # ── 운영 활동 타임라인 ───────────────────────────────────
-    st.subheader("📋 운영 활동 타임라인")
-
-    TIMELINE_FILE = "timeline_log.json"
-
-    # 타임라인 데이터 로드
-    def load_timeline(drive):
-        try:
-            data = load_json(drive, TIMELINE_FILE)
-            return data if data else []
-        except:
-            return []
-
-    def save_timeline(drive, data):
-        save_json(drive, data, TIMELINE_FILE)
-
-    if 'timeline_data' not in st.session_state:
-        raw = load_timeline(drive)
-        # 드라이브 데이터가 없거나 비어있으면 기본 활동 기록 삽입
-        DEFAULT_TIMELINE = [
-            {
-                'date': '2026-04-29',
-                'type': 'eval',
-                'title': '2026 원스톱 스케일업 참가 신청 접수 시작',
-                'desc': '선정 대상 기업 공개 모집 · 온라인 신청 폼 운영',
-                'count': '접수 기간 4/29~5/22',
-                'note': '',
-            },
-            {
-                'date': '2026-05-22',
-                'type': 'eval',
-                'title': '참가 신청 접수 마감',
-                'desc': '총 184개사 신청 접수',
-                'count': '184개사',
-                'note': '',
-            },
-            {
-                'date': '2026-06-22',
-                'type': 'eval',
-                'title': '2026 원스톱 스케일업 최종 선정 확정',
-                'desc': '1단계 평가 → 상위 70개사 선정 확정',
-                'count': '선정 50개사 · 예비 20개사',
-                'note': '184개사 중 70개사',
-            },
-            {
-                'date': '2026-06-26',
-                'type': 'mail',
-                'title': '선정기업 대상 첫 안내 메일 발송',
-                'desc': '선정 축하 · 프로그램 안내 · 키워드 회신 요청',
-                'count': '50개사',
-                'note': '',
-            },
-            {
-                'date': '2026-07-06',
-                'type': 'match',
-                'title': '맞춤형 공고 1차 발송',
-                'desc': '나라장터 공고 크롤링 → 기업별 키워드 매칭 → 개별 발송 · 캘린더 자동 등록',
-                'count': '50개사 · 캘린더 21건',
-                'note': '',
-            },
-            {
-                'date': '2026-07-14',
-                'type': 'mail',
-                'title': '7월 교육 프로그램 신청 안내 발송',
-                'desc': 'AI 마케팅/콘텐츠 제작 활용 교육 안내 · CES 밋업 안내 포함',
-                'count': '50개사',
-                'note': '신청 마감 7/17(금) 18:00',
-            },
-            {
-                'date': '2026-07-29',
-                'type': 'edu',
-                'title': '7월 정기 교육 — AI 마케팅/콘텐츠 제작 활용',
-                'desc': '온라인 Zoom · 강사: 송윤경 (소상공인연합회)',
-                'count': '',
-                'note': '14:00~16:00 예정',
-            },
-        ]
-        if not raw:
-            raw = DEFAULT_TIMELINE
-            save_timeline(drive, raw)
-        st.session_state['timeline_data'] = raw
-    tl_data = st.session_state['timeline_data']
-
-    # 필터
-    TYPE_LABELS = {
-        "all": "전체",
-        "mail": "📧 메일 발송",
-        "match": "🎯 공고 매칭",
-        "edu": "📚 교육",
-        "meetup": "🤝 밋업",
-        "system": "⚙️ 시스템",
-        "eval": "📊 평가·선정",
-    }
-    TYPE_COLORS = {
-        "mail": "#3B82F6", "match": "#F43F5E", "edu": "#10B981",
-        "meetup": "#F59E0B", "system": "#8B5CF6", "eval": "#F59E0B",
-    }
-    TYPE_BADGE = {
-        "mail": "background:#001020;color:#1D4ED8",
-        "match": "background:#FFF1F2;color:#BE123C",
-        "edu": "background:#0A1A0F;color:#059669",
-        "meetup": "background:#1A0A00;color:#C2410C",
-        "system": "background:#F5F3FF;color:#6D28D9",
-        "eval": "background:#FFFBEB;color:#92400E",
-    }
-
-    filter_cols = st.columns(len(TYPE_LABELS))
-    tl_filter = st.session_state.get('tl_filter', 'all')
-    for i, (k, v) in enumerate(TYPE_LABELS.items()):
-        with filter_cols[i]:
-            is_active = tl_filter == k
-            label = f"**{v}**" if is_active else v
-            if st.button(
-                label,
-                key=f"tl_f_{k}",
-                type="primary" if is_active else "secondary",
-                use_container_width=True
-            ):
-                st.session_state['tl_filter'] = k
-                st.rerun()
-
-    tl_filter = st.session_state.get('tl_filter', 'all')
-    filtered = [t for t in sorted(tl_data, key=lambda x: x.get('date',''), reverse=True)
-                if tl_filter == 'all' or t.get('type') == tl_filter]
-
-    if not filtered:
-        st.info("활동 기록이 없습니다. 아래에서 추가해주세요.")
-    else:
-        # 월별 그룹
-        from itertools import groupby
-        def month_key(item):
-            d = item.get('date','')
-            return d[:7] if d else '0000-00'
-
-        for month, items in groupby(filtered, key=month_key):
-            try:
-                import datetime as _dt2
-                yr, mo = int(month[:4]), int(month[5:7])
-                mo_label = f"{yr}년 {mo}월"
-            except:
-                mo_label = month
-
-            st.markdown(f"<p style='font-size:10px;font-weight:900;color:#C9A96A;letter-spacing:3px;text-transform:uppercase;margin:16px 0 8px 0;'>{mo_label}</p>", unsafe_allow_html=True)
-
-            for item in items:
-                t = item.get('type','system')
-                color = TYPE_COLORS.get(t, '#94A3B8')
-                badge_style = TYPE_BADGE.get(t, 'background:#F1F5F9;color:#AAAAAA')
-                badge_label = TYPE_LABELS.get(t, t)
-                date_str = item.get('date','')
-                try:
-                    d = datetime.strptime(date_str, '%Y-%m-%d')
-                    day = d.strftime('%d')
-                    dow = ['월','화','수','목','금','토','일'][d.weekday()]
-                except:
-                    day, dow = '??', ''
-
-                meta_parts = []
-                if item.get('count'): meta_parts.append(f"📤 {item['count']}")
-                if item.get('note'): meta_parts.append(f"📝 {item['note']}")
-                meta_html = '&nbsp;·&nbsp;'.join(meta_parts)
-
-                st.markdown(f"""
-<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;">
-  <div style="width:36px;text-align:right;flex-shrink:0;padding-top:8px;">
-    <div style="font-size:16px;font-weight:900;color:#F0F0F0;">{day}</div>
-    <div style="font-size:10px;color:#666666;">{dow}</div>
-  </div>
-  <div style="width:10px;height:10px;border-radius:50%;background:{color};flex-shrink:0;margin-top:13px;box-shadow:0 0 8px {color},0 0 16px {color}66;"></div>
-  <div style="background:#151515;border-radius:10px;padding:10px 14px;flex:1;border:1px solid #252525;border-left:3px solid {color};">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
-      <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:{color}22;color:{color};">{badge_label}</span>
-      <span style="font-size:13px;font-weight:600;color:#F0F0F0;">{item.get('title','')}</span>
-    </div>
-    <div style="font-size:11px;color:#AAAAAA;line-height:1.5;">{item.get('desc','')}</div>
-    {"<div style='font-size:10px;color:#888888;margin-top:4px;'>" + meta_html + "</div>" if meta_html else ""}
-  </div>
-</div>""", unsafe_allow_html=True)
-
+    # ── 최근 회차 성과 (판단 기록에서 자동) ───────────────
+    # 예전 대시보드는 활동 타임라인을 사람이 직접 적어 넣는 구조라 손이 안 갔다.
+    # 이제 판단 기록이 회차별로 쌓이므로 수치는 전부 자동으로 나온다.
     st.divider()
+    st.subheader("📈 회차별 성과")
+    _stats = round_stats(_dl_rows)
+    if not _stats:
+        st.info("판단 기록이 아직 없습니다. 발송 후 '발송 → 데이터 내보내기 → 🔄 갱신'을 누르면 쌓입니다.")
+    else:
+        _last = _stats[-1]
+        _prev = _stats[-2] if len(_stats) > 1 else None
+        r1, r2, r3, r4 = st.columns(4)
 
-    # 활동 추가
-    col_add, col_reset = st.columns([5, 1])
-    with col_reset:
-        if st.button("🔄 초기화", key="tl_reset", help="기본 데이터로 초기화"):
-            save_timeline(drive, DEFAULT_TIMELINE)
-            st.session_state['timeline_data'] = DEFAULT_TIMELINE
-            st.success("초기화 완료")
-            st.rerun()
+        def _delta(cur, key):
+            if not _prev:
+                return None
+            return f"{cur - _prev[key]:+.0f}%p"
 
-    st.markdown("""
-<style>
-.bp-egg { 
-  opacity: 0 !important;
-  transition: opacity 0.4s !important;
-  text-align: right;
-  font-size: 13px;
-  letter-spacing: 3px;
-  font-weight: 900;
-  color: #C9A96A !important;
-  margin-top: 32px;
-  cursor: default;
-  user-select: none;
-}
-.bp-egg:hover { opacity: 1 !important; }
-</style>
-<p class="bp-egg">BLACKPINK IN MY AREA</p>
-""", unsafe_allow_html=True)
+        r1.metric("발송", f"{_last['발송기업']}개사",
+                  f"공고 {_last['발송공고']}건", delta_color="off")
+        r2.metric("열람 기업", f"{_last['열람기업비율']:.0f}%",
+                  _delta(_last['열람기업비율'], '열람기업비율'))
+        r3.metric("클릭 기업", f"{_last['클릭기업비율']:.0f}%",
+                  _delta(_last['클릭기업비율'], '클릭기업비율'))
+        r4.metric("공고 클릭률", f"{_last['공고클릭률']:.0f}%",
+                  _delta(_last['공고클릭률'], '공고클릭률'))
+        st.caption(f"최근 회차 {_last['회차ID']} · 발송 {_last['발송일'] or '—'}  ·  "
+                   f"본 공고 {_last['본공고클릭률']:.0f}% / 참고 공고 {_last['참고클릭률']:.0f}%"
+                   + ("  ·  열람률은 이미지 차단 때문에 과소집계됩니다" if _last['열람기업비율'] else ""))
 
-    with st.expander("➕ 활동 기록 추가"):
-        a1, a2, a3 = st.columns([1.5, 2, 1.5])
-        with a1:
-            new_date = st.date_input("날짜", key="tl_new_date")
-            new_type = st.selectbox("유형", list(TYPE_LABELS.keys())[1:],
-                                    format_func=lambda x: TYPE_LABELS[x], key="tl_new_type")
-        with a2:
-            new_title = st.text_input("제목", key="tl_new_title")
-            new_desc  = st.text_input("설명 (선택)", key="tl_new_desc")
-        with a3:
-            new_count = st.text_input("수량 (선택, 예: 50개사)", key="tl_new_count")
-            new_note  = st.text_input("비고 (선택)", key="tl_new_note")
+        _tbl = pd.DataFrame([{
+            '회차': x['회차ID'], '발송일': x['발송일'],
+            '기업': x['발송기업'], '공고': x['발송공고'],
+            '열람기업%': round(x['열람기업비율']), '클릭기업%': round(x['클릭기업비율']),
+            '공고클릭률%': round(x['공고클릭률']),
+            '본공고%': round(x['본공고클릭률']), '참고%': round(x['참고클릭률']),
+        } for x in _stats[-6:]])
+        st.dataframe(_tbl, use_container_width=True, hide_index=True)
 
-        if st.button("✅ 추가", type="primary", key="tl_add_btn"):
-            if new_title:
-                new_item = {
-                    'date': str(new_date),
-                    'type': new_type,
-                    'title': new_title,
-                    'desc': new_desc,
-                    'count': new_count,
-                    'note': new_note,
-                }
-                tl_data.append(new_item)
-                save_timeline(drive, tl_data)
-                st.session_state['timeline_data'] = tl_data
-                st.success(f"'{new_title}' 추가됐습니다.")
+        # ── 손 써야 할 기업 ──
+        _silent = silent_companies(_dl_rows, last_n=3)
+        _used = [x['회차ID'] for x in round_stats(_dl_rows)][-3:]
+        st.markdown("")
+        if _silent:
+            st.warning(f"최근 회차에서 한 번도 클릭하지 않은 기업 — {len(_silent)}개사")
+            st.caption("메일을 고쳐서 풀릴 문제가 아닐 수 있습니다(담당자 변경·주소 오류·스팸함). "
+                       "전화로 수신 담당자를 확인하는 편이 빠릅니다.")
+            st.code("  ·  ".join(_silent), language=None)
+        else:
+            st.success("최근 3회차 안에 모든 기업이 한 번 이상 반응했습니다.")
+
+
+    # ── 운영 활동 타임라인 (수기 기록) ────────────────────
+    # 직접 적어 넣어야 해서 거의 쓰이지 않았다. 드라이브에 남은 과거 기록이 있으므로
+    # 지우지 않고 접어 둔다 — 필요할 때만 펴보면 된다.
+    st.divider()
+    with st.expander("📋 운영 활동 타임라인 (직접 기록)", expanded=False):
+        # ── 운영 활동 타임라인 ───────────────────────────────────
+        st.subheader("📋 운영 활동 타임라인")
+
+        TIMELINE_FILE = "timeline_log.json"
+
+        # 타임라인 데이터 로드
+        def load_timeline(drive):
+            try:
+                data = load_json(drive, TIMELINE_FILE)
+                return data if data else []
+            except:
+                return []
+
+        def save_timeline(drive, data):
+            save_json(drive, data, TIMELINE_FILE)
+
+        if 'timeline_data' not in st.session_state:
+            raw = load_timeline(drive)
+            # 드라이브 데이터가 없거나 비어있으면 기본 활동 기록 삽입
+            DEFAULT_TIMELINE = [
+                {
+                    'date': '2026-04-29',
+                    'type': 'eval',
+                    'title': '2026 원스톱 스케일업 참가 신청 접수 시작',
+                    'desc': '선정 대상 기업 공개 모집 · 온라인 신청 폼 운영',
+                    'count': '접수 기간 4/29~5/22',
+                    'note': '',
+                },
+                {
+                    'date': '2026-05-22',
+                    'type': 'eval',
+                    'title': '참가 신청 접수 마감',
+                    'desc': '총 184개사 신청 접수',
+                    'count': '184개사',
+                    'note': '',
+                },
+                {
+                    'date': '2026-06-22',
+                    'type': 'eval',
+                    'title': '2026 원스톱 스케일업 최종 선정 확정',
+                    'desc': '1단계 평가 → 상위 70개사 선정 확정',
+                    'count': '선정 50개사 · 예비 20개사',
+                    'note': '184개사 중 70개사',
+                },
+                {
+                    'date': '2026-06-26',
+                    'type': 'mail',
+                    'title': '선정기업 대상 첫 안내 메일 발송',
+                    'desc': '선정 축하 · 프로그램 안내 · 키워드 회신 요청',
+                    'count': '50개사',
+                    'note': '',
+                },
+                {
+                    'date': '2026-07-06',
+                    'type': 'match',
+                    'title': '맞춤형 공고 1차 발송',
+                    'desc': '나라장터 공고 크롤링 → 기업별 키워드 매칭 → 개별 발송 · 캘린더 자동 등록',
+                    'count': '50개사 · 캘린더 21건',
+                    'note': '',
+                },
+                {
+                    'date': '2026-07-14',
+                    'type': 'mail',
+                    'title': '7월 교육 프로그램 신청 안내 발송',
+                    'desc': 'AI 마케팅/콘텐츠 제작 활용 교육 안내 · CES 밋업 안내 포함',
+                    'count': '50개사',
+                    'note': '신청 마감 7/17(금) 18:00',
+                },
+                {
+                    'date': '2026-07-29',
+                    'type': 'edu',
+                    'title': '7월 정기 교육 — AI 마케팅/콘텐츠 제작 활용',
+                    'desc': '온라인 Zoom · 강사: 송윤경 (소상공인연합회)',
+                    'count': '',
+                    'note': '14:00~16:00 예정',
+                },
+            ]
+            if not raw:
+                raw = DEFAULT_TIMELINE
+                save_timeline(drive, raw)
+            st.session_state['timeline_data'] = raw
+        tl_data = st.session_state['timeline_data']
+
+        # 필터
+        TYPE_LABELS = {
+            "all": "전체",
+            "mail": "📧 메일 발송",
+            "match": "🎯 공고 매칭",
+            "edu": "📚 교육",
+            "meetup": "🤝 밋업",
+            "system": "⚙️ 시스템",
+            "eval": "📊 평가·선정",
+        }
+        TYPE_COLORS = {
+            "mail": "#3B82F6", "match": "#F43F5E", "edu": "#10B981",
+            "meetup": "#F59E0B", "system": "#8B5CF6", "eval": "#F59E0B",
+        }
+        TYPE_BADGE = {
+            "mail": "background:#001020;color:#1D4ED8",
+            "match": "background:#FFF1F2;color:#BE123C",
+            "edu": "background:#0A1A0F;color:#059669",
+            "meetup": "background:#1A0A00;color:#C2410C",
+            "system": "background:#F5F3FF;color:#6D28D9",
+            "eval": "background:#FFFBEB;color:#92400E",
+        }
+
+        filter_cols = st.columns(len(TYPE_LABELS))
+        tl_filter = st.session_state.get('tl_filter', 'all')
+        for i, (k, v) in enumerate(TYPE_LABELS.items()):
+            with filter_cols[i]:
+                is_active = tl_filter == k
+                label = f"**{v}**" if is_active else v
+                if st.button(
+                    label,
+                    key=f"tl_f_{k}",
+                    type="primary" if is_active else "secondary",
+                    use_container_width=True
+                ):
+                    st.session_state['tl_filter'] = k
+                    st.rerun()
+
+        tl_filter = st.session_state.get('tl_filter', 'all')
+        filtered = [t for t in sorted(tl_data, key=lambda x: x.get('date',''), reverse=True)
+                    if tl_filter == 'all' or t.get('type') == tl_filter]
+
+        if not filtered:
+            st.info("활동 기록이 없습니다. 아래에서 추가해주세요.")
+        else:
+            # 월별 그룹
+            from itertools import groupby
+            def month_key(item):
+                d = item.get('date','')
+                return d[:7] if d else '0000-00'
+
+            for month, items in groupby(filtered, key=month_key):
+                try:
+                    import datetime as _dt2
+                    yr, mo = int(month[:4]), int(month[5:7])
+                    mo_label = f"{yr}년 {mo}월"
+                except:
+                    mo_label = month
+
+                st.markdown(f"<p style='font-size:10px;font-weight:900;color:#C9A96A;letter-spacing:3px;text-transform:uppercase;margin:16px 0 8px 0;'>{mo_label}</p>", unsafe_allow_html=True)
+
+                for item in items:
+                    t = item.get('type','system')
+                    color = TYPE_COLORS.get(t, '#94A3B8')
+                    badge_style = TYPE_BADGE.get(t, 'background:#F1F5F9;color:#AAAAAA')
+                    badge_label = TYPE_LABELS.get(t, t)
+                    date_str = item.get('date','')
+                    try:
+                        d = datetime.strptime(date_str, '%Y-%m-%d')
+                        day = d.strftime('%d')
+                        dow = ['월','화','수','목','금','토','일'][d.weekday()]
+                    except:
+                        day, dow = '??', ''
+
+                    meta_parts = []
+                    if item.get('count'): meta_parts.append(f"📤 {item['count']}")
+                    if item.get('note'): meta_parts.append(f"📝 {item['note']}")
+                    meta_html = '&nbsp;·&nbsp;'.join(meta_parts)
+
+                    st.markdown(f"""
+    <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;">
+      <div style="width:36px;text-align:right;flex-shrink:0;padding-top:8px;">
+        <div style="font-size:16px;font-weight:900;color:#F0F0F0;">{day}</div>
+        <div style="font-size:10px;color:#666666;">{dow}</div>
+      </div>
+      <div style="width:10px;height:10px;border-radius:50%;background:{color};flex-shrink:0;margin-top:13px;box-shadow:0 0 8px {color},0 0 16px {color}66;"></div>
+      <div style="background:#151515;border-radius:10px;padding:10px 14px;flex:1;border:1px solid #252525;border-left:3px solid {color};">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
+          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:{color}22;color:{color};">{badge_label}</span>
+          <span style="font-size:13px;font-weight:600;color:#F0F0F0;">{item.get('title','')}</span>
+        </div>
+        <div style="font-size:11px;color:#AAAAAA;line-height:1.5;">{item.get('desc','')}</div>
+        {"<div style='font-size:10px;color:#888888;margin-top:4px;'>" + meta_html + "</div>" if meta_html else ""}
+      </div>
+    </div>""", unsafe_allow_html=True)
+
+        st.divider()
+
+        # 활동 추가
+        col_add, col_reset = st.columns([5, 1])
+        with col_reset:
+            if st.button("🔄 초기화", key="tl_reset", help="기본 데이터로 초기화"):
+                save_timeline(drive, DEFAULT_TIMELINE)
+                st.session_state['timeline_data'] = DEFAULT_TIMELINE
+                st.success("초기화 완료")
                 st.rerun()
+
+        st.markdown("""
+    <style>
+    .bp-egg { 
+      opacity: 0 !important;
+      transition: opacity 0.4s !important;
+      text-align: right;
+      font-size: 13px;
+      letter-spacing: 3px;
+      font-weight: 900;
+      color: #C9A96A !important;
+      margin-top: 32px;
+      cursor: default;
+      user-select: none;
+    }
+    .bp-egg:hover { opacity: 1 !important; }
+    </style>
+    <p class="bp-egg">BLACKPINK IN MY AREA</p>
+    """, unsafe_allow_html=True)
+
+        with st.expander("➕ 활동 기록 추가"):
+            a1, a2, a3 = st.columns([1.5, 2, 1.5])
+            with a1:
+                new_date = st.date_input("날짜", key="tl_new_date")
+                new_type = st.selectbox("유형", list(TYPE_LABELS.keys())[1:],
+                                        format_func=lambda x: TYPE_LABELS[x], key="tl_new_type")
+            with a2:
+                new_title = st.text_input("제목", key="tl_new_title")
+                new_desc  = st.text_input("설명 (선택)", key="tl_new_desc")
+            with a3:
+                new_count = st.text_input("수량 (선택, 예: 50개사)", key="tl_new_count")
+                new_note  = st.text_input("비고 (선택)", key="tl_new_note")
+
+            if st.button("✅ 추가", type="primary", key="tl_add_btn"):
+                if new_title:
+                    new_item = {
+                        'date': str(new_date),
+                        'type': new_type,
+                        'title': new_title,
+                        'desc': new_desc,
+                        'count': new_count,
+                        'note': new_note,
+                    }
+                    tl_data.append(new_item)
+                    save_timeline(drive, tl_data)
+                    st.session_state['timeline_data'] = tl_data
+                    st.success(f"'{new_title}' 추가됐습니다.")
+                    st.rerun()
 
 elif page == "기업 관리":
     drive = _get_drive()

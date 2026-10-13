@@ -314,6 +314,37 @@ def crawl_one(page, url, pid):
         print(f"    오류: {str(e)[:120]}")
         return fail_record(pid, 'exc')
 
+DETAIL_SUMMARY_FILE = "notices_detail_summary.json"
+
+
+def upload_detail_summary(creds, df_detail, df_notices=None):
+    """전문 DB의 요약만 따로 올린다.
+
+    전문 DB는 3MB가 넘는데 웹앱 대시보드가 쓰는 건 '몇 건 수집됐나' 뿐이다.
+    요약이 있으면 대시보드가 화면을 그릴 때마다 3MB를 내려받지 않아도 된다."""
+    try:
+        import json
+        ok = int((df_detail.get('크롤링성공', pd.Series(dtype=str)) == 'Y').sum())             if '크롤링성공' in df_detail.columns else int(len(df_detail))
+        miss = 0
+        if df_notices is not None and not df_notices.empty                 and 'pblancId' in df_notices.columns and 'pblancId' in df_detail.columns:
+            done = set(df_detail[df_detail.get('크롤링성공', '') == 'Y']['pblancId'])                 if '크롤링성공' in df_detail.columns else set(df_detail['pblancId'])
+            miss = len(set(df_notices['pblancId']) - done)
+        last = ''
+        if '크롤링일' in df_detail.columns and len(df_detail):
+            last = str(df_detail['크롤링일'].max() or '')[:10]
+        payload = {'총건수': int(len(df_detail)), '성공': ok,
+                   '실패': int(len(df_detail)) - ok, '미수집': miss,
+                   '마지막크롤링일': last,
+                   'saved_at': datetime.now().strftime('%Y-%m-%d %H:%M')}
+        if drive_upload(creds, DETAIL_SUMMARY_FILE,
+                        json.dumps(payload, ensure_ascii=False).encode('utf-8')):
+            print(f"  📑 전문 요약 저장 — 성공 {ok:,} / 미수집 {miss:,}")
+            return True
+    except Exception as e:
+        print(f"  ⚠️ 전문 요약 저장 건너뜀: {str(e)[:60]}")
+    return False
+
+
 def merge_and_upload(creds, df_detail, records):
     """기존 DB에 병합 후 업로드. 성공 시 갱신된 df_detail 반환."""
     if not records:
@@ -452,6 +483,9 @@ def main():
 
     if records:
         df_detail = merge_and_upload(creds, df_detail, records)
+
+    # 웹앱 대시보드가 3MB짜리 전문 DB를 매번 읽지 않도록 요약만 따로 남긴다
+    upload_detail_summary(creds, df_detail, df_n)
 
     elapsed = (time.time() - START_TS) / 60
     print(f"\n{'⏸️ 부분 완료' if stopped_early else '✅ 완료'} — "
