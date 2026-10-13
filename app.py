@@ -563,7 +563,9 @@ def save_decision_log(drive, rows, round_id, df_click=None):
     try:
         import json as _j
         keep = [r for r in load_decision_log(drive) if r.get('회차ID') != round_id]
-        allr = backfill_decision_src(reattach_clicks(keep + list(rows), df_click))
+        allr = backfill_decision_src(reattach_clicks(keep + list(rows or []), df_click))
+        if not allr:
+            return False, 0
         ok = drive_upload(drive, DECISION_LOG_FILE,
                           _j.dumps({'rows': allr,
                                     'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M')},
@@ -588,9 +590,10 @@ def record_decision_log(drive, round_id=None, sent_map=None,
             st.session_state.get('review_state', {}),
             st.session_state.get('decision_src', {}),
             sent_map, click_map, reaction_map)
-        if not rows:
-            return False, 0
         st.session_state.pop('_declog_cache', None)
+        # 이번 회차 매칭 결과가 비어 있어도(발송 뒤 상태 초기화 등) 그냥 끝내면 안 된다.
+        # '🔄 갱신'의 주 목적은 과거 회차의 클릭 재귀속과 빈 출처 되짚기이기 때문이다.
+        # rows 가 비면 save_decision_log 가 기존 기록만 손질해 다시 올린다.
         return save_decision_log(drive, rows, rid, df_click)
     except Exception:
         return False, 0
@@ -2086,7 +2089,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v0929-23"
+BUILD_TAG = "v0929-24"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -3695,9 +3698,13 @@ with st.sidebar:
                 _smap = load_send_progress(_dd, _drid).get('sent', {}) if _drid else {}
                 _ok_d, _cnt_d = record_decision_log(_dd, _drid, _smap, _cmap, _rmap, _craw)
             if _ok_d:
-                st.success(f"갱신 완료 — 누적 {_cnt_d}행")
+                _mr_now = st.session_state.get('match_results', [])
+                st.success(
+                    f"갱신 완료 — 누적 {_cnt_d}행"
+                    + ("" if _mr_now else
+                       " (이번 회차 매칭 결과가 없어 과거 회차의 클릭·출처만 손질했습니다)"))
             else:
-                st.warning("갱신할 매칭 결과가 없거나 저장에 실패했습니다.")
+                st.warning("판단 기록이 비어 있거나 저장에 실패했습니다.")
 
         if '_declog_cache' not in st.session_state:
             st.session_state['_declog_cache'] = load_decision_log(_get_drive())
