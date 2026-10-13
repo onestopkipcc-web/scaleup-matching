@@ -1944,7 +1944,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v0929-21"
+BUILD_TAG = "v0929-22"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -2181,8 +2181,20 @@ _SOFTEN_RULES = [
 
 # 메일 카드에 넣는 길이 상한. 예전에는 상한에서 그냥 잘라 문장이 뚝 끊겼다
 # (주의사항 736건 중 332건이 90자에서 잘림).
-REASON_MAX = 120
+# 💡 추천 사유 / ⚠️ 주의사항의 표시 상한.
+# 실측(2026-10-13 회차 승인 80건): 원문은 판단근거 259자 · 주의사항 128자로
+# 사유가 2배 긴데, 상한이 120/160 이라 화면에서는 주의가 더 길게 나왔다.
+# 신청을 권하는 메일에서 경고가 권유보다 커지는 건 뒤바뀐 것이라 사유를 늘렸다.
+REASON_MAX = 150
 CAUTION_MAX = 160
+# 카드에 보일 해시태그 수. 같은 회차에서 80건 중 73건이 태그 5개였는데
+# 조합이 거의 같아 변별력 없이 한 줄을 통째로 먹었다. 되돌리려면 숫자만 올리면 된다.
+TAG_MAX = 3
+# 💡 추천 사유에 쓸 문장 수. 1문장만 쓰면 평균 69자라, 125자인 주의사항에 밀려
+# 경고가 권유보다 커 보였다(REASON_MAX를 올려도 소용없었던 이유 — 상한이 아니라
+# 문장 수에서 잘리고 있었다). 2문장이면 평균 120자로 균형이 맞고, 두 번째 문장이
+# 자격요건·대상 조건을 담아 실제로 쓸모가 있다. 되돌리려면 1로 낮추면 된다.
+REASON_SENTENCES = 2
 
 def clip_text(text, limit):
     """limit 안에서 문장 경계로 자른다. 경계를 못 찾으면 자르고 … 을 붙인다."""
@@ -2246,10 +2258,9 @@ def attach_ai_reason(n, company, ai_cache):
         return n
     reason = str(res.get('판단근거', '') or '').strip()
     if reason and reason.lower() != 'nan':
-        first = re.split(r'(?<=다\.)\s+', reason)[0]
-        if _RE_NO_REASON.search(first):
-            # 판단불가·정보누락을 말하는 문장은 추천 이유가 될 수 없다
-            first = ''
+        # 판단불가·정보누락을 말하는 문장은 추천 이유가 될 수 없다 — 문장별로 거른다.
+        _sents = re.split(r'(?<=다\.)\s+', reason)[:REASON_SENTENCES]
+        first = ' '.join(s for s in _sents if s and not _RE_NO_REASON.search(s))
         _names = {str(company or ''), str(n.get('기업명', '') or '')}
         for _nm in list(_names):
             _core = re.sub(r'\(주\)|\(유\)|주식회사|\s', '', _nm)
@@ -2382,7 +2393,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
         tag_html = ""
         if hashtags:
             tag_html = "<div style=\'margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;\'>"
-            for _ti, tag in enumerate(hashtags.split()):
+            for _ti, tag in enumerate(hashtags.split()[:TAG_MAX]):
                 _tc = ("background:#F3EDE0;color:#7E6433" if _ti == 0
                        else "background:#EDEBE5;color:#797469")
                 tag_html += f"<span style=\'font-size:11px;{_tc};padding:3px 8px;border-radius:20px;\'>{tag}</span>"
@@ -2400,7 +2411,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
             _extra += (f"<p style=\"margin:8px 0 0;padding:8px 10px;font-size:13px;"
                        f"color:#7E6C47;background:#FBF7EF;"
                        f"border-left:3px solid #D8C9A8;border-radius:4px;"
-                       f"line-height:1.6;\">📌 신청 전 확인: {n['_ai_caution']}</p>")
+                       f"line-height:1.6;\">⚠️ 신청 전 확인: {n['_ai_caution']}</p>")
         if n.get('_related'):
             _rl = []
             for _rn in n['_related'][:3]:
@@ -2418,27 +2429,33 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
                       border:1px solid #E8E2D5;border-radius:10px;overflow:hidden;
                       box-shadow:0 1px 4px rgba(26,35,50,0.05);">
           <tr>
-            <td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;padding:12px 16px;">
+            <td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;padding:14px 16px;">
               <a href="{_trk}"
                  style="font-size:14px;font-weight:600;color:#1B2A41;
                         text-decoration:none;line-height:1.5;display:block;
                         word-break:keep-all;">
                 {notice_name}
               </a>
-              <p style="margin:4px 0 0;font-size:13px;color:#757066;">
-                {n.get("주관기관","")} &nbsp;·&nbsp; <span style="color:{_dl_col};font-weight:600;">{_dl_txt}</span>
-              </p>
+              <!-- 메타 줄과 버튼을 한 행에. 제목(평균 41자·96%가 2줄 이상)은
+                   전체 폭을 쓰고, 버튼은 한 줄짜리 메타 옆에 붙어 밀리지 않는다. -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;">
+                <tr>
+                  <td valign="middle" style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;font-size:13px;color:#757066;">
+                    {n.get("주관기관","")} &nbsp;·&nbsp; <span style="color:{_dl_col};font-weight:600;">{_dl_txt}</span>
+                  </td>
+                  <td width="78" align="right" valign="middle" style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;">
+                    <a href="{_trk}"
+                       style="display:inline-block;padding:7px 15px;font-size:12px;
+                              font-weight:700;color:#1B2A41;background:#C9A96A;
+                              border-radius:6px;text-decoration:none;
+                              white-space:nowrap;">
+                      보기 →
+                    </a>
+                  </td>
+                </tr>
+              </table>
               {tag_html}
               {_extra}
-              <div style="margin-top:12px;">
-                <a href="{_trk}"
-                   style="display:inline-block;padding:9px 20px;font-size:13px;
-                          font-weight:700;color:#1B2A41;background:#C9A96A;
-                          border-radius:6px;text-decoration:none;
-                          white-space:nowrap;">
-                  보기 →
-                </a>
-              </div>
             </td>
           </tr>
         </table>"""
