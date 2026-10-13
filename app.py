@@ -269,6 +269,84 @@ def flush_send_history(drive, prog):
 # 기록 실패가 발송이나 저장 흐름을 막으면 안 되므로 전부 예외를 삼킨다.
 DECISION_LOG_FILE = "decision_log.json"
 
+# 발송이 끝난 회차의 매칭·AI판정·승인 상태를 통째로 남긴다.
+# 발송 뒤에는 match_results 가 비워져서, 메일 모양을 한 번 확인하려 해도 수집·매칭·
+# AI 분석을 처음부터 다시 돌려야 했다. 스냅샷이 있으면 비용 0으로 실제 데이터 그대로
+# 미리보기·테스트 발송을 할 수 있다.
+ROUND_SNAPSHOT_FILE = "round_snapshot.json"
+
+
+def save_round_snapshot(drive, round_id):
+    """발송 직후 호출. 실패해도 발송 흐름을 막지 않는다."""
+    try:
+        import json as _j
+        payload = {
+            'round_id':      round_id or '',
+            'saved_at':      datetime.today().strftime('%Y-%m-%d %H:%M'),
+            'match_results': st.session_state.get('match_results', []),
+            'ai_analysis':   st.session_state.get('ai_analysis', {}),
+            'review_state':  st.session_state.get('review_state', {}),
+            'ref_notices':   st.session_state.get('_ref_notices_by_co', {}),
+        }
+        if not payload['match_results']:
+            return False
+        return bool(drive_upload(
+            drive, ROUND_SNAPSHOT_FILE,
+            _j.dumps(payload, ensure_ascii=False, default=str).encode('utf-8'),
+            "application/json"))
+    except Exception:
+        return False
+
+
+def load_round_snapshot(drive):
+    """{'round_id','saved_at','match_results','ai_analysis','review_state','ref_notices'}"""
+    try:
+        return load_json(drive, ROUND_SNAPSHOT_FILE) or {}
+    except Exception:
+        return {}
+
+
+def snapshot_buckets(snap):
+    """스냅샷의 기업을 '메일에 실릴 맞춤 공고 수'로 묶는다.
+
+    메일 모양이 가장 크게 갈리는 지점이라 이 세 가지만 보면 레이아웃 확인이 끝난다.
+    HTML을 다 만들지 않고 관문만 통과시켜 세므로 가볍다."""
+    res = snap.get('match_results', []) or []
+    ai  = snap.get('ai_analysis', {}) or {}
+    rv  = snap.get('review_state', {}) or {}
+    cnt = {}
+    for r in res:
+        co = str(r.get('기업명', '') or '').strip()
+        if not co:
+            continue
+        cnt.setdefault(co, 0)
+        if can_include_notice(r, co, ai, rv)[0] and rv.get(
+                f"{co}_{r.get('공고ID','')}", '') == '○':
+            cnt[co] += 1
+    out = {'맞춤 0건': [], '1~2건': [], '3건 이상': []}
+    for co, c in sorted(cnt.items()):
+        out['맞춤 0건' if c == 0 else ('1~2건' if c <= 2 else '3건 이상')].append(co)
+    return out
+
+
+def send_test_mail(to_list, company, html, meta):
+    """테스트 메일 발송 — 실제 발송과 같은 발신자·제목 규칙을 쓴다."""
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.header import Header
+    from email.utils import formataddr
+    import base64 as _b64
+    sent = 0
+    for to in to_list:
+        msg = MIMEMultipart('alternative')
+        msg['From'] = formataddr((str(Header(MAIL_FROM_NAME, 'utf-8')), MAIL_FROM_ADDR))
+        msg['To'] = to
+        msg['Subject'] = Header("[TEST] " + mail_subject(company, meta), 'utf-8')
+        msg.attach(MIMEText(html, 'html', 'utf-8'))
+        gmail_send(_b64.urlsafe_b64encode(msg.as_bytes()).decode())
+        sent += 1
+    return sent
+
 def _ai_cache_version(res):
     """AI 판정 캐시 버전 — 판정 내용의 해시 앞 8자리.
     ai_analysis에 버전 필드가 없어서, 같은 판정이면 같은 값이 나오도록 만든다.
@@ -2157,7 +2235,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v0929-25"
+BUILD_TAG = "v0929-26"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -5949,6 +6027,63 @@ elif page == "발송":
         """,
         "발신자 이름·서명 변경 → `app.py` HTML 템플릿 수정")
 
+    # ── 🧪 메일 테스트 (매칭 불필요) ─────────────────────
+    # 발송이 끝나면 match_results 가 비워져, 메일 모양을 한 번 보려 해도 수집·매칭·
+    # AI 분석을 다시 돌려야 했다. 마지막 회차 스냅샷으로 비용 0으로 재현한다.
+    with st.expander("🧪 메일 테스트 — 매칭 없이 지난 회차로 확인", expanded=False):
+        _snap = load_round_snapshot(drive)
+        if not _snap.get('match_results'):
+            st.caption("아직 저장된 회차 스냅샷이 없습니다. 다음 발송이 끝나면 자동으로 생깁니다.")
+        else:
+            st.caption(f"스냅샷 회차 {_snap.get('round_id','?')} · 저장 {_snap.get('saved_at','?')}"
+                       f" · 매칭 {len(_snap.get('match_results',[])):,}건")
+            _bk = snapshot_buckets(_snap)
+            _labels = [f"{_lb} ({len(_cos)}개사)" for _lb, _cos in _bk.items() if _cos]
+            _by_label = {f"{_lb} ({len(_cos)}개사)": _cos
+                         for _lb, _cos in _bk.items() if _cos}
+            if not _labels:
+                st.caption("스냅샷에 기업이 없습니다.")
+            else:
+                _pick = st.radio("승인 공고 수로 본 메일 유형", _labels,
+                                 key="snap_pick", horizontal=True)
+                # 유형 안에서 기업을 고를 수 있게 한다. 같은 유형이라도 참고 공고가
+                # 채워지는지 여부로 메일 모양이 갈려서, 첫 기업만 보면 놓치는 경우가 있다.
+                _co_t = st.selectbox("기업", _by_label[_pick], key="snap_co")
+                _df_ct = get_companies_df()
+                _row_t = {}
+                if not _df_ct.empty and '기업명' in _df_ct.columns:
+                    _mt = _df_ct[_df_ct['기업명'] == _co_t]
+                    if not _mt.empty:
+                        _row_t = _mt.iloc[0].to_dict()
+                # 실제 발송은 승인(○) 공고만 build_match_mail 에 넘긴다(grouped = approved).
+                # 여기서도 똑같이 걸러야 테스트 메일이 실제 메일과 같아진다.
+                _rv_t = _snap.get('review_state', {}) or {}
+                _notices_t = [r for r in _snap['match_results']
+                              if str(r.get('기업명', '')).strip() == _co_t
+                              and _rv_t.get(f"{_co_t}_{r.get('공고ID','')}", '') == '○']
+                _html_t, _meta_t = build_match_mail(
+                    _co_t, _notices_t, _row_t,
+                    _snap.get('ai_analysis', {}) or {},
+                    _snap.get('ref_notices', {}) or {},
+                    _snap.get('review_state', {}) or {})
+                if _html_t is None:
+                    st.warning(f"{_co_t} — 실을 공고가 없어 실제 발송에서도 건너뛰는 기업입니다.")
+                else:
+                    st.caption(f"제목: {mail_subject(_co_t, _meta_t)}")
+                    _t1, _t2 = st.columns(2)
+                    if _t1.button("👁 미리보기", key="snap_prev", use_container_width=True):
+                        st.session_state['_snap_html'] = _html_t
+                    if _t2.button("📤 테스트 발송", key="snap_send", use_container_width=True,
+                                  help="사이드바 테스트 수신자에게만 보냅니다"):
+                        try:
+                            _nt = send_test_mail(get_test_recipients(), _co_t, _html_t, _meta_t)
+                            st.success(f"테스트 발송 {_nt}통 — {', '.join(get_test_recipients())}")
+                        except Exception as _e_t:
+                            st.error(f"발송 실패: {str(_e_t)[:160]}")
+                    if st.session_state.get('_snap_html'):
+                        st.components.v1.html(st.session_state.pop('_snap_html'),
+                                              height=1200, scrolling=True)
+
     results  = st.session_state.get('match_results', [])
 
     # review_state 없으면 드라이브에서 불러오기 (현재 회차 것만)
@@ -6350,6 +6485,8 @@ elif page == "발송":
                     save_send_progress(drive, _sprog)
                     # 판단 기록에 발송 결과 반영 — 실패해도 발송 흐름을 막지 않는다
                     record_decision_log(drive, _send_rid, _sprog.get('sent', {}))
+                    # 이 회차를 그대로 재현할 수 있게 남긴다 (실패해도 발송엔 영향 없음)
+                    save_round_snapshot(drive, _send_rid)
                 prog.progress(1.0)
                 st.success(f"발송 완료 — {len(history_records)}건 → send_history.xlsx 저장 "
                            f"(회차 {_send_rid} · {len(_sprog['sent'])}개사)")
