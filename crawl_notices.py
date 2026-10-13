@@ -122,6 +122,9 @@ def collect_notices(creds):
     else:
         df_n = pd.DataFrame()
     ex_map = {r['pblancId']: r.get('수정일','') for _, r in df_n.iterrows()} if not df_n.empty else {}
+    # 기존 행의 최초수집일 — 업데이트 시 덮어쓰지 않으려고 미리 뽑아 둔다
+    first_map = ({r['pblancId']: str(r.get('최초수집일','') or '') for _, r in df_n.iterrows()}
+                 if not df_n.empty and '최초수집일' in df_n.columns else {})
 
     all_items, seen = [], set()
     for code in REALM_CODES:
@@ -170,6 +173,12 @@ def collect_notices(creds):
                 "공고문파일URL":item.get('printFlpthNm',''),
                 "첨부파일명":item.get('fileNm',''),
                 "첨부파일URL":item.get('flpthNm',''),
+                # 날짜 3종을 구분해 둔다.
+                #   공고등록일 — 기업마당에 공고가 올라온 날 (API creatPnttm)
+                #   최초수집일 — 우리 DB에 처음 들어온 날 (한 번 정해지면 안 바뀜)
+                #   수집일     — 마지막으로 확인한 날 (매 수집마다 갱신, app.py가 참조)
+                "공고등록일":str(item.get('creatPnttm','') or '')[:10],
+                "최초수집일":today,
                 "전문내용":"","수정일":item.get('updtPnttm',''),"수집일":today}
 
     new_rows, upd_rows, dup = [], [], 0
@@ -180,6 +189,8 @@ def collect_notices(creds):
         if pid not in ex_map:
             new_rows.append(row)
         elif ex_map[pid] != item.get('updtPnttm',''):
+            # 내용이 바뀐 공고라도 '처음 들어온 날'은 그대로 둔다
+            row['최초수집일'] = first_map.get(pid, '') or row['최초수집일']
             upd_rows.append(row)
         else:
             dup += 1
@@ -188,6 +199,10 @@ def collect_notices(creds):
         upd_ids = {r['pblancId'] for r in upd_rows}
         df_base = df_n[~df_n['pblancId'].isin(upd_ids)].copy()
         df_base['수집일'] = today   # 기존 공고도 '오늘 확인함'으로 갱신
+        # 최초수집일은 이 체계 도입(2026-10-13) 이전 행에는 없다.
+        # 오늘 날짜로 채우면 '전부 오늘 처음 들어왔다'는 거짓이 되므로 빈칸으로 둔다.
+        if '최초수집일' not in df_base.columns:
+            df_base['최초수집일'] = ''
 
         # 공고문·첨부 파일 필드는 '유지' 행에도 채운다.
         # to_row() 는 신규·업데이트 행에만 적용되므로, 그대로 두면 기존 행이 계속
@@ -195,8 +210,10 @@ def collect_notices(creds):
         # API 응답에 이미 들어 있어 추가 호출은 없다.
         _fmap = {str(it.get('pblancId', '')): it for it in all_items}
         _filled = 0
+        # 공고등록일은 API 가 전 건에 주므로 기존 행도 소급해서 채울 수 있다.
         for _col, _key in (('공고문파일명', 'printFileNm'), ('공고문파일URL', 'printFlpthNm'),
-                           ('첨부파일명', 'fileNm'), ('첨부파일URL', 'flpthNm')):
+                           ('첨부파일명', 'fileNm'), ('첨부파일URL', 'flpthNm'),
+                           ('공고등록일', 'creatPnttm')):
             if _col not in df_base.columns:
                 df_base[_col] = ''
             _vals = []
@@ -206,6 +223,8 @@ def collect_notices(creds):
                     _vals.append(_old)          # 이번 응답에 없는 공고는 그대로 둔다
                     continue
                 _new = str(_it.get(_key, '') or '')
+                if _col == '공고등록일':
+                    _new = _new[:10]          # '2026-09-28 14:11:29' → '2026-09-28'
                 if _new and _new != _old:
                     _filled += 1
                 _vals.append(_new or _old)
@@ -285,6 +304,7 @@ def crawl_one(page, url, pid):
         if len(full_text) > 200:
             amount, scale = extract_meta(full_text)
             return {'pblancId': pid, '전문내용': full_text[:3000],
+                    '전문길이': len(full_text[:3000]),
                     '지원금액': amount, '선정규모': scale,
                     '크롤링방법': 'Playwright',
                     '크롤링일': datetime.today().strftime('%Y-%m-%d'),
@@ -300,6 +320,10 @@ def merge_and_upload(creds, df_detail, records):
         return df_detail
     df_new = pd.DataFrame(records)
     if not df_detail.empty:
+        # 기존 행에도 전문길이를 채운다 (매 배치마다 전체를 다시 쓰므로 비용 없음)
+        if '전문내용' in df_detail.columns:
+            df_detail = df_detail.copy()
+            df_detail['전문길이'] = df_detail['전문내용'].astype(str).str.len()
         new_pids = set(df_new['pblancId'].tolist())
         df_out = pd.concat([df_detail[~df_detail['pblancId'].isin(new_pids)], df_new],
                            ignore_index=True)
