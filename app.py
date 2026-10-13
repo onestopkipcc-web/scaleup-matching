@@ -2332,7 +2332,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v0929-27"
+BUILD_TAG = "v0929-28"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -4102,12 +4102,19 @@ if page == "대시보드":
 
     last_crawl = "—"
     need_crawl_cnt = 0
+    crawl_ok = 0
+    have_crawl = False       # 전문 수집 정보를 가지고 있는가 (요약이든 원본이든)
     if _det_sum:
         last_crawl = str(_det_sum.get('마지막크롤링일', '') or '—')[:10]
         need_crawl_cnt = max(0, int(_det_sum.get('미수집', 0) or 0))
+        crawl_ok = int(_det_sum.get('성공', 0) or 0)
+        have_crawl = True
     else:
+        have_crawl = not df_det.empty
         if not df_det.empty and '크롤링일' in df_det.columns:
             last_crawl = df_det['크롤링일'].max()[:10] if df_det['크롤링일'].max() else "—"
+        if not df_det.empty:
+            crawl_ok = int((df_det['크롤링성공'] == 'Y').sum())                 if '크롤링성공' in df_det.columns else int(len(df_det))
         if not df_n.empty and not df_det.empty and 'pblancId' in df_n.columns and 'pblancId' in df_det.columns:
             crawled_pids = set(df_det[df_det.get('크롤링성공',pd.Series(''))=='Y']['pblancId']) if '크롤링성공' in df_det.columns else set()
             need_crawl_cnt = len(set(df_n['pblancId']) - crawled_pids)
@@ -4131,7 +4138,8 @@ if page == "대시보드":
             "step": "② 전문 크롤링",
             "status": "완료" if need_crawl_cnt == 0 else f"{need_crawl_cnt}건 대기",
             "ok": need_crawl_cnt == 0,
-            "detail": f"수집 완료 {crawl_ok}건 / 미수집 {need_crawl_cnt}건" if not df_det.empty else "크롤링 미실행",
+            "detail": (f"수집 완료 {crawl_ok:,}건 / 미수집 {need_crawl_cnt:,}건"
+                       if have_crawl else "크롤링 미실행"),
             "action": "공고 수집"
         },
         {
