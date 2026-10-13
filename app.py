@@ -312,6 +312,106 @@ def build_click_map(df_click):
         pass
     return out
 
+def _ts(v):
+    """'2026-09-30 9:43:02' 처럼 한 자리 시(時)가 섞인 값도 비교 가능하게 만든다.
+    문자열끼리 비교하면 '9:43' > '07:33' 이 되어 같은 날짜에서 순서가 뒤집힌다."""
+    m = re.search(r'(\d{4})\D(\d{1,2})\D(\d{1,2})(?:\D+(\d{1,2})\D(\d{1,2})(?:\D(\d{1,2}))?)?',
+                  str(v or ''))
+    if not m:
+        return None
+    g = [int(x) if x else 0 for x in m.groups()]
+    return tuple(g)
+
+
+def reattach_clicks(rows, df_click):
+    """판단 기록 전체(모든 회차)의 클릭 칸을 다시 계산한다.
+
+    클릭 로그에는 회차가 없다. 같은 공고가 회차마다 다시 매칭되므로 (기업,공고)로만
+    맞추면 과거 클릭이 최신 회차로 빨려간다 — 실제로 9/29 회차가 자기 클릭을 0건으로
+    적고, 아직 발송도 안 한 10/13 회차에 10건이 찍혀 있었다.
+    그래서 클릭 한 건을 '그 시각 이전의 가장 최근 발송'에 귀속시킨다.
+    귀속할 발송이 없는 클릭(판단 기록에 없는 과거 회차 분)은 버린다 — 어느 회차의
+    성과인지 알 수 없는 것을 아무 회차에나 얹지 않는다.
+
+    발송하지 않은 행의 클릭 칸은 비운다. save_decision_log 가 매번 전체에 적용하므로
+    나중에 도착한 클릭도 제 회차로 들어간다(과거 회차가 냉동되지 않는다).
+    """
+    rows = list(rows or [])
+    if df_click is None or getattr(df_click, 'empty', True):
+        return rows
+    # ① 발송 색인 — (기업, 공고ID) 와 (기업, 공고명) 두 갈래로 만든다
+    sent = {}
+    for r in rows:
+        if str(r.get('발송여부', '')) not in ('Y', '참고'):
+            continue
+        at = _ts(r.get('발송시각', ''))
+        if not at:
+            continue
+        co = str(r.get('기업명', '') or '').strip()
+        for v in (str(r.get('공고ID', '') or '').strip(),
+                  str(r.get('공고명', '') or '').strip()):
+            if v:
+                sent.setdefault((co, v), []).append((at, str(r.get('회차ID', ''))))
+    # ② 클릭 한 건씩 '직전 발송'에 귀속
+    tally, dropped = {}, 0
+    try:
+        cols = list(df_click.columns)
+
+        def pick(*keys):
+            for c in cols:
+                if any(k in str(c).lower() for k in keys):
+                    return c
+            return None
+
+        co_col = pick('기업', 'co')
+        id_col = pick('공고id', 'notice', 'pblanc')
+        nm_col = pick('공고명', 'name')
+        tm_col = pick('시각', '시간', 'time', 'date') or cols[0]
+        if not co_col:
+            return rows
+        for _, cr in df_click.iterrows():
+            co = str(cr.get(co_col, '') or '').strip()
+            ct = _ts(cr.get(tm_col, ''))
+            if not co or not ct:
+                continue
+            cand = []
+            for _c in (id_col, nm_col):
+                if not _c:
+                    continue
+                v = str(cr.get(_c, '') or '').strip()
+                if v:
+                    cand += sent.get((co, v), [])
+            past = [(at, rid) for at, rid in cand if at <= ct]
+            if not past:
+                dropped += 1
+                continue
+            _, rid = max(past)
+            pid = str(cr.get(id_col, '') or '').strip() if id_col else ''
+            nm = str(cr.get(nm_col, '') or '').strip() if nm_col else ''
+            e = tally.setdefault((rid, co, pid, nm), {'count': 0, 'last': ''})
+            e['count'] += 1
+            raw = str(cr.get(tm_col, '') or '')
+            if _ts(raw) and (not e['last'] or _ts(raw) > _ts(e['last'])):
+                e['last'] = raw
+    except Exception:
+        return rows
+    # ③ 행에 되쓰기 — 발송한 행에만 값이 들어간다
+    for r in rows:
+        if str(r.get('발송여부', '')) not in ('Y', '참고'):
+            r['클릭여부'], r['클릭시각'], r['클릭수'] = '', '', ''
+            continue
+        rid = str(r.get('회차ID', ''))
+        co = str(r.get('기업명', '') or '').strip()
+        hit = (tally.get((rid, co, str(r.get('공고ID', '') or '').strip(),
+                          str(r.get('공고명', '') or '').strip())) or {})
+        r['클릭여부'] = 'Y' if hit.get('count') else 'N'
+        r['클릭시각'] = hit.get('last', '')
+        r['클릭수'] = hit.get('count', 0) or ''
+    if dropped:
+        print(f"  (귀속할 발송 기록이 없어 제외된 클릭 {dropped}건)")
+    return rows
+
+
 def collect_reactions(days=90, max_results=200):
     """메일 하단 반응 버튼의 회신을 Gmail에서 모은다 → {기업명: {'value','at'}}.
     반응 링크가 mailto라 클릭 자체는 추적되지 않고 회신이 와야 알 수 있다.
@@ -400,8 +500,12 @@ def build_decision_rows(round_id, results, ai_cache, review_state, decision_src,
             '최종결정': _stat.get(dec, '미결정'),
             '결정출처': (decision_src or {}).get(key, '') if dec in ('○', '✕') else '',
             '발송여부': _sent, '발송시각': _s.get('at', ''),
-            '클릭여부': 'Y' if _ck.get('count') else ('N' if _sent in ('Y', '참고') else ''),
-            '클릭시각': _ck.get('last', ''), '클릭수': _ck.get('count', 0) or '',
+            # 발송하지 않은 회차에는 클릭을 적지 않는다. 클릭 로그에 회차가 없어
+            # 예전에는 '아직 보내지도 않은 공고'에 Y가 찍혔다.
+            # 회차별 정확한 귀속은 reattach_clicks() 가 저장 직전에 다시 계산한다.
+            '클릭여부': ('Y' if _ck.get('count') else 'N') if _sent in ('Y', '참고') else '',
+            '클릭시각': _ck.get('last', '') if _sent in ('Y', '참고') else '',
+            '클릭수': (_ck.get('count', 0) or '') if _sent in ('Y', '참고') else '',
             '반응버튼': _rx.get('value', ''), '반응시각': _rx.get('at', ''),
             '기록시각': _now,
         })
@@ -415,13 +519,16 @@ def load_decision_log(drive):
     except Exception:
         return []
 
-def save_decision_log(drive, rows, round_id):
+def save_decision_log(drive, rows, round_id, df_click=None):
     """이번 회차 행을 통째로 교체하고 다른 회차 행은 그대로 둔다.
-    담당자가 ○/✕를 바꾸면 다음 기록 때 최종 결정·출처가 자동 갱신된다."""
+    담당자가 ○/✕를 바꾸면 다음 기록 때 최종 결정·출처가 자동 갱신된다.
+
+    df_click 이 있으면 저장 직전에 '모든 회차'의 클릭 칸을 다시 계산한다.
+    과거 회차 행을 그대로 두기만 하면 발송 뒤에 도착한 클릭이 영영 반영되지 않는다."""
     try:
         import json as _j
         keep = [r for r in load_decision_log(drive) if r.get('회차ID') != round_id]
-        allr = keep + list(rows)
+        allr = reattach_clicks(keep + list(rows), df_click)
         ok = drive_upload(drive, DECISION_LOG_FILE,
                           _j.dumps({'rows': allr,
                                     'saved_at': datetime.today().strftime('%Y-%m-%d %H:%M')},
@@ -432,7 +539,7 @@ def save_decision_log(drive, rows, round_id):
         return False, 0
 
 def record_decision_log(drive, round_id=None, sent_map=None,
-                        click_map=None, reaction_map=None):
+                        click_map=None, reaction_map=None, df_click=None):
     """현재 세션 상태로 이번 회차 판단 기록을 갱신한다.
     예외를 절대 밖으로 내보내지 않는다 — 기록 실패가 발송을 막으면 안 된다."""
     try:
@@ -449,7 +556,7 @@ def record_decision_log(drive, round_id=None, sent_map=None,
         if not rows:
             return False, 0
         st.session_state.pop('_declog_cache', None)
-        return save_decision_log(drive, rows, rid)
+        return save_decision_log(drive, rows, rid, df_click)
     except Exception:
         return False, 0
 
@@ -1944,7 +2051,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v0929-22"
+BUILD_TAG = "v0929-23"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -3522,10 +3629,11 @@ with st.sidebar:
             with st.spinner("클릭 로그·반응 회신 수집 중..."):
                 _dd   = _get_drive()
                 _drid = current_round_id()
-                _cmap = build_click_map(load_click_log())
+                _craw = load_click_log()          # 원본 — 회차 귀속에 시각이 필요하다
+                _cmap = build_click_map(_craw)
                 _rmap = collect_reactions()
                 _smap = load_send_progress(_dd, _drid).get('sent', {}) if _drid else {}
-                _ok_d, _cnt_d = record_decision_log(_dd, _drid, _smap, _cmap, _rmap)
+                _ok_d, _cnt_d = record_decision_log(_dd, _drid, _smap, _cmap, _rmap, _craw)
             if _ok_d:
                 st.success(f"갱신 완료 — 누적 {_cnt_d}행")
             else:
