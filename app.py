@@ -1944,7 +1944,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v0929-20"
+BUILD_TAG = "v0929-21"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -2052,12 +2052,36 @@ def notice_deadline_date(n):
 
 def deadline_label(n):
     """카드에 찍을 접수기간 문구. 날짜가 없을 때 '상시'로 뭉개면
-    '예산 소진시까지'인 공고가 상시 접수처럼 보인다 — 원문을 그대로 쓴다."""
+    '예산 소진시까지'인 공고가 상시 접수처럼 보인다 — 원문을 그대로 쓴다.
+
+    '2026-10-19' 보다 '10/19(일) · D-6' 이 한눈에 읽힌다. 요일은 영업일 감각을
+    주고, D-day는 암산을 덜어준다. 다만 수신자가 며칠 뒤 열면 D-day가 어긋나므로
+    날짜가 주(主)이고 D-day는 뒤에 붙는 보조 표기다. 해가 바뀌는 공고만 연도를 쓴다."""
+    from datetime import date as _date
     _d = notice_deadline_date(n)
     if _d:
-        return f"마감 {_d.strftime('%Y-%m-%d')}"
+        _wd = '월화수목금토일'[_d.weekday()]
+        _today = _date.today()
+        _head = (f"마감 {_d.month}/{_d.day}({_wd})" if _d.year == _today.year
+                 else f"마감 {_d.year}.{_d.month}/{_d.day}({_wd})")
+        _left = (_d - _today).days
+        if _left == 0:
+            return f"{_head} · 오늘 마감"
+        if 0 < _left <= 30:
+            return f"{_head} · D-{_left}"
+        return _head
     _rp = str(n.get('접수기간', '') or '').strip()
     return f"접수 {_rp}" if _rp else "접수기간 확인 필요"
+
+
+def deadline_urgent(n):
+    """마감을 붉게 강조할 것인가 — D-3 이내만.
+
+    이번 회차 실측: 승인 63건 중 D-7 이내가 40건(63%)이고 그중 37건이 같은 날
+    (10/19)이었다. D-7을 기준 삼으면 카드 대부분이 붉어져 경고가 무의미해진다."""
+    from datetime import date as _date
+    _d = notice_deadline_date(n)
+    return bool(_d) and 0 <= (_d - _date.today()).days <= 3
 
 def _notice_open(n, _ref=None):
     """발송 시점 기준으로 접수 중인 공고인지 검사.
@@ -2340,7 +2364,8 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
                        border-radius:6px;">
               <a href="{_trk}"
                  style="font-size:13px;font-weight:500;color:#5A5548;
-                        text-decoration:none;display:block;">
+                        text-decoration:none;display:block;
+                        word-break:keep-all;line-height:1.5;">
                 {n.get('공고명','')}
               </a>
               <p style="margin:3px 0 0;font-size:12px;color:#78736A;">
@@ -2352,6 +2377,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
 
     def notice_card(n, idx):
         _dl_txt = deadline_label(n)
+        _dl_col = "#C0392B" if deadline_urgent(n) else "#8D6E3B"
         hashtags = reason_to_hashtag(n.get("매칭근거",""))
         tag_html = ""
         if hashtags:
@@ -2369,7 +2395,11 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
             _extra += (f"<p style=\"margin:7px 0 0;font-size:13px;color:#7A6B45;"
                        f"line-height:1.65;\">💡 {n['_ai_reason']}</p>")
         if n.get('_ai_caution'):
-            _extra += (f"<p style=\"margin:4px 0 0;font-size:13px;color:#7E6C47;"
+            # 💡 추천 사유와 📌 주의는 역할이 정반대(권유 vs 경고)인데
+            # 같은 모양의 작은 문단이라 뭉쳐 보였다. 주의에만 테두리를 준다.
+            _extra += (f"<p style=\"margin:8px 0 0;padding:8px 10px;font-size:13px;"
+                       f"color:#7E6C47;background:#FBF7EF;"
+                       f"border-left:3px solid #D8C9A8;border-radius:4px;"
                        f"line-height:1.6;\">📌 신청 전 확인: {n['_ai_caution']}</p>")
         if n.get('_related'):
             _rl = []
@@ -2378,7 +2408,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
                 _lb = _m.group(0) if _m else str(_rn.get('공고명',''))[:10]
                 _rtrk = track_link(_rn.get('공고링크','#'), company,
                                    _rn.get('공고ID',''), _rn.get('공고명',''))
-                _rl.append(f"<a href=\"{_rtrk}\" style=\"color:#B0894A;"
+                _rl.append(f"<a href=\"{_rtrk}\" style=\"color:#8D6E3B;"
                            f"text-decoration:none;font-weight:600;\">{_lb}</a>")
             _extra += (f"<p style=\"margin:5px 0 0;font-size:12px;color:#78736A;\">"
                        f"같은 사업 관련 공고: {' · '.join(_rl)}</p>")
@@ -2391,22 +2421,24 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
             <td style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;padding:12px 16px;">
               <a href="{_trk}"
                  style="font-size:14px;font-weight:600;color:#1B2A41;
-                        text-decoration:none;line-height:1.5;display:block;">
+                        text-decoration:none;line-height:1.5;display:block;
+                        word-break:keep-all;">
                 {notice_name}
               </a>
               <p style="margin:4px 0 0;font-size:13px;color:#757066;">
-                {n.get("주관기관","")} &nbsp;·&nbsp; <span style="color:#B0894A;font-weight:600;">{_dl_txt}</span>
+                {n.get("주관기관","")} &nbsp;·&nbsp; <span style="color:{_dl_col};font-weight:600;">{_dl_txt}</span>
               </p>
               {tag_html}
               {_extra}
-            </td>
-            <td width="60" align="center" valign="middle"
-                style="font-family:'Apple SD Gothic Neo','Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;padding:14px 12px;border-left:1px solid #EDEBE5;">
-              <a href="{_trk}"
-                 style="display:inline-block;font-size:12px;font-weight:700;
-                        color:#B0894A;text-decoration:none;white-space:nowrap;">
-                보기 →
-              </a>
+              <div style="margin-top:12px;">
+                <a href="{_trk}"
+                   style="display:inline-block;padding:9px 20px;font-size:13px;
+                          font-weight:700;color:#1B2A41;background:#C9A96A;
+                          border-radius:6px;text-decoration:none;
+                          white-space:nowrap;">
+                  보기 →
+                </a>
+              </div>
             </td>
           </tr>
         </table>"""
