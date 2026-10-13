@@ -383,6 +383,8 @@ def reattach_clicks(rows, df_click):
             ct = _ts(cr.get(tm_col, ''))
             if not co or not ct:
                 continue
+            if id_col and str(cr.get(id_col, '') or '').strip() == OPEN_MARK:
+                continue          # 오픈 추적 행 — 클릭이 아니다
             cand = []
             for _c in (id_col, nm_col):
                 if not _c:
@@ -444,6 +446,69 @@ def backfill_decision_src(rows):
             r['결정출처'] = 'AI 자동 제외(추정)'
         else:
             r['결정출처'] = '기록 없음'
+    return rows
+
+
+def reattach_opens(rows, df_click):
+    """오픈 추적 행(OPEN_MARK)을 읽어 회차·기업별 열람 여부를 행에 적는다.
+
+    메일 한 통에 픽셀 하나라 '기업이 그 회차 메일을 열었는가'까지만 알 수 있다.
+    공고별 구분은 안 되므로 같은 기업·회차의 모든 행에 같은 값이 들어간다.
+    픽셀 URL에 회차 ID를 실어 보내므로 공고명 칸에서 바로 회차를 읽는다."""
+    rows = list(rows or [])
+    if df_click is None or getattr(df_click, 'empty', True):
+        return rows
+    try:
+        cols = list(df_click.columns)
+
+        def pick(*keys):
+            for c in cols:
+                if any(k in str(c).lower() for k in keys):
+                    return c
+            return None
+
+        co_col = pick('기업', 'co')
+        id_col = pick('공고id', 'notice', 'pblanc')
+        nm_col = pick('공고명', 'name')
+        tm_col = pick('시각', '시간', 'time', 'date') or cols[0]
+        if not (co_col and id_col):
+            return rows
+        # 회차별 발송 시각 — 회차 ID가 비어 온 옛 행을 시각으로 귀속할 때 쓴다
+        sent = {}
+        for r in rows:
+            if str(r.get('발송여부', '')) in ('Y', '참고'):
+                at = _ts(r.get('발송시각', ''))
+                if at:
+                    sent.setdefault(str(r.get('기업명', '') or '').strip(), []).append(
+                        (at, str(r.get('회차ID', ''))))
+        opens = {}
+        for _, cr in df_click.iterrows():
+            if str(cr.get(id_col, '') or '').strip() != OPEN_MARK:
+                continue
+            co = str(cr.get(co_col, '') or '').strip()
+            ot = _ts(cr.get(tm_col, ''))
+            if not co or not ot:
+                continue
+            rid = str(cr.get(nm_col, '') or '').strip() if nm_col else ''
+            if not rid:
+                past = [(at, r) for at, r in sent.get(co, []) if at <= ot]
+                if not past:
+                    continue
+                rid = max(past)[1]
+            e = opens.setdefault((rid, co), {'count': 0, 'first': ''})
+            e['count'] += 1
+            raw = str(cr.get(tm_col, '') or '')
+            if not e['first'] or _ts(raw) < _ts(e['first']):
+                e['first'] = raw      # 첫 열람 시각이 '언제 읽었나'에 더 쓸모 있다
+    except Exception:
+        return rows
+    for r in rows:
+        if str(r.get('발송여부', '')) not in ('Y', '참고'):
+            r['오픈여부'], r['오픈시각'] = '', ''
+            continue
+        hit = opens.get((str(r.get('회차ID', '')), str(r.get('기업명', '') or '').strip())) or {}
+        r['오픈여부'] = 'Y' if hit.get('count') else 'N'
+        r['오픈시각'] = hit.get('first', '')
     return rows
 
 
@@ -541,6 +606,8 @@ def build_decision_rows(round_id, results, ai_cache, review_state, decision_src,
             '클릭여부': ('Y' if _ck.get('count') else 'N') if _sent in ('Y', '참고') else '',
             '클릭시각': _ck.get('last', '') if _sent in ('Y', '참고') else '',
             '클릭수': (_ck.get('count', 0) or '') if _sent in ('Y', '참고') else '',
+            # 오픈은 reattach_opens() 가 저장 직전에 채운다 (메일 단위라 공고별 구분 불가)
+            '오픈여부': '', '오픈시각': '',
             '반응버튼': _rx.get('value', ''), '반응시각': _rx.get('at', ''),
             '기록시각': _now,
         })
@@ -563,7 +630,8 @@ def save_decision_log(drive, rows, round_id, df_click=None):
     try:
         import json as _j
         keep = [r for r in load_decision_log(drive) if r.get('회차ID') != round_id]
-        allr = backfill_decision_src(reattach_clicks(keep + list(rows or []), df_click))
+        allr = backfill_decision_src(
+            reattach_opens(reattach_clicks(keep + list(rows or []), df_click), df_click))
         if not allr:
             return False, 0
         ok = drive_upload(drive, DECISION_LOG_FILE,
@@ -2089,7 +2157,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v0929-24"
+BUILD_TAG = "v0929-25"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -2448,6 +2516,41 @@ def attach_ai_reason(n, company, ai_cache):
         n['_ai_caution'] = _h.escape(clip_text(caution, CAUTION_MAX))
     return n
 
+# 받은편지함에 뜨는 발신자 표시 이름.
+# 예전에는 'onestop.kipcc@gmail.com' 만 떠서 기업 담당자 눈에는 모르는 지메일
+# 주소였다. 열람 여부는 '발신자 → 제목' 순으로 갈리는데 첫 관문이 비어 있었다.
+MAIL_FROM_NAME = "한국조달연구원 원스톱 스케일업"
+MAIL_FROM_ADDR = "onestop.kipcc@gmail.com"
+# 오픈 추적 행을 클릭 행과 구분하는 표식 (클릭 로그의 공고ID 자리에 들어간다).
+OPEN_MARK = "__OPEN__"
+
+
+def mail_subject(company, meta=None):
+    """메일 제목. 기업명·건수·마감을 앞으로 당긴다.
+
+    예전: '[원스톱 스케일업] 2026.10.13 이번 주 맞춤 지원사업 공고 — 주식회사 ○○'
+    48자쯤이라 휴대폰 받은편지함(약 35자)에서는 기업명도 건수도 보이지 않았다.
+    날짜는 메일함이 이미 보여주므로 앞자리를 쓸 이유가 없다."""
+    from datetime import date as _date
+    meta = meta or {}
+    _main = (meta.get('sss') or []) + (meta.get('ss') or [])
+    if _main:
+        head = f"[원스톱] {company} 맞춤 공고 {len(_main)}건"
+        _left = []
+        for _x in _main:
+            _d = notice_deadline_date(_x)
+            if _d:
+                _left.append((_d - _date.today()).days)
+        _near = min([x for x in _left if x >= 0], default=None)
+        if _near is not None and _near <= 7:
+            head += " · 오늘 마감" if _near == 0 else f" · 마감 D-{_near}"
+        return head
+    _ref = len(meta.get('review') or [])
+    if _ref:
+        return f"[원스톱] {company} 참고 공고 {_ref}건"
+    return f"[원스톱] {company} 맞춤 공고 안내"
+
+
 # 메일용 한글 폰트 스택.
 # Gmail은 수신 메일에서 <body>와 그 style을 통째로 걷어낸다. body에만 선언하면
 # 폰트가 사라지고 클라이언트 기본값(한글 글리프 없음 → 폴백)으로 그려져
@@ -2790,6 +2893,20 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
       </a>
     </div>"""
 
+    # ── 오픈 추적 1×1 ──────────────────────────────────
+    # 클릭만 보면 '못 받았다 / 안 열었다 / 열었는데 관심 없다'를 구분할 수 없다.
+    # 셋은 처방이 완전히 달라서, 무엇을 고칠지 정하려면 열람 여부가 먼저 필요하다.
+    # 클릭 추적과 같은 Apps Script 를 쓰되 공고ID 자리에 OPEN_MARK 를 넣어 구분하고,
+    # 공고명 자리에는 회차 ID를 넣어 어느 회차의 열람인지 남긴다.
+    # 지메일은 이미지를 차단하는 경우가 있어 과소집계된다 — 절대값이 아니라 회차 추세로 본다.
+    _open_px = ''
+    if CLICK_TRACK_URL:
+        import urllib.parse as _up_op
+        _q_op = _up_op.urlencode({'co': company, 'notice': OPEN_MARK,
+                                  'name': current_round_id() or '', 'url': ''})
+        _open_px = (f'<img src="{CLICK_TRACK_URL}?{_q_op}" width="1" height="1" alt="" '
+                    f'style="display:block;width:1px;height:1px;border:0;opacity:0;">')
+
     today_str = datetime.today().strftime('%Y.%m.%d')
     # PICKS 뱃지 — 실제로 메일에 실리는 맞춤 공고(🔦+📌) 수.
     # 승인 건수(len(notices))를 쓰면 마감 경과·업종 강등으로 빠진 공고까지 세어
@@ -2958,6 +3075,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
     </table>
     </td></tr>
     </table>
+    {_open_px}
     </body></html>"""
 
     return html, {'sss': notices_sss, 'ss': notices_ss,
@@ -5994,6 +6112,8 @@ elif page == "발송":
         if st.button("📤 발송 실행", type="primary") or st.session_state.get('_send_preview_co'):
             from email.mime.multipart import MIMEMultipart
             from email.mime.text import MIMEText
+            from email.header import Header
+            from email.utils import formataddr
             import base64
 
             cal_id        = load_text(drive, CALID_FILE)
@@ -6139,12 +6259,15 @@ elif page == "발송":
                 recipients = get_test_recipients() if test_mode else [co_email]
                 for to in recipients:
                     msg = MIMEMultipart('alternative')
-                    msg['From']    = "onestop.kipcc@gmail.com"
+                    # 한글 표시 이름·제목은 RFC 2047 로 인코딩해야 클라이언트에서 안 깨진다.
+                    msg['From']    = formataddr(
+                        (str(Header(MAIL_FROM_NAME, 'utf-8')), MAIL_FROM_ADDR))
                     msg['To']      = to
                     if cc_list and not test_mode:
                         msg['Cc'] = ", ".join(cc_list)
-                    msg['Subject'] = (f"[TEST] " if test_mode else "") + \
-                        f"[원스톱 스케일업] {today_str} 이번 주 맞춤 지원사업 공고 — {company}"
+                    msg['Subject'] = Header(
+                        ("[TEST] " if test_mode else "")
+                        + mail_subject(company, _mail_meta), 'utf-8')
                     msg.attach(MIMEText(html,'html','utf-8'))
                     gmail_send(base64.urlsafe_b64encode(msg.as_bytes()).decode())
                     logs.append(f"✅ {company} → {to}" + (f" (+Cc {len(cc_list)})" if cc_list and not test_mode else ""))
