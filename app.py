@@ -2173,11 +2173,24 @@ _RE_NOTICE_DATE = re.compile(r'(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})')
 REQUIRE_NOTICE_DATE = True
 
 # 이미 끝났을 수 있는 접수 표기. 빈손 폴백에서도 이건 끝까지 내보내지 않는다.
-_RE_RISKY_PERIOD = re.compile(r'예산\s*소진|모집\s*완료|소진\s*시|선착순|조기\s*마감')
+# 이미 끝났을 수 있는 표기 — 본 공고·참고 공고 어디에도 내보내지 않는다.
+# '모집 마감(시)'는 '모집 완료(시)'와 같은 뜻인데 패턴에서 빠져 있었다.
+_RE_RISKY_PERIOD = re.compile(
+    r'예산\s*소진|모집\s*완료|모집\s*마감|소진\s*시|선착순|조기\s*마감')
+# 마감 위험이 구조적으로 없는 표기 — 날짜가 없어도 본 공고로 안내할 수 있다.
+_RE_OPEN_PERIOD = re.compile(r'상시\s*접수|수시\s*접수|상시\s*모집|연중\s*수시')
 
 def notice_period_risky(n):
     """'예산 소진시까지'처럼 이미 마감됐을 수 있는 표기인가."""
     return bool(_RE_RISKY_PERIOD.search(f"{n.get('마감일','')} {n.get('접수기간','')}"))
+
+
+def notice_period_open(n):
+    """'상시 접수'처럼 마감 위험이 없는 표기인가.
+
+    notice_period_risky() 를 먼저 통과한 공고에만 의미가 있다 —
+    '상시 접수(예산 소진시까지)' 같은 혼합 표기는 위험 쪽이 이겨야 한다."""
+    return bool(_RE_OPEN_PERIOD.search(f"{n.get('마감일','')} {n.get('접수기간','')}"))
 
 def notice_deadline_date(n):
     """공고의 마감일을 date로. 마감일 → 접수기간 끝 순으로 찾고, 없으면 None."""
@@ -2213,7 +2226,10 @@ def deadline_label(n):
             return f"{_head} · D-{_left}"
         return _head
     _rp = str(n.get('접수기간', '') or '').strip()
-    return f"접수 {_rp}" if _rp else "접수기간 확인 필요"
+    if not _rp:
+        return "접수기간 확인 필요"
+    # '상시 접수'에 접두사를 또 붙이면 '접수 상시 접수'가 된다.
+    return _rp if ('접수' in _rp or '모집' in _rp) else f"접수 {_rp}"
 
 
 def deadline_urgent(n):
@@ -2262,12 +2278,18 @@ def can_include_notice(notice, company, ai_cache=None, review_state=None, ref=No
     if not _notice_open(notice, ref):
         return False, '마감 경과'
     if notice_deadline_date(notice) is None:
-        # allow_undated 는 '이 기업에게 보낼 카드가 한 장도 없을 때'만 쓴다.
-        # 그 경우에도 소진형·선착순은 내보내지 않는다.
-        if not allow_undated and REQUIRE_NOTICE_DATE:
-            return False, '접수기간 불명'
+        # 소진형·선착순은 이미 끝났을 수 있다 — 본 공고든 참고 공고든 내보내지 않는다.
         if notice_period_risky(notice):
             return False, '소진·선착순 마감형'
+        # '상시 접수'는 마감 위험이 구조적으로 없으므로 날짜가 없어도 본 공고로 안내한다.
+        # REQUIRE_NOTICE_DATE 의 취지는 '마감된 공고를 보내지 말자'인데, 날짜가 없다는
+        # 이유만으로 상시 접수까지 막고 있었다(실측: 접수 중 공고 108건이 무날짜이고
+        # 그중 23건이 상시·수시 접수였다).
+        if notice_period_open(notice):
+            return True, ''
+        # 그 밖의 불명(세부사업별 상이·추후 공지 등)은 참고 공고에서만 허용한다.
+        if not allow_undated and REQUIRE_NOTICE_DATE:
+            return False, '접수기간 불명'
     return True, ''
 
 def _region_cut_result(row):
