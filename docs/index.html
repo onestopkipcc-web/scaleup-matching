@@ -1,0 +1,1296 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>혁신제품 지정 지침서</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.9/dist/web/variable/pretendardvariable.min.css">
+<style>
+:root{
+  --ink:#0E1A18; --body:#384845; --mute:#6E7D79; --faint:#95A29E;
+  --teal:#0E7266; --teal-d:#08463E; --teal-m:#13877A; --teal-l:#EDF6F4; --teal-b:#C2DED8;
+  --gold:#8A6318; --gold-l:#FCF7EC; --gold-b:#E8D7B0;
+  --rose:#94382A; --rose-l:#FCF1EF; --rose-b:#EAC8C1;
+  --line:#E3EAE8; --soft:#F6FAF9; --bg:#fff;
+  --f:'Pretendard Variable',Pretendard,'Apple SD Gothic Neo','Malgun Gothic',-apple-system,'Segoe UI',sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--body);font-family:var(--f);
+  font-size:16.5px;line-height:1.8;word-break:keep-all;letter-spacing:-.003em;
+  -webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+/* 마지막 줄에 한 단어만 떨어지는 것(고아 줄)을 줄인다 */
+p,li,td,.lead,.note,.qh,.opt .ol,.td span{text-wrap:pretty}
+h1,h2,h3,h4,.qt,.vt,.sh h2{text-wrap:balance}
+.w{max-width:860px;margin:0 auto;padding:0 28px}
+.band{padding:72px 0}
+.band.soft{background:var(--soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+
+/* 표지 */
+.cover{background:var(--teal-d);color:#fff;padding:96px 0 76px;position:relative;overflow:hidden}
+.cover::after{content:'';position:absolute;right:-180px;top:-120px;width:520px;height:520px;
+  border-radius:50%;background:rgba(255,255,255,.035)}
+.cover .w{position:relative}
+.tag{display:inline-block;font-size:12.5px;letter-spacing:.14em;font-weight:600;color:#8ED1C5;
+  border:1px solid rgba(255,255,255,.22);border-radius:99px;padding:7px 16px;margin:0 0 26px}
+.cover h1{font-size:46px;line-height:1.15;margin:0 0 20px;font-weight:800;letter-spacing:-.035em}
+.cover .sub{font-size:17.5px;line-height:1.78;color:#BFDFD8;margin:0 0 42px;max-width:580px;font-weight:350}
+.meta{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid rgba(255,255,255,.16);padding-top:24px}
+.meta div{padding-right:40px}
+.meta .k{font-size:11.5px;letter-spacing:.1em;color:#7CBDB1;font-weight:600;margin-bottom:3px}
+.meta .v{font-size:14.5px;color:#DCF0EC;font-weight:500}
+
+/* 목차 */
+.toc{padding:44px 0 8px}
+.toc .lbl{font-size:11.5px;letter-spacing:.16em;color:var(--faint);font-weight:700;margin:0 0 20px}
+.toc ol{margin:0;padding:0;list-style:none;columns:2;column-gap:40px}
+.toc li{margin:0 0 11px;break-inside:avoid}
+.toc a{display:flex;gap:14px;color:var(--ink);text-decoration:none;font-size:15.5px;
+  align-items:baseline;transition:.12s}
+.toc a:hover{color:var(--teal)}
+.toc .n{font-size:12px;color:var(--faint);font-weight:700;font-variant-numeric:tabular-nums;
+  letter-spacing:.04em;flex:0 0 auto}
+
+/* 섹션 */
+section{scroll-margin-top:24px}
+.sh{margin:0 0 32px}
+.sh .n{display:block;font-size:52px;font-weight:800;line-height:1;color:var(--teal-b);
+  letter-spacing:-.05em;margin-bottom:10px}
+.sh h2{font-size:30px;line-height:1.28;color:var(--ink);font-weight:800;margin:0;letter-spacing:-.03em}
+.sh .d{font-size:16px;color:var(--mute);margin:12px 0 0;line-height:1.72}
+h3{font-size:20px;color:var(--ink);font-weight:700;margin:42px 0 12px;letter-spacing:-.02em}
+h4{font-size:15.5px;color:var(--teal-d);font-weight:700;margin:26px 0 8px}
+p{margin:0 0 16px}
+ul,ol{margin:0 0 16px;padding-left:20px}
+li{margin:8px 0}
+li::marker{color:var(--teal-b)}
+strong,b{color:var(--ink);font-weight:700}
+.lead{font-size:18.5px;line-height:1.82;color:var(--ink);font-weight:450;margin-bottom:20px;letter-spacing:-.015em}
+a{color:var(--teal);text-decoration-thickness:1px;text-underline-offset:2px}
+.note{font-size:14.5px;color:var(--mute);line-height:1.74}
+.src{font-size:13px;color:var(--faint);margin-top:12px}
+
+/* 카드 */
+.card{background:var(--teal-l);border-radius:14px;padding:26px 28px;margin:26px 0}
+.card>h4{margin-top:0}
+.card>:last-child{margin-bottom:0}
+.flag{background:var(--gold-l);border-radius:14px;padding:26px 28px;margin:26px 0;
+  border-left:3px solid var(--gold-b)}
+.flag>h4{margin-top:0;color:var(--gold)}
+.flag>:last-child{margin-bottom:0}
+
+/* 표 */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:24px 0}
+table{width:100%;border-collapse:collapse;font-size:15.5px;min-width:440px}
+th,td{padding:14px 16px;text-align:center;vertical-align:middle}
+th{background:var(--ink);color:#fff;font-weight:600;font-size:13.5px;letter-spacing:.01em}
+th:first-child{border-radius:10px 0 0 0} th:last-child{border-radius:0 10px 0 0}
+td{border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+td.c,th.c{text-align:center;white-space:nowrap}
+/* 라벨·수치처럼 짧은 열은 접지 않는다. 접혀야 할 것은 설명 열 하나뿐이다. */
+td.nw,th.nw{white-space:nowrap}
+/* 여러 줄로 흐르는 설명 칸만 양쪽 정렬. 한 줄짜리 짧은 칸은 가운데가 더 깔끔하다. */
+td.jt{text-align:justify;text-justify:inter-word}
+.tw table{table-layout:auto}
+td.num{text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;
+  font-weight:700;color:var(--teal-d)}
+tbody tr:nth-child(even) td{background:var(--soft)}
+
+/* 수치 */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:1px;
+  background:var(--line);border-radius:14px;overflow:hidden;margin:30px 0}
+.stat{background:#fff;padding:24px 22px}
+.stat .v{font-size:30px;font-weight:800;color:var(--teal-d);line-height:1.1;letter-spacing:-.035em}
+.stat .l{font-size:13.5px;color:var(--mute);margin-top:8px;line-height:1.55}
+
+/* 도형 */
+figure{margin:30px 0}
+figure svg{display:block;width:100%;height:auto}
+figcaption{font-size:13.5px;color:var(--faint);margin-top:12px;text-align:center}
+.sv-ink{fill:var(--ink)} .sv-teal{fill:var(--teal)} .sv-td{fill:var(--teal-d)}
+.sv-mute{fill:var(--mute)} .sv-wh{fill:#fff} .sv-faint{fill:var(--faint)}
+.sv-lbl{font:600 13px var(--f)} .sv-sm{font:500 11.5px var(--f)} .sv-num{font:800 15px var(--f)}
+.sv-big{font:800 17px var(--f)}
+
+/* 절차 */
+.flow{list-style:none;padding:0;margin:26px 0;counter-reset:f}
+.flow li{counter-increment:f;position:relative;padding:0 0 26px 54px}
+.flow li::before{content:counter(f,decimal-leading-zero);position:absolute;left:0;top:1px;
+  font-size:13px;font-weight:800;color:var(--teal);letter-spacing:.02em}
+.flow li::after{content:'';position:absolute;left:11px;top:24px;bottom:4px;width:1px;background:var(--teal-b)}
+.flow li:last-child::after{display:none}
+.flow b{display:block;color:var(--ink);font-size:16.5px;margin-bottom:4px}
+.flow span{display:block;font-size:15px;color:var(--mute);line-height:1.72}
+
+/* 진단 */
+.dx{border-radius:16px;overflow:hidden;margin:30px 0;background:#fff;
+  box-shadow:0 1px 3px rgba(14,26,24,.06),0 8px 28px rgba(14,26,24,.07)}
+.dxh{background:var(--teal-d);color:#fff;padding:26px 30px}
+.dxh b{display:block;font-size:18px;font-weight:700;margin-bottom:5px;letter-spacing:-.02em}
+.dxh span{font-size:14px;color:#A4D5CC}
+.dxb{padding:6px 30px 26px}
+.qz{padding:26px 0;border-bottom:1px solid var(--line)}
+.qz:last-of-type{border-bottom:0}
+.qt{font-size:16.5px;font-weight:700;color:var(--ink);margin:0 0 5px;display:flex;gap:12px;letter-spacing:-.015em}
+.qt i{font-style:normal;color:var(--teal-m);font-weight:800;font-size:13px;padding-top:3px;flex:0 0 auto}
+.qh{font-size:14px;color:var(--mute);margin:0 0 16px;padding-left:28px;line-height:1.68}
+.opts{display:flex;flex-direction:column;gap:9px;padding-left:28px}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:13px 16px;border:1px solid var(--line);
+  border-radius:11px;cursor:pointer;transition:.13s;background:#fff}
+.opt:hover{border-color:var(--teal-b);background:var(--teal-l)}
+.opt.on{border-color:var(--teal);background:var(--teal-l);box-shadow:inset 0 0 0 1px var(--teal)}
+.opt input{margin:5px 0 0;accent-color:var(--teal);width:16px;height:16px;flex:0 0 auto}
+.opt .ol{font-size:15px;color:var(--body);line-height:1.6}
+.opt .ol b{display:block;color:var(--ink);font-weight:600}
+.dxa{padding:22px 30px;background:var(--soft);border-top:1px solid var(--line);
+  display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.btn{appearance:none;border:0;border-radius:11px;padding:13px 26px;font-family:var(--f);
+  font-size:15.5px;font-weight:700;cursor:pointer;background:var(--teal);color:#fff;transition:.13s}
+.btn:hover{background:var(--teal-d)}
+.btn.gh{background:#fff;color:var(--teal-d);box-shadow:inset 0 0 0 1px var(--teal-b)}
+.btn:disabled{background:#CBD7D4;cursor:not-allowed}
+.dxa .hint{font-size:14px;color:var(--mute)}
+#res{display:none;border-top:1px solid var(--line)}
+#res.show{display:block}
+.vd{padding:28px 30px;display:flex;gap:18px;align-items:flex-start}
+.bdg{flex:0 0 auto;font-size:12.5px;font-weight:800;letter-spacing:.02em;padding:8px 15px;border-radius:99px}
+.v-ok .bdg{background:#D6F0E9;color:#08463E}
+.v-cond .bdg{background:#F9EEDA;color:#8A6318}
+.v-no .bdg{background:#F8DFDA;color:#94382A}
+.vd .vt{font-size:17.5px;font-weight:700;color:var(--ink);margin:0 0 7px;line-height:1.5;letter-spacing:-.02em}
+.vd .vp{font-size:15.5px;color:var(--body);margin:0;line-height:1.74}
+.rb{padding:0 30px 28px}
+.rb h4{margin:24px 0 10px;font-size:13px;letter-spacing:.1em;color:var(--faint);font-weight:700}
+.td{list-style:none;padding:0;margin:0}
+.td li{display:flex;gap:13px;padding:13px 0;border-bottom:1px solid var(--line);font-size:15.5px}
+.td li:last-child{border-bottom:0}
+.td .mk{flex:0 0 auto;width:22px;height:22px;border-radius:7px;background:var(--teal-l);
+  color:var(--teal-d);font-size:12px;font-weight:800;display:flex;align-items:center;
+  justify-content:center;margin-top:3px}
+.td b{color:var(--ink);font-weight:650}
+.td span{color:var(--mute);font-size:14.5px;display:block;line-height:1.7;margin-top:2px}
+
+/* 준비 항목 카드. 표의 좁은 칸에 긴 문장을 넣으면 반드시 어중간하게 접힌다. */
+.prep{list-style:none;padding:0;margin:26px 0;display:grid;gap:14px}
+.prep li{display:grid;grid-template-columns:46px minmax(0,1fr);gap:18px;align-items:start;
+  background:#fff;border-radius:13px;padding:22px 24px;box-shadow:inset 0 0 0 1px var(--line)}
+.prep .pn{font-size:15px;font-weight:800;color:var(--teal);background:var(--teal-l);
+  border-radius:9px;height:34px;display:flex;align-items:center;justify-content:center}
+.prep b{font-size:17px;color:var(--ink);display:block;letter-spacing:-.02em}
+.prep .where{display:inline-block;font-size:13px;color:var(--teal-d);background:var(--teal-l);
+  border-radius:6px;padding:3px 10px;margin:7px 0 10px;font-weight:600}
+.prep p{margin:0;font-size:15.5px;color:var(--mute);line-height:1.72}
+
+/* 평가 블록. 항목 나열은 칩으로 떼어 줄바꿈이 자연스럽게 한다. */
+.eval{display:grid;gap:14px;margin:26px 0}
+.ev{background:#fff;border-radius:13px;padding:24px 26px;box-shadow:inset 0 0 0 1px var(--line)}
+.ev .evt{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:baseline;margin-bottom:16px}
+.ev .evt b{font-size:17.5px;color:var(--ink);letter-spacing:-.02em}
+.ev .evt span{font-size:15px;color:var(--teal-d);font-weight:600}
+.chips{list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:8px}
+.chips li{margin:0;font-size:14.5px;color:var(--body);background:var(--soft);
+  border-radius:8px;padding:7px 13px;line-height:1.4;box-shadow:inset 0 0 0 1px var(--line)}
+
+/* 질문 */
+.cpw{margin-top:22px;padding-top:20px;border-top:1px solid var(--line);
+  display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.q{background:#fff;border-radius:12px;padding:20px 22px;margin:14px 0;
+  box-shadow:inset 0 0 0 1px var(--line)}
+.q b{display:block;color:var(--ink);margin-bottom:6px;font-size:16px}
+.q span{font-size:14.5px;color:var(--mute);line-height:1.7}
+
+.law{display:inline-block;font-size:11.5px;color:var(--teal-d);background:var(--teal-l);
+  border-radius:6px;padding:3px 9px;margin-left:7px;font-weight:700;white-space:nowrap;
+  vertical-align:middle;letter-spacing:.01em}
+
+footer{background:var(--ink);color:#9BAAA6;padding:60px 0 68px;font-size:14px;line-height:1.85}
+footer h4{color:#fff;font-size:14.5px;margin:0 0 10px;font-weight:600}
+footer .blk{margin-bottom:30px}
+footer b{color:#D6E0DD}
+footer a{color:#7FC9BC}
+footer .sign{color:#fff;font-weight:700;font-size:16px;margin-top:34px;letter-spacing:-.02em}
+
+/* 넓은 화면에서는 가로를 쓴다.
+   섹션 제목을 왼쪽에 세우고 본문을 오른쪽에 흘려, 아래로만 쌓이는 느낌을 줄인다. */
+@media (min-width:1060px){
+  .band .w{max-width:1260px}
+  .toc .w{max-width:1260px}
+  /* sticky 와 전체폭 span 을 함께 쓰면 두 요소가 같은 칸을 점유해 글이 겹친다.
+     제목은 흐름대로 두고, 모든 본문은 오른쪽 칸에만 둔다. */
+  section{display:grid;grid-template-columns:260px minmax(0,1fr);column-gap:64px;align-items:start}
+  .sh{grid-column:1;margin:0}
+  .sh .n{font-size:58px}
+  .sh h2{font-size:26px}
+  .sh .d{font-size:15px}
+  section>*:not(.sh){grid-column:2}
+  .toc ol{columns:3}
+  h3:first-of-type{margin-top:0}
+}
+
+/* CSS 다단(columns)은 항목 높이가 제각각이면 한쪽만 남고 문장이 어중간하게 접힌다.
+   높이가 저절로 맞춰지는 카드 그리드를 쓴다. */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(224px,1fr));
+  gap:12px;list-style:none;padding:0;margin:0}
+.tiles li{background:#fff;border-radius:11px;padding:17px 19px;margin:0;
+  font-size:15.5px;line-height:1.68;color:var(--body)}
+.tiles li b,.tiles li strong{color:var(--ink)}
+
+/* 좌측 고정 목차. 지금 몇 장인지 늘 보이게 하고, 끝없는 스크롤 느낌을 줄인다. */
+#side{display:none}
+@media (min-width:1100px){
+  #side{display:block;position:fixed;left:0;top:0;width:264px;height:100vh;
+    background:var(--ink);color:#9BAAA6;padding:34px 0 24px;overflow-y:auto;z-index:50}
+  #side .bd{padding:0 26px 22px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:18px}
+  #side .bd b{display:block;color:#fff;font-size:16px;font-weight:700;letter-spacing:-.02em;line-height:1.4}
+  #side .bd span{display:block;font-size:12px;color:#7FA69D;margin-top:6px}
+  #side ol{list-style:none;margin:0;padding:0 14px}
+  #side li{margin:0}
+  #side a{display:flex;gap:11px;align-items:baseline;padding:9px 12px;border-radius:9px;
+    color:#B7C5C1;text-decoration:none;font-size:14.5px;transition:.12s;line-height:1.45}
+  #side a:hover{background:rgba(255,255,255,.07);color:#fff}
+  #side a.on{background:var(--teal);color:#fff;font-weight:600}
+  #side a .n{font-size:11.5px;font-weight:700;opacity:.7;font-variant-numeric:tabular-nums;flex:0 0 auto}
+  #side .tg{margin:22px 26px 0;padding-top:18px;border-top:1px solid rgba(255,255,255,.1)}
+  #side .tg button{width:100%;appearance:none;border:0;border-radius:9px;padding:11px 14px;
+    background:rgba(255,255,255,.08);color:#D6E0DD;font-family:var(--f);font-size:13.5px;
+    font-weight:600;cursor:pointer;transition:.12s;text-align:left}
+  #side .tg button:hover{background:rgba(255,255,255,.14);color:#fff}
+  #side .tg button.on{background:var(--teal);color:#fff}
+  #side .tg p{font-size:12px;color:#7FA69D;margin:9px 2px 0;line-height:1.55}
+  body{padding-left:264px}
+  .toc{display:none}
+}
+/* 한 장씩 보기 */
+body.solo .band{display:none}
+body.solo .band.cur{display:block}
+body.solo .cover{display:none}
+
+@media (max-width:680px){
+  body{font-size:16px}
+  .cover{padding:64px 0 52px}
+  .cover h1{font-size:33px}
+  .cover .sub{font-size:16px}
+  .w{padding:0 20px}
+  .band{padding:52px 0}
+  .sh .n{font-size:40px}
+  .sh h2{font-size:24px}
+  .toc ol{columns:1}
+  .opts,.qh{padding-left:0}
+  .vd{flex-direction:column;gap:14px}
+  .dxb,.dxa,.rb,.vd{padding-left:20px;padding-right:20px}
+  .dxh{padding:22px 20px}
+}
+@media print{
+  .cover{background:#fff;color:#000;padding:0 0 28px;border-bottom:2px solid #000}
+  .cover h1,.cover .sub,.meta .v,.meta .k{color:#000}
+  .cover::after{display:none} .tag{color:#000}
+  .toc,.dxa,.opt input{display:none}
+  /* 종이에서는 손으로 체크한다 */
+  .opt .ol b::before{content:'';display:inline-block;width:12px;height:12px;border:1.3px solid #111;margin-right:10px;vertical-align:0;border-radius:2px}
+  .opt{break-inside:avoid;page-break-inside:avoid}
+  .qz{break-inside:avoid;page-break-inside:avoid}
+  .band.soft{background:#fff}
+  #res{display:block!important}
+  .dx{box-shadow:none;border:1px solid #000}
+  .dxh{background:#fff;color:#000;border-bottom:1px solid #000}
+  .dxh span{color:#444}
+  footer{background:#fff;color:#333;border-top:2px solid #000}
+  footer h4,footer .sign{color:#000}
+  section,figure,.card,.flag,.tw{page-break-inside:avoid}
+  .sh{page-break-after:avoid}
+}
+</style>
+</head>
+<body>
+
+<aside id="side">
+  <div class="bd"><b>혁신제품 지정 지침서</b><span>혁신제품지원센터 혁신판로부<br>2026. 10. 15. 기준</span></div>
+  <ol>
+    <li><a href="#s0" data-s="s0"><span class="n">00</span><span>들어가며</span></a></li>
+    <li><a href="#s1" data-s="s1"><span class="n">01</span><span>왜 혁신제품인가</span></a></li>
+    <li><a href="#s2" data-s="s2"><span class="n">02</span><span>지정받는 두 갈래 길</span></a></li>
+    <li><a href="#s3" data-s="s3"><span class="n">03</span><span>우리 회사는 어디에 있나</span></a></li>
+    <li><a href="#s4" data-s="s4"><span class="n">04</span><span>지정 경로 지도</span></a></li>
+    <li><a href="#s5" data-s="s5"><span class="n">05</span><span>유형 Ⅱ 자격 요건</span></a></li>
+    <li><a href="#s6" data-s="s6"><span class="n">06</span><span>신청 전에 갖출 세 가지</span></a></li>
+    <li><a href="#s7" data-s="s7"><span class="n">07</span><span>신청 절차와 평가</span></a></li>
+    <li><a href="#s8" data-s="s8"><span class="n">08</span><span>자주 막히는 지점</span></a></li>
+    <li><a href="#s9" data-s="s9"><span class="n">09</span><span>지정받은 뒤에는</span></a></li>
+    <li><a href="#s10" data-s="s10"><span class="n">10</span><span>언제 신청하나</span></a></li>
+    <li><a href="#s11" data-s="s11"><span class="n">11</span><span>더 궁금하신 점은</span></a></li>
+  </ol>
+  <div class="tg">
+    <button id="solo" type="button">한 장씩 보기</button>
+    <p id="solohint">선택한 장만 띄웁니다</p>
+  </div>
+</aside>
+
+<header class="cover">
+  <div class="w">
+    <p class="tag">원스톱 스케일업</p>
+    <h1>혁신제품 지정 지침서</h1>
+    <p class="sub">아직 혁신제품으로 지정받지 않은 조달기업을 위한 안내입니다.
+      제도가 무엇인지부터, 우리 회사가 어느 길로 가야 하는지, 무엇부터 준비해야 하는지까지 순서대로 담았습니다.</p>
+    <div class="meta">
+      <div><div class="k">작성 기준일</div><div class="v">2026. 10. 15.</div></div>
+      <div><div class="k">지정 실적 집계</div><div class="v">2026. 9. 8.</div></div>
+      <div><div class="k">발행</div><div class="v">한국조달연구원 혁신제품지원센터 혁신판로부</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="toc"><div class="w">
+  <p class="lbl">차례</p>
+  <ol>
+    <li><a href="#s0"><span class="n">00</span><span>들어가며</span></a></li>
+    <li><a href="#s1"><span class="n">01</span><span>왜 혁신제품인가</span></a></li>
+    <li><a href="#s2"><span class="n">02</span><span>지정받는 두 갈래 길</span></a></li>
+    <li><a href="#s3"><span class="n">03</span><span>우리 회사는 어디에 있나</span></a></li>
+    <li><a href="#s4"><span class="n">04</span><span>지정 경로 지도</span></a></li>
+    <li><a href="#s5"><span class="n">05</span><span>유형 Ⅱ 자격 요건 네 가지</span></a></li>
+    <li><a href="#s6"><span class="n">06</span><span>신청 전에 갖출 세 가지</span></a></li>
+    <li><a href="#s7"><span class="n">07</span><span>신청 절차와 평가</span></a></li>
+    <li><a href="#s8"><span class="n">08</span><span>자주 막히는 지점</span></a></li>
+    <li><a href="#s9"><span class="n">09</span><span>지정받은 뒤에는</span></a></li>
+    <li><a href="#s10"><span class="n">10</span><span>언제 신청하나</span></a></li>
+    <li><a href="#s11"><span class="n">11</span><span>더 궁금하신 점은</span></a></li>
+  </ol>
+</div></div>
+
+<!-- 00 -->
+<div data-sec="s0" class="band"><div class="w"><section id="s0">
+<div class="sh"><span class="n">00</span><h2>들어가며</h2>
+<p class="d">이 지침서가 무엇을 다루는지, 어느 시점을 기준으로 썼는지 먼저 밝힙니다.</p></div>
+
+<p class="lead">공공조달 시장은 2025년 기준 238.5조 원입니다. GDP의 약 9%, 정부 예산의 약 3분의 1입니다.
+그런데 좋은 기술을 가진 중소기업이 이 시장에 들어가기는 어렵습니다.
+구매 담당자가 검증되지 않은 신제품을 사는 데 부담을 느끼기 때문입니다.
+<strong>혁신제품 제도는 바로 그 벽을 넘으라고 만든 제도입니다.</strong></p>
+
+<div class="card">
+<h4>이 지침서가 따르는 법령과 기준</h4>
+<div class="tw">
+<table>
+  <thead><tr><th>근거</th><th>반영 기준</th></tr></thead>
+  <tbody>
+  <tr><td>「조달사업에 관한 법률」 제27조</td><td>2026. 10. 15. 시행 기준</td></tr>
+  <tr><td>「조달사업에 관한 법률 시행령」 제33조</td><td>2026. 10. 15. 시행 기준</td></tr>
+  <tr><td>「혁신제품 구매 운영 규정」(조달청 고시)</td><td>2026. 10. 15. 시행 기준</td></tr>
+  <tr><td>혁신시제품 지정신청 공고(조달청)</td><td>2026년 4차 공고(접수 8.31.~9.18.) 기준</td></tr>
+  <tr><td>혁신제품 지정 실적 통계</td><td>2026. 9. 8. 집계분</td></tr>
+  <tr><td>시범구매 예산 및 구매목표 비율</td><td>2026년도 기준</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="note" style="margin-top:16px"><strong>법령과 고시는 개정됩니다.</strong>
+특히 지정 요건과 제외 사유는 차수별 공고에서 바뀌는 경우가 있습니다.
+실제 신청 전에는 <strong>해당 차수의 공고문을 반드시 직접 확인</strong>해 주십시오.
+본문에서 <span class="law">근거</span> 표시가 붙은 내용은 그 법령이나 고시에 직접 규정된 사항입니다.</p>
+</div>
+
+</section></div></div>
+
+<!-- 01 -->
+<div data-sec="s1" class="band soft"><div class="w"><section id="s1">
+<div class="sh"><span class="n">01</span><h2>왜 혁신제품인가</h2>
+<p class="d">지정을 받으면 달라지는 것은 크게 넷입니다.</p></div>
+
+<div class="stats">
+  <div class="stat"><div class="v">최대 6년</div><div class="l">수의계약 가능 기간<br>기본 3년에 연장 3년</div></div>
+  <div class="stat"><div class="v">839억 원</div><div class="l">2026년 시범구매 예산<br>정부가 먼저 구매</div></div>
+  <div class="stat"><div class="v">약 1조 원</div><div class="l">2026년 공공부문<br>혁신제품 구매목표</div></div>
+  <div class="stat"><div class="v">구매 면책</div><div class="l">중대한 과실이 아니면<br>구매 담당자 면책</div></div>
+</div>
+
+<h3>첫째, 경쟁입찰 없이 바로 팔 수 있습니다</h3>
+<p>지정되면 수요기관이 <strong>경쟁입찰 없이 수의계약으로 구매</strong>할 수 있습니다.
+공공조달의 가장 큰 장벽이 입찰 경쟁이라는 점을 생각하면, 이 한 가지만으로도 의미가 큽니다.</p>
+<p class="note">추정가격 1억 원 미만은 수요기관이 자체 수의계약, 1억 원 이상은 자체 수의계약 또는 중앙조달 요청이 가능합니다.
+추정가격은 부가가치세와 조달수수료를 제외한 금액입니다.</p>
+
+<h3>둘째, 정부가 먼저 사줍니다</h3>
+<p>조달청이 예산으로 혁신제품을 직접 구매해 수요기관에 제공하고 시범 사용하게 합니다.
+아직 판매 실적이 없는 제품에 <strong>공공기관 납품 실적을 만들어 주는 장치</strong>입니다.</p>
+<p class="note">시범사용 결과가 성공 판정을 받으면 우수조달물품 1차 심사에서 특례를 받습니다.
+기존에는 70점 이상이어야 합격이지만, 특례가 적용되면 평가위원 2/3 찬성으로 합격하고 품질소명자료도 생략할 수 있습니다.</p>
+
+<h3>셋째, 공공기관은 일정 비율을 의무로 사야 합니다</h3>
+<p>수요기관은 물품구매액 중 일정 비율을 혁신제품으로 채워야 하고, 달성률이 기관 평가에 반영됩니다.
+<strong>사야 할 이유가 제도로 만들어져 있다</strong>는 뜻입니다.</p>
+<div class="tw">
+<table>
+  <thead><tr><th>구분</th><th class="c">중앙행정기관</th><th class="c">지방자치단체</th><th class="c">공공기관</th><th class="c">지방공기업</th></tr></thead>
+  <tbody><tr><td>구매목표 비율</td><td class="c">1.4%</td><td class="c">1.9%</td><td class="c">2.2%</td><td class="c">2.8%</td></tr></tbody>
+</table>
+</div>
+<p class="src">2026년도 기준입니다. 비율은 연도별로 조정됩니다.</p>
+
+<h3>넷째, 구매 담당자가 면책됩니다 <span class="law">조달사업법 §27</span></h3>
+<p>신제품 구매를 꺼리는 가장 큰 이유가 감사 부담입니다.
+혁신제품은 <strong>중대한 과실이 아니면 구매자가 면책</strong>됩니다. 담당자가 안심하고 살 수 있게 만든 장치입니다.</p>
+
+<div class="card">
+<h4>이 밖에</h4>
+<ul class="tiles">
+<li><b>혁신장터 노출</b><br>전용몰에 등록되어 전국 수요기관이 찾아봅니다</li>
+<li><b>해외 판로</b><br>수출선도형 시범구매로 해외 진출도 지원받습니다</li>
+<li><b>전시 홍보</b><br>나라장터 엑스포와 조달의 날 전시회에 참여합니다</li>
+</ul>
+</div>
+</section></div></div>
+
+<!-- 02 -->
+<div data-sec="s2" class="band"><div class="w"><section id="s2">
+<div class="sh"><span class="n">02</span><h2>지정받는 두 갈래 길</h2>
+<p class="d">기획재정부가 총괄하고, 조달청을 포함한 18개 부처가 각자 혁신제품을 지정합니다.
+어느 길인지부터 정해야 그다음이 풀립니다.</p></div>
+
+<figure>
+<svg viewBox="0 0 720 330" role="img" aria-label="혁신제품 지정의 두 갈래 길">
+  <rect x="270" y="8" width="180" height="52" rx="12" class="sv-td"/>
+  <text x="360" y="33" text-anchor="middle" class="sv-big sv-wh">혁신제품 지정</text>
+  <text x="360" y="50" text-anchor="middle" class="sv-sm" fill="#9FD3C9">기획재정부 총괄 · 18개 부처</text>
+  <path d="M360 60 L360 82 M360 82 L170 82 L170 104 M360 82 L550 82 L550 104"
+        fill="none" stroke="#C2DED8" stroke-width="1.5"/>
+  <rect x="24" y="104" width="292" height="196" rx="14" fill="#F6FAF9" stroke="#E3EAE8"/>
+  <rect x="24" y="104" width="292" height="44" rx="14" class="sv-teal"/>
+  <rect x="24" y="134" width="292" height="14" class="sv-teal"/>
+  <text x="170" y="132" text-anchor="middle" class="sv-big sv-wh">유형 Ⅰ · 부처 운영형</text>
+  <text x="170" y="178" text-anchor="middle" class="sv-lbl sv-ink">각 부처(17개)가 지정</text>
+  <text x="170" y="202" text-anchor="middle" class="sv-sm sv-mute">부처 R&amp;D 결과물 중</text>
+  <text x="170" y="220" text-anchor="middle" class="sv-sm sv-mute">혁신성·공공성이 인정된 제품</text>
+  <text x="170" y="238" text-anchor="middle" class="sv-sm sv-mute">또는 부처별 자체 기술인증 제품</text>
+  <text x="170" y="272" text-anchor="middle" class="sv-sm sv-faint">누적 지정</text>
+  <text x="170" y="292" text-anchor="middle" class="sv-num sv-td">1,972건</text>
+  <rect x="404" y="104" width="292" height="196" rx="14" fill="#F6FAF9" stroke="#E3EAE8"/>
+  <rect x="404" y="104" width="292" height="44" rx="14" class="sv-td"/>
+  <rect x="404" y="134" width="292" height="14" class="sv-td"/>
+  <text x="550" y="132" text-anchor="middle" class="sv-big sv-wh">유형 Ⅱ · 혁신시제품</text>
+  <text x="550" y="178" text-anchor="middle" class="sv-lbl sv-ink">조달청이 지정</text>
+  <text x="550" y="202" text-anchor="middle" class="sv-sm sv-mute">상용화 직전 시제품 중</text>
+  <text x="550" y="220" text-anchor="middle" class="sv-sm sv-mute">혁신성·공공성이 인정된 제품</text>
+  <text x="550" y="238" text-anchor="middle" class="sv-sm sv-mute">R&amp;D 이력 없이 특허만으로 가능</text>
+  <text x="550" y="272" text-anchor="middle" class="sv-sm sv-faint">누적 지정</text>
+  <text x="550" y="292" text-anchor="middle" class="sv-num sv-td">1,106건</text>
+</svg>
+<figcaption>누적 지정 건수는 2020년 제도 도입 이후 2026년 9월 8일까지 집계분입니다.</figcaption>
+</figure>
+
+<div class="tw">
+<table>
+  <thead><tr><th>구분</th><th>유형 Ⅰ</th><th>유형 Ⅱ</th></tr></thead>
+  <tbody>
+  <tr><td><b>전제</b></td>
+      <td class="jt"><b>해당 부처의 국가 R&amp;D 과제를 수행</b>하고 그 결과물을 사업화한 제품이어야 합니다</td>
+      <td class="jt">R&amp;D 이력이 없어도 됩니다. 대신 <b>특허 등 권리</b>와 <b>TRL 7~9</b>가 필요합니다</td></tr>
+  <tr><td><b>공고</b></td><td>부처별로 따로, 각자의 일정으로 공고합니다</td>
+      <td>조달청이 연간 일정(연 3~4차)으로 공고합니다</td></tr>
+  <tr><td><b>요건</b></td><td>부처마다 다릅니다. 소관 부처 공고를 확인하셔야 합니다</td>
+      <td>네 가지 자격 요건이 공통으로 적용됩니다(5장)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>유형 Ⅱ 안에서도 세 갈래가 있습니다</h3>
+<ul>
+<li><strong>공급자 제안형.</strong> 기업이 조달청 공고 분야에 맞춰 자사 제품을 먼저 신청합니다. 가장 일반적입니다.</li>
+<li><strong>수요자 제안형.</strong> 수요기관이나 기업, 국민이 제안한 과제를 공모하고 그 문제를 풀 제품을 모집합니다. <b>연중 상시</b>입니다.</li>
+<li><strong>민간전문가(스카우터) 추천형.</strong> 전문가가 현장에서 유망 제품을 발굴해 추천합니다.</li>
+</ul>
+
+<h4>공급자 제안형 신청 분야</h4>
+<p>세 분야 중 <strong>하나를 골라 상세항목 1개만</strong> 신청합니다. 중복 신청은 되지 않습니다.</p>
+<div class="tw">
+<table>
+  <thead><tr><th>분야</th><th>상세항목</th></tr></thead>
+  <tbody>
+  <tr><td><b>혁신성장지원</b></td><td class="jt">미래형 모빌리티 · 드론 · 에너지신산업 · 바이오헬스 · 스마트공장 · 스마트시티 ·
+      스마트농어업 · 로봇 · 인공지능(AI) · 조선해양 · 디지털 신기술(콘텐츠·ICT)</td></tr>
+  <tr><td><b>국민생활문제</b></td><td>안전 · 환경 · 건강 · 복지 · 교육 · 문화 · 전기차 화재</td></tr>
+  <tr><td><b>미래대비</b></td><td class="jt">저출생 · 고령화 · 양육돌봄 · 탄소중립 · 순환경제 · 기후변화 대응 · 사회적약자 지원</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="src">2026년 4차 공고 기준입니다. 분야와 상세항목은 차수마다 조정될 수 있습니다.</p>
+</section></div></div>
+
+<!-- 03 -->
+<div data-sec="s3" class="band soft"><div class="w"><section id="s3">
+<div class="sh"><span class="n">03</span><h2>우리 회사는 어디에 있나</h2>
+<p class="d">제도 설명을 다 읽어도 "그래서 우리는 무엇부터 하면 되는가"는 남습니다.
+아래 여섯 가지만 고르시면 그 답을 정리해 드립니다.</p></div>
+
+<div class="card">
+<h4>용어가 낯설면 건너뛰셔도 됩니다</h4>
+<p>진단에 나오는 특허 권리, 물품식별번호 같은 말은 <strong>5장과 6장에서 자세히 설명</strong>합니다.
+지금 확신이 서지 않으시면 <strong>확인이 필요합니다</strong>를 고르시거나,
+뒤를 먼저 읽고 이 장으로 돌아오셔도 됩니다.</p>
+</div>
+
+<div class="dx">
+  <div class="dxh">
+    <b>6개 문항 자가진단</b>
+    <span>지금 알고 계신 대로만 고르시면 됩니다. 입력한 내용은 저장되거나 전송되지 않습니다.</span>
+  </div>
+  <div class="dxb">
+
+    <div class="qz">
+      <p class="qt"><i>Q1</i>제품에 적용된 기술을 권리로 보유하고 계십니까?</p>
+      <p class="qh">유형 Ⅱ의 핵심 요건입니다. 등록이 끝나 있어야 하고, 통상실시권만으로는 되지 않습니다.</p>
+      <div class="opts">
+        <label class="opt"><input type="radio" name="right" value="patent"><span class="ol"><b>특허 등록, 등록일로부터 7년 이내</b>회사(법인) 또는 대표자 명의로 등록권리자</span></label>
+        <label class="opt"><input type="radio" name="right" value="util"><span class="ol"><b>실용신안 등록, 등록일로부터 3년 이내</b></span></label>
+        <label class="opt"><input type="radio" name="right" value="nep"><span class="ol"><b>NEP(신제품) 또는 NET(신기술) 인증, 3년 이내</b></span></label>
+        <label class="opt"><input type="radio" name="right" value="pending"><span class="ol"><b>출원 중입니다</b>아직 등록 전</span></label>
+        <label class="opt"><input type="radio" name="right" value="none"><span class="ol"><b>없거나 확인이 필요합니다</b></span></label>
+      </div>
+    </div>
+
+    <div class="qz">
+      <p class="qt"><i>Q2</i>이 제품을 이미 판매하고 계십니까?</p>
+      <p class="qh">유형 Ⅱ는 상용화 이전이 원칙입니다. 다만 예외가 둘 있습니다.</p>
+      <div class="opts">
+        <label class="opt"><input type="radio" name="sale" value="no"><span class="ol"><b>아직 판매 전입니다</b>상업적 거래 없음</span></label>
+        <label class="opt"><input type="radio" name="sale" value="first"><span class="ol"><b>최초 매출이 1년 이내입니다</b>벤처나라 등록제품은 2년 이내</span></label>
+        <label class="opt"><input type="radio" name="sale" value="small"><span class="ol"><b>매출이 제품 단가의 10배 이내입니다</b></span></label>
+        <label class="opt"><input type="radio" name="sale" value="full"><span class="ol"><b>본격적으로 판매하고 있습니다</b></span></label>
+        <label class="opt"><input type="radio" name="sale" value="chk"><span class="ol"><b>확인이 필요합니다</b>매출 현황을 다시 봐야 합니다</span></label>
+      </div>
+    </div>
+
+    <div class="qz">
+      <p class="qt"><i>Q3</i>이 제품으로 우수조달물품 지정이나 다수공급자계약(MAS)을 가지고 계십니까?</p>
+      <p class="qh">같은 제품으로 두 제도를 동시에 가져갈 수 없습니다. 동일 여부는 물품식별번호나 세부품명, 핵심기술로 판단합니다.</p>
+      <div class="opts">
+        <label class="opt"><input type="radio" name="dup" value="none"><span class="ol"><b>없습니다</b></span></label>
+        <label class="opt"><input type="radio" name="dup" value="other"><span class="ol"><b>있지만 이 제품과는 다른 제품입니다</b></span></label>
+        <label class="opt"><input type="radio" name="dup" value="same"><span class="ol"><b>이 제품으로 우수조달물품 또는 MAS 계약이 있습니다</b></span></label>
+        <label class="opt"><input type="radio" name="dup" value="chk"><span class="ol"><b>확인이 필요합니다</b>잘 모르겠습니다</span></label>
+      </div>
+    </div>
+
+    <div class="qz">
+      <p class="qt"><i>Q4</i>국가 R&amp;D 과제를 수행하고 그 결과물을 제품화하셨습니까?</p>
+      <p class="qh">유형 Ⅰ로 갈 수 있는지가 여기서 갈립니다. 중기부, 산업부, 과기부 등 부처 R&amp;D를 말합니다.</p>
+      <div class="opts">
+        <label class="opt"><input type="radio" name="rnd" value="yes"><span class="ol"><b>있습니다</b>최근 수행한 부처 R&amp;D 결과물을 사업화했습니다</span></label>
+        <label class="opt"><input type="radio" name="rnd" value="net"><span class="ol"><b>부처 기술인증(NET·NEP·신기술 등)을 보유하고 있습니다</b></span></label>
+        <label class="opt"><input type="radio" name="rnd" value="no"><span class="ol"><b>없습니다</b>자체 개발 제품이거나 확인이 필요합니다</span></label>
+      </div>
+    </div>
+
+    <div class="qz">
+      <p class="qt"><i>Q5</i>조달 행정 절차는 어디까지 되어 있습니까?</p>
+      <p class="qh">기술과 별개로 이것이 되어 있지 않으면 지정 절차가 진행되지 않습니다.</p>
+      <div class="opts">
+        <label class="opt"><input type="radio" name="admin" value="both"><span class="ol"><b>입찰참가자격 등록과 물품식별번호 모두 완료</b></span></label>
+        <label class="opt"><input type="radio" name="admin" value="bid"><span class="ol"><b>입찰참가자격 등록만 되어 있습니다</b>물품식별번호는 아직</span></label>
+        <label class="opt"><input type="radio" name="admin" value="none"><span class="ol"><b>둘 다 아직이거나 확인이 필요합니다</b></span></label>
+      </div>
+    </div>
+
+    <div class="qz">
+      <p class="qt"><i>Q6</i>제품이 어느 분야에 가까우십니까?</p>
+      <p class="qh">분야에 따라 열려 있는 문이 다릅니다. 가장 가까운 하나를 고르십시오.</p>
+      <div class="opts">
+        <label class="opt"><input type="radio" name="field" value="env"><span class="ol"><b>환경 · 에너지</b>정수, 대기, 폐기물, 신재생, 에너지 절감 등</span></label>
+        <label class="opt"><input type="radio" name="field" value="city"><span class="ol"><b>도시 · 교통 · 건설</b>도로, 시설물, 스마트시티, 건축자재 등</span></label>
+        <label class="opt"><input type="radio" name="field" value="ict"><span class="ol"><b>AI · ICT · 데이터</b>소프트웨어, 영상분석, 플랫폼, 통신 등</span></label>
+        <label class="opt"><input type="radio" name="field" value="elec"><span class="ol"><b>전기 · 전자 · 기계</b>부품, 장비, 계측, 제조설비 등</span></label>
+        <label class="opt"><input type="radio" name="field" value="safe"><span class="ol"><b>안전 · 재난</b>소방, 방재, 보안, 작업안전 등</span></label>
+        <label class="opt"><input type="radio" name="field" value="agri"><span class="ol"><b>농림 · 수산 · 식품</b>농업기계, 축산, 양식, 식품가공 등</span></label>
+        <label class="opt"><input type="radio" name="field" value="bio"><span class="ol"><b>바이오 · 의료</b>의료기기, 진단, 헬스케어 등</span></label>
+        <label class="opt"><input type="radio" name="field" value="etc"><span class="ol"><b>그 밖의 분야이거나 여러 분야에 걸칩니다</b></span></label>
+      </div>
+    </div>
+
+  </div>
+  <div class="dxa">
+    <button class="btn" id="go" disabled>진단 결과 보기</button>
+    <button class="btn gh" id="rs" type="button">다시 선택</button>
+    <span class="hint" id="hint">6개 문항을 모두 선택해 주세요</span>
+  </div>
+  <div id="res"></div>
+</div>
+</section></div></div>
+
+<!-- 04 -->
+<div data-sec="s4" class="band"><div class="w"><section id="s4">
+<div class="sh"><span class="n">04</span><h2>지정 경로 지도</h2>
+<p class="d">혁신제품은 한 문이 아니라 여러 문으로 되어 있습니다.
+어느 문이 우리 분야에 열려 있고 그 문이 실제로 얼마나 열리는지를 아는 것이 출발점입니다.</p></div>
+
+<p class="lead">부처와 지정자격을 합치면 신청 경로는 <strong>모두 42가지</strong>입니다.
+유형 Ⅰ이 37가지, 유형 Ⅱ가 5가지입니다. 그런데 경로마다 실제 지정 건수는 크게 다릅니다.
+아래는 그중 많이 지정되는 열 가지입니다.</p>
+
+<h3>가장 많이 지정되는 경로</h3>
+<div class="tw">
+<table>
+  <thead><tr><th class="c">유형</th><th class="nw">경로</th><th class="c">누적 지정</th><th>이런 기업에게</th></tr></thead>
+  <tbody>
+  <tr><td class="c">Ⅱ</td><td class="nw"><b>조달청 공급자제안형</b></td><td class="num">810건</td><td>R&amp;D 이력 없이 특허만 있어도 되는 가장 일반적인 길</td></tr>
+  <tr><td class="c">Ⅰ</td><td class="nw"><b>중소벤처기업부 우수연구개발</b></td><td class="num">594건</td><td>중기부 R&amp;D 과제를 수행한 기업. 유형 Ⅰ 중 최대</td></tr>
+  <tr><td class="c">Ⅰ</td><td class="nw"><b>산업통상부 에너지기술마켓</b></td><td class="num">218건</td><td>에너지와 환경 분야 기술</td></tr>
+  <tr><td class="c">Ⅱ</td><td class="nw"><b>조달청 스카우터 추천</b></td><td class="num">170건</td><td>전문가 추천 경로. 생각보다 활발합니다</td></tr>
+  <tr><td class="c">Ⅰ</td><td class="nw"><b>국토교통부 SOC기술마켓</b></td><td class="num">138건</td><td>도시, 교통, 건설 인프라</td></tr>
+  <tr><td class="c">Ⅰ</td><td class="nw"><b>지식재산처 우수특허기반 혁신제품</b></td><td class="num">138건</td><td>강한 특허를 보유한 기업</td></tr>
+  <tr><td class="c">Ⅰ</td><td class="nw"><b>산업통상부 우수연구개발</b></td><td class="num">133건</td><td>산업부 R&amp;D 결과물</td></tr>
+  <tr><td class="c">Ⅱ</td><td class="nw"><b>조달청 수요자제안형</b></td><td class="num">101건</td><td>공모 과제를 푸는 제품. <b>연중 상시</b></td></tr>
+  <tr><td class="c">Ⅰ</td><td class="nw"><b>과학기술정보통신부 우수연구개발</b></td><td class="num">75건</td><td>과기부 R&amp;D 결과물</td></tr>
+  <tr><td class="c">Ⅰ</td><td class="nw"><b>지식재산처 우수발명품</b></td><td class="num">73건</td><td>발명 기반 제품</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="src">2020년 제도 도입 이후 2026년 9월 8일까지 누적 지정 건수입니다.
+신청 건수는 집계되지 않으므로 <strong>합격률이 아닙니다.</strong> 각 경로가 실제로 얼마나 지정하는지를 보여주는 수치입니다.</p>
+
+<h3>우리 분야는 어느 문인가</h3>
+<div class="tw">
+<table>
+  <thead><tr><th>제품 분야</th><th>유형 Ⅰ 주요 경로와 누적 건수</th><th>평가·전담기관</th></tr></thead>
+  <tbody>
+  <tr><td><b>환경·에너지</b></td>
+      <td class="jt">산업부 에너지기술마켓 218 · 기후에너지환경부 우수연구개발 50 · 탄소중립 45 · 환경신기술 20</td>
+      <td>한국전력공사<br>한국환경산업기술원</td></tr>
+  <tr><td><b>도시·교통·건설</b></td>
+      <td class="jt">국토부 SOC기술마켓 138 · 우수연구개발 51 · 스마트챌린지 14 · 건설신기술 5</td>
+      <td>국토교통과학기술진흥원</td></tr>
+  <tr><td><b>AI·ICT·데이터</b></td>
+      <td>과기부 우수연구개발 75 · 디지털전문서비스 58 · ICT기술마켓 49</td>
+      <td>한국산업기술진흥협회<br>한국지능정보사회진흥원</td></tr>
+  <tr><td><b>전기·전자·기계</b></td>
+      <td class="jt">산업부 우수연구개발 133 · 차세대세계일류상품 21 · NEP 20 · 산업신기술 14</td>
+      <td>한국산업기술진흥원</td></tr>
+  <tr><td><b>안전·재난</b></td>
+      <td class="jt">행안부 재난안전제품인증 18 · 재난안전신기술 14 · 경찰청 우수연구개발 16</td>
+      <td>한국산업기술평가관리원<br>국립소방연구원</td></tr>
+  <tr><td><b>농림·수산·식품</b></td>
+      <td class="jt">농식품부 농림식품신기술 42 · 우수연구개발 33 · 해수부 해양수산신기술 20 · 우수연구개발 18</td>
+      <td>농림식품기술기획평가원<br>해양수산과학기술진흥원</td></tr>
+  <tr><td><b>바이오·의료</b></td>
+      <td>보건복지부 보건신기술 10 <span class="note">(경로가 좁습니다)</span></td>
+      <td>한국보건산업진흥원</td></tr>
+  <tr><td><b>목재·산림</b></td>
+      <td>산림청 우수연구개발 11 · 목재신기술 3</td>
+      <td>한국임업진흥원</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="card">
+<h4>이 표를 읽는 법</h4>
+<p><strong>유형 Ⅰ 경로는 그 부처의 R&amp;D나 기술인증을 가지고 있을 때만 열립니다.</strong>
+해당 이력이 없다면 아무리 분야가 맞아도 신청할 수 없습니다.</p>
+<p>그 경우 <strong>유형 Ⅱ(조달청 공급자제안형, 누적 810건)가 기본 경로</strong>입니다.
+전 분야가 대상이고, R&amp;D 이력 없이 특허만으로도 신청할 수 있습니다.</p>
+<p>바이오·의료처럼 유형 Ⅰ 경로가 좁은 분야라면 처음부터 유형 Ⅱ를 목표로 잡는 편이 현실적입니다.</p>
+</div>
+</section></div></div>
+
+<!-- 05 -->
+<div data-sec="s5" class="band soft"><div class="w"><section id="s5">
+<div class="sh"><span class="n">05</span><h2>유형 Ⅱ 자격 요건 네 가지</h2>
+<p class="d">유형 Ⅱ는 네 가지를 모두 충족해야 신청할 수 있습니다.
+하나라도 빠지면 신청 자체가 되지 않습니다. <span class="law">혁신제품 구매 운영 규정</span></p></div>
+
+<h3>하나. 기술개발단계(TRL) 7~9단계</h3>
+<p>최대 1년 안에 기술혁신 성능을 확인할 수 있는 수준이어야 합니다.</p>
+
+<figure>
+<svg viewBox="0 0 720 150" role="img" aria-label="TRL 단계와 혁신시제품 신청 구간">
+  <rect x="24" y="48" width="396" height="34" rx="8" fill="#EDF0EF"/>
+  <text x="222" y="70" text-anchor="middle" class="sv-lbl sv-faint">TRL 1 ~ 6 단계 (신청 대상 아님)</text>
+  <rect x="428" y="40" width="268" height="50" rx="10" class="sv-teal"/>
+  <text x="562" y="62" text-anchor="middle" class="sv-big sv-wh">TRL 7 ~ 9 단계</text>
+  <text x="562" y="79" text-anchor="middle" class="sv-sm" fill="#C2DED8">혁신시제품 신청 가능 구간</text>
+  <g class="sv-sm sv-mute">
+    <text x="470" y="112">7단계</text><text x="470" y="129" class="sv-sm sv-faint">시제품 개발 완료</text>
+    <text x="562" y="112" text-anchor="middle">8단계</text><text x="562" y="129" text-anchor="middle" class="sv-sm sv-faint">양산 검증 완료</text>
+    <text x="690" y="112" text-anchor="end">9단계</text><text x="690" y="129" text-anchor="end" class="sv-sm sv-faint">출시 직전</text>
+  </g>
+  <path d="M470 94 L470 100 M562 94 L562 100 M672 94 L672 100" stroke="#C2DED8" stroke-width="1.5"/>
+</svg>
+</figure>
+
+<div class="tw">
+<table>
+  <thead><tr><th class="c">단계</th><th>상태</th><th>이런 증빙이 있습니다</th></tr></thead>
+  <tbody>
+  <tr><td class="c"><b>7단계</b></td><td>현장 적용과 활용이 가능한 시제품 개발 완료</td><td>실험실 테스트 다수, 시험성적서(자체 또는 공인)</td></tr>
+  <tr><td class="c"><b>8단계</b></td><td>현장 요구사항이 반영되어 양산을 위한 검증 완료</td><td>현장적용 사례, 실증완료 보고서</td></tr>
+  <tr><td class="c"><b>9단계</b></td><td>양산을 위한 모든 요건 완료, 시장 출시 직전</td><td>양산 준비 완료, 법정 인증 완료</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>둘. 상용화 이전</h3>
+<p>원칙은 <strong>상업적 거래가 없을 것</strong>입니다. 다만 아래 둘 중 하나에 해당하면 예외적으로 신청할 수 있습니다.
+증빙은 신청 기업이 제시합니다.</p>
+<ul>
+<li>신청제품의 <strong>매출액이 제품 단가의 10배 이내</strong>인 경우</li>
+<li>신청제품의 <strong>최초 매출이 접수마감일 기준 1년 이내</strong>인 경우. 벤처나라 등록제품은 2년 이내입니다</li>
+</ul>
+<div class="flag">
+<h4>TRL 9단계와 이 요건은 긴장 관계입니다</h4>
+<p>TRL 9는 시장 출시 직전인데, 출시해서 본격적으로 팔기 시작하면 이 요건에서 걸립니다.
+지정을 염두에 두신다면 <strong>판매 시작 시점을 전략적으로</strong> 보셔야 합니다.</p>
+</div>
+
+<h3>셋. 기술 조건</h3>
+<p>특허, 실용신안, NEP, NET 중 하나를 권리로 보유하고 있어야 합니다.</p>
+<div class="tw">
+<table>
+  <thead><tr><th>권리</th><th>조건</th></tr></thead>
+  <tbody>
+  <tr><td><b>특허</b></td><td>등록일로부터 <b>7년 이내</b>, 권리자 또는 전용실시권자일 것</td></tr>
+  <tr><td><b>실용신안</b></td><td>등록일로부터 <b>3년 이내</b>, 권리자 또는 전용실시권자일 것</td></tr>
+  <tr><td><b>신제품(NEP) 인증</b></td><td>최초 지정일로부터 <b>3년 이내</b></td></tr>
+  <tr><td><b>신기술(NET) 인증</b></td><td>최초 지정일로부터 <b>3년 이내</b>, 해당 신기술의 적용이 확인된 제품</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="flag">
+<h4>여기서 가장 많이 걸립니다</h4>
+<ul>
+<li><strong>출원 중이면 되지 않습니다.</strong> 신청서 접수 마감일 이전에 <b>등록</b>이 끝나 있어야 합니다.</li>
+<li><strong>통상실시권만으로는 되지 않습니다.</strong> 권리자이거나 전용실시권자여야 합니다.</li>
+<li>특허등록원부에 <strong>법인사업자는 법인명으로, 개인사업자는 대표자명으로</strong> 등록권리자로 올라 있어야 합니다.
+    <b>대표 개인 명의 특허를 법인이 신청하는 경우</b>가 흔한 탈락 사유입니다.</li>
+<li>공동권리자가 있으면 <strong>모든 권리자가 포함된 약정서와 인감증명서</strong>를 함께 내야 합니다.</li>
+</ul>
+<p class="note" style="margin-top:14px"><b>예외.</b> 「기술의 이전 및 사업화 촉진에 관한 법률」에 따라
+공공연구기관 기술을 직접 사업화하려고 기술이전을 받는 경우에는, 해당 기술이 출원 중이어도
+기술이전 업무협약서 제출로 신청할 수 있습니다. 다만 <b>계약심사협의회 심사 전까지는 권리 등록을 마쳐야</b> 지정됩니다.</p>
+</div>
+
+<h3>넷. 제조 조건</h3>
+<ul>
+<li><strong>단독 참여.</strong> 기술과 제조 설비를 모두 보유한 경우입니다.</li>
+<li><strong>협업 제조.</strong> 특정 제조기업과 1:1 협업입니다. 추진기업은 지식재산권과 입찰참가등록을,
+    참여기업은 입찰참가등록과 제조물품 등록, 물품식별번호 발급을 갖춰야 합니다.</li>
+</ul>
+<p class="note">자율주행시스템이나 로봇 등 신산업 기술개발제품은 대기업, 중견기업, 중소기업 간 컨소시엄(공동수급체 분담이행)도 가능합니다.
+<span class="law">운영규정 §46</span></p>
+</section></div></div>
+
+<!-- 06 -->
+<div data-sec="s6" class="band"><div class="w"><section id="s6">
+<div class="sh"><span class="n">06</span><h2>신청 전에 갖출 세 가지</h2>
+<p class="d">자격 요건과 별개로 공공조달에 들어가기 위한 행정 절차가 먼저 되어 있어야 합니다.</p></div>
+
+<p>센터 상담에서 보면 <strong>지정 신청이 저조한 가장 큰 원인이 바로 이 준비 부족</strong>입니다.
+기술은 충분한데 서류 단계에서 멈추는 경우가 많습니다.</p>
+
+<ol class="prep">
+  <li><span class="pn">01</span>
+    <div><b>입찰참가자격 등록</b>
+      <span class="where">조달청 나라장터</span>
+      <p>제조 또는 협업 여부가 증빙되어야 합니다. 협업이라면 협업기관의 제조등록이 필요합니다.</p></div></li>
+  <li><span class="pn">02</span>
+    <div><b>물품식별번호 등록</b>
+      <span class="where">조달청 상품정보시스템</span>
+      <p>현 체계상 물품분류번호가 있어야 지정 절차가 진행됩니다.</p></div></li>
+  <li><span class="pn">03</span>
+    <div><b>특허적용여부 확인서</b>
+      <span class="where">한국특허기술진흥원</span>
+      <p>보유한 특허가 그 제품에 실제로 적용되었음을 확인하는 서류입니다.</p></div></li>
+</ol>
+
+<div class="flag">
+<h4>물품식별번호가 아직 없다면</h4>
+<p>제안제품(세부품명번호 10자리)의 제조물품 입찰참가 등록과 물품식별번호 등록을 마치지 못했더라도,
+입찰참가자격등록만 되어 있으면 <strong>신청은 할 수 있습니다.</strong></p>
+<p>다만 그 상태로는 <strong>평가 대상에 포함될 뿐 평가 이후 지정 절차는 진행되지 않습니다.</strong>
+신청서를 내면서 <strong>동시에</strong> 제조물품 입찰참가등록과 물품식별번호 등록을 진행하셔야 합니다.</p>
+<p class="note">물품식별번호 없이 신청하실 때는 공고에 첨부된 신규업체 혁신시제품 온라인 신청 매뉴얼을 반드시 확인하십시오.</p>
+</div>
+</section></div></div>
+
+<!-- 07 -->
+<div data-sec="s7" class="band soft"><div class="w"><section id="s7">
+<div class="sh"><span class="n">07</span><h2>신청 절차와 평가</h2></div>
+
+<ol class="flow">
+  <li><b>지정 신청</b><span>혁신장터(ppi.g2b.go.kr)에서 온라인 신청합니다.
+      혁신장터, 혁신시제품 지정, 업체 지정신청 공고 순으로 들어가 공고서 제목을 누른 뒤
+      첨부파일에서 별첨 1(제안서)과 별첨 2(규격서) 등을 내려받아 작성합니다.</span></li>
+  <li><b>사전 서류 검토</b><span>제안서와 규격서, 특허 관련 서류의 구비 요건과 신청자 자격 조건을 먼저 확인합니다.</span></li>
+  <li><b>혁신시제품 평가</b><span>공공성과 혁신성을 대면 발표로 함께 심사합니다.
+      <b>공공성 심사에서 적합 판정을 받은 경우에만</b> 혁신성 심사로 넘어갑니다.</span></li>
+  <li><b>추가 서류 제출</b><span>혁신성 심사를 통과한 업체만 상용화 관련 서류와 특허적용확인서, 최종 규격서를 냅니다.</span></li>
+  <li><b>지정</b><span>조달정책심의위원회(공공수요발굴위원회)에서 심의해 지정합니다. 연 4회 있습니다.</span></li>
+  <li><b>혁신장터 제품 등록</b><span>지정만으로 끝이 아닙니다.
+      <b>혁신장터에 제품을 등록해야</b> 시범구매 사업에 참여할 수 있습니다.</span></li>
+</ol>
+
+<h3>무엇을 보나</h3>
+<div class="eval">
+  <div class="ev">
+    <div class="evt"><b>1차 공공성</b><span>모든 항목에서 심사위원 2/3 이상 적합 판정</span></div>
+    <ul class="chips">
+      <li>분야 적합성</li><li>공공서비스 향상</li><li>공공구매의 필요성</li>
+      <li>수요기관 구매 적합성</li><li>안전성 및 규제 부합</li></ul>
+  </div>
+  <div class="ev">
+    <div class="evt"><b>2차 혁신성</b><span>최고점과 최저점을 뺀 평균 70점 이상</span></div>
+    <ul class="chips">
+      <li>기술의 신규성</li><li>기술의 탁월성</li><li>기술 완성도와 실현 가능성</li>
+      <li>시장성</li><li>시범구매 수행 역량</li></ul>
+  </div>
+</div>
+
+<figure>
+<svg viewBox="0 0 760 196" role="img" aria-label="공공성 심사를 통과해야 혁신성 심사로 넘어가는 2단계 평가 흐름">
+  <rect x="10" y="56" width="104" height="52" rx="10" fill="#E8EEEC"/>
+  <text x="62" y="87" text-anchor="middle" class="sv-lbl sv-mute">신청</text>
+  <path d="M118 82 L146 82" stroke="#C2DED8" stroke-width="2"/>
+  <path d="M142 77 L151 82 L142 87 Z" fill="#C2DED8"/>
+
+  <rect x="155" y="48" width="188" height="68" rx="11" class="sv-teal"/>
+  <text x="249" y="76" text-anchor="middle" class="sv-big sv-wh">1차 공공성</text>
+  <text x="249" y="97" text-anchor="middle" class="sv-sm" fill="#C9E6E1">심사위원 2/3 이상 적합</text>
+
+  <path d="M347 82 L387 82" stroke="#0E7266" stroke-width="2"/>
+  <path d="M383 77 L392 82 L383 87 Z" fill="#0E7266"/>
+  <text x="367" y="72" text-anchor="middle" class="sv-sm sv-td" style="font-weight:700">적합</text>
+
+  <rect x="396" y="48" width="188" height="68" rx="11" class="sv-td"/>
+  <text x="490" y="76" text-anchor="middle" class="sv-big sv-wh">2차 혁신성</text>
+  <text x="490" y="97" text-anchor="middle" class="sv-sm" fill="#9FD3C9">평균 70점 이상</text>
+
+  <path d="M588 82 L626 82" stroke="#0E7266" stroke-width="2"/>
+  <path d="M622 77 L631 82 L622 87 Z" fill="#0E7266"/>
+  <rect x="635" y="52" width="115" height="60" rx="10" fill="#D6F0E9"/>
+  <text x="692" y="79" text-anchor="middle" class="sv-lbl sv-td">지정</text>
+  <text x="692" y="97" text-anchor="middle" class="sv-sm sv-td">연 4회 심의</text>
+
+  <path d="M249 120 L249 152" stroke="#D9C4BD" stroke-width="2" stroke-dasharray="4 4"/>
+  <path d="M244 148 L249 157 L254 148 Z" fill="#D9C4BD"/>
+  <text x="262" y="140" class="sv-sm" fill="#94382A">부적합</text>
+  <rect x="186" y="157" width="126" height="32" rx="8" fill="#FCF1EF"/>
+  <text x="249" y="178" text-anchor="middle" class="sv-sm" fill="#94382A">여기서 종료</text>
+
+  <path d="M490 120 L490 152" stroke="#D9C4BD" stroke-width="2" stroke-dasharray="4 4"/>
+  <path d="M485 148 L490 157 L495 148 Z" fill="#D9C4BD"/>
+  <text x="503" y="140" class="sv-sm" fill="#94382A">미달</text>
+  <rect x="427" y="157" width="126" height="32" rx="8" fill="#FCF1EF"/>
+  <text x="490" y="178" text-anchor="middle" class="sv-sm" fill="#94382A">여기서 종료</text>
+</svg>
+<figcaption>공공성 심사에서 부적합을 받으면 혁신성은 보지도 않습니다. 순서가 고정되어 있습니다.</figcaption>
+</figure>
+
+<div class="card">
+<h4>순서가 중요합니다. 공공성이 먼저입니다</h4>
+<p>기술이 아무리 뛰어나도 <strong>"공공기관이 이걸 왜 사야 하는가"</strong>에 답하지 못하면
+혁신성 심사까지 가지 못합니다. 제안서를 쓰실 때 이 질문을 가장 먼저 잡으십시오.</p>
+<p class="note" style="margin-top:12px">좋은 답은 이런 모양입니다.
+<b>어느 기관이, 어떤 현안 때문에, 지금 무엇이 없어서 곤란한가. 그 문제를 우리 제품이 어떻게 푸는가.</b></p>
+</div>
+</section></div></div>
+
+<!-- 08 -->
+<div data-sec="s8" class="band"><div class="w"><section id="s8">
+<div class="sh"><span class="n">08</span><h2>자주 막히는 지점</h2></div>
+
+<h3>아예 신청이 되지 않는 경우</h3>
+<p>아래에 해당하면 심사와 지정 대상에서 제외됩니다. <span class="law">혁신제품 구매 운영 규정</span></p>
+<ul>
+<li>신청 서류를 위조하거나 변조하고, 허위 서류를 제출한 경우</li>
+<li>휴업이나 폐업, 부도, 파산 상태이거나 부정당업자 제재 중인 경우</li>
+<li><strong>우수조달물품 또는 다수공급자계약(MAS)을 체결한 물품이나 서비스와 동일한 제품.</strong>
+    물품식별번호가 같거나 세부품명, 핵심기술이 같은 경우입니다</li>
+<li>신청제품이 <strong>이미 시중에 판매되고 있거나</strong>, 그 업체가 시중에 파는 상품과 동일하다고 판단되는 경우</li>
+<li><strong>이미 지정된 혁신제품과 동일한 제품</strong>인 경우</li>
+<li>동일 제품으로 <strong>4회 이상 혁신시제품 평가에서 탈락</strong>한 경우</li>
+<li>외국산 부품의 원가계산서상 <strong>직접재료비 비율이 50%를 초과</strong>한 제품.
+    2026년 4차 지정분부터 적용됩니다</li>
+</ul>
+
+<div class="flag">
+<h4>우수조달물품이나 MAS를 이미 가지고 계시다면</h4>
+<p>그 제품으로는 혁신제품 중복 지정이 되지 않습니다.
+기존 계약 제품과 <strong>세부품명이나 핵심기술이 다른 새 제품</strong>으로 접근하셔야 합니다.</p>
+<p>이미 우수조달이나 MAS가 있다는 것은 공공조달 역량을 갖추셨다는 뜻이므로,
+<strong>다음 제품을 혁신제품으로 올리는 전략</strong>이 현실적입니다.</p>
+</div>
+
+<h3>요건은 맞는데 떨어지는 경우</h3>
+<ul>
+<li><strong>특허와 제품의 연결이 약한 경우.</strong> 특허는 있는데 그 특허가 이 제품의 어느 기능을
+    구현하는지 설명되지 않으면 혁신성에서 감점됩니다. 특허적용여부 확인서가 필요한 이유입니다.</li>
+<li><strong>좋은 제품이라는 설명만 하고 공공이 왜 사야 하는지를 빠뜨리는 경우.</strong></li>
+<li><strong>수요기관이 살 수 있는 규격이 아닌 경우.</strong> 성능은 좋은데 기존 공공 규격과 맞지 않아
+    구매가 어려우면 수요기관 구매 적합성에서 걸립니다.</li>
+</ul>
+</section></div></div>
+
+<!-- 09 -->
+<div data-sec="s9" class="band soft"><div class="w"><section id="s9">
+<div class="sh"><span class="n">09</span><h2>지정받은 뒤에는</h2></div>
+
+<h3>지정 기간은 3년, 최대 6년까지</h3>
+
+<figure>
+<svg viewBox="0 0 720 128" role="img" aria-label="혁신제품 지정 기간과 연장 구조">
+  <rect x="24" y="30" width="330" height="46" rx="10" class="sv-td"/>
+  <text x="189" y="52" text-anchor="middle" class="sv-big sv-wh">최초 지정 3년</text>
+  <text x="189" y="68" text-anchor="middle" class="sv-sm" fill="#9FD3C9">지정·고시된 날부터</text>
+  <rect x="362" y="30" width="110" height="46" rx="10" class="sv-teal"/>
+  <text x="417" y="52" text-anchor="middle" class="sv-lbl sv-wh">1차 +1년</text>
+  <text x="417" y="68" text-anchor="middle" class="sv-sm" fill="#C2DED8">납품 실적</text>
+  <rect x="480" y="30" width="216" height="46" rx="10" fill="#4FA093"/>
+  <text x="588" y="52" text-anchor="middle" class="sv-lbl sv-wh">2차 +2년</text>
+  <text x="588" y="68" text-anchor="middle" class="sv-sm" fill="#E3F2EF">유사기술·기술탁월성 평가</text>
+  <path d="M24 92 L696 92" stroke="#C2DED8" stroke-width="1"/>
+  <path d="M24 88 L24 96 M354 88 L354 96 M472 88 L472 96 M696 88 L696 96" stroke="#C2DED8" stroke-width="1"/>
+  <text x="24" y="114" class="sv-sm sv-faint">0년</text>
+  <text x="354" y="114" text-anchor="middle" class="sv-sm sv-faint">3년</text>
+  <text x="472" y="114" text-anchor="middle" class="sv-sm sv-faint">4년</text>
+  <text x="696" y="114" text-anchor="end" class="sv-sm sv-td" style="font-weight:800">최대 6년</text>
+</svg>
+</figure>
+
+<p class="note">제품에 적용된 특허나 실용신안, 규제샌드박스 특례 기간이 정해져 있으면
+지정 기간은 3년 이내에서 그 기간까지로 한정됩니다.</p>
+
+<div class="flag">
+<h4>연장은 저절로 되지 않습니다</h4>
+<p>연장은 <strong>기간이 끝나기 전에 신청해야</strong> 합니다. 각 부처가 연장 공고를 따로 내므로
+지정받으신 부처의 공고 일정을 챙기셔야 합니다.
+<strong>놓치면 지정이 만료되고 수의계약 자격도 함께 사라집니다.</strong></p>
+<p>1차 연장의 핵심 조건이 <strong>공공기관 납품 실적</strong>이라는 점도 기억해 두십시오.
+지정받은 3년 동안 실적을 만들어 두어야 연장이 됩니다.</p>
+</div>
+
+<h3>혁신장터에 제품을 등록하십시오</h3>
+<p>지정만 받고 등록하지 않으면 시범구매에 참여할 수 없습니다.</p>
+<ol class="flow">
+  <li><b>혁신장터 로그인</b><span>나라장터 인증서로 접속합니다.</span></li>
+  <li><b>이용약관 및 사전절차 동의</b><span>최초 1회만 하면 됩니다.</span></li>
+  <li><b>업체정보 등록</b><span>담당자와 업체 소개 등을 입력합니다.</span></li>
+  <li><b>제품정보 등록</b><span><b>지정받은 식별번호로만</b> 등록할 수 있습니다.</span></li>
+  <li><b>진행현황 확인</b><span>보완 요청이나 반려가 있으면 확인한 뒤 수정해 다시 제출합니다.</span></li>
+</ol>
+</section></div></div>
+
+<!-- 10 -->
+<div data-sec="s10" class="band"><div class="w"><section id="s10">
+<div class="sh"><span class="n">10</span><h2>언제 신청하나</h2>
+<p class="d">2026년 공급자 제안형 신청은 모두 마감되었습니다.</p></div>
+
+<div class="tw">
+<table>
+  <thead><tr><th>구분</th><th>2026년 일정</th></tr></thead>
+  <tbody>
+  <tr><td><b>공급자 제안형</b></td>
+      <td class="jt">2차 3.3.~3.27. · 3차 5.26.~6.12. · 4차 8.31.~9.18. <span class="note">(모두 종료)</span></td></tr>
+  <tr><td><b>수요자 제안형</b></td><td><b>연중 상시</b></td></tr>
+  <tr><td><b>민간전문가 추천형</b></td><td>연 3회</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="src">2026년도 혁신시제품 지정신청 공고 기준입니다. 차수와 기간은 매년 달라집니다.</p>
+
+<div class="card">
+<h4>지금 하실 일. 내년 1차를 목표로 준비하십시오</h4>
+<p><strong>차년도 지정 계획 공고는 혁신장터 공지사항에 연말에 게시됩니다.</strong>
+공고가 나오고 준비를 시작하면 늦습니다. <strong>신청 기간이 3~4주로 짧기 때문</strong>입니다.</p>
+<ul>
+<li>6장의 <strong>세 가지 행정 준비</strong>를 미리 마쳐두기. 가장 오래 걸립니다</li>
+<li>특허가 <strong>출원 중</strong>이라면 등록 완료 예상 시점 확인하기</li>
+<li>어느 <strong>분야와 상세항목</strong>으로 신청할지 정해두기</li>
+<li>공공성 논리를 글로 정리해 두기. <strong>어느 기관이, 어떤 문제 때문에, 이 제품을 사야 하는가</strong></li>
+<li>유형 Ⅰ이 가능하다면 <strong>해당 부처 공고 일정</strong>을 따로 확인하기. 부처마다 다릅니다</li>
+</ul>
+<p class="note" style="margin-top:14px">수요자 제안형은 연중 상시입니다.
+공모된 과제 중 우리 제품으로 풀 수 있는 것이 있는지 혁신장터에서 수시로 확인해 보시는 것도 방법입니다.</p>
+</div>
+</section></div></div>
+
+<!-- 11 -->
+<div data-sec="s11" class="band soft"><div class="w"><section id="s11">
+<div class="sh"><span class="n">11</span><h2>더 궁금하신 점은</h2>
+<p class="d">여기까지 보셨다면 우리 회사가 어디쯤 있는지는 가늠이 되셨을 것입니다.
+제도와 신청에 관한 문의는 혁신제품지원센터에서 받고 있습니다.</p></div>
+
+<div class="card">
+<h4>혁신제품지원센터로 문의해 주십시오</h4>
+<p>제도 해석, 자격 요건 판단, 신청 준비 등 무엇이든 괜찮습니다.
+개별 상황은 제품과 권리 관계에 따라 크게 달라지므로, <strong>현황을 알려주시면 검토해 답변드립니다.</strong></p>
+<p style="margin-bottom:0"><strong>한국조달연구원 혁신제품지원센터 혁신판로부</strong><br>
+02-796-8234 · <a href="https://www.kipcc.re.kr">www.kipcc.re.kr</a></p>
+</div>
+
+<div class="flag">
+<h4>원스톱 스케일업 참여기업이시라면</h4>
+<p>이 지침서를 <strong>안내 메일로 받으셨다면 그 메일에 그대로 회신</strong>해 주십시오.
+담당자가 확인하여 답변드립니다. 메일에 적힌 세 가지 질문에 답해 주시면
+<strong>귀사 상황에 맞춰 검토</strong>해 드립니다.</p>
+</div>
+
+<h3>문의하실 때 이것을 함께 적어주시면 빠릅니다</h3>
+<ul>
+<li><strong>자가진단(3장) 결과.</strong> 화면에 나온 판정과 추천 경로를 그대로 적어 주셔도 됩니다</li>
+<li><strong>제품에 적용된 권리.</strong> 특허·실용신안·NEP·NET 중 무엇이고 등록 시점이 언제인지</li>
+<li><strong>현재 판매 상황.</strong> 판매 전인지, 최초 매출이 언제인지</li>
+<li><strong>가장 막히는 부분.</strong> 제도 이해, 서류 준비, 특허 문제, 제안서 작성 등</li>
+</ul>
+</section></div></div>
+
+<footer><div class="w">
+<div class="blk">
+<h4>근거 자료</h4>
+<p>「조달사업에 관한 법률」 제27조 및 동법 시행령 제33조 · 「혁신제품 구매 운영 규정」(조달청 고시) ·
+2026년도 혁신시제품 지정신청 공고(조달청) · 조달청 「공공조달길잡이」 핸드북(2026.6.) ·
+한국조달연구원 혁신제품지원센터 「혁신조달의 이해와 실무」(2026.10.) ·
+혁신제품 인증현황 통합(한국조달연구원, 2026.9.8. 집계)</p>
+</div>
+<div class="blk">
+<h4>기준일</h4>
+<p>본 지침서는 <b>2026년 10월 15일</b> 기준 법령과 고시, 공고를 반영했습니다.
+지정 실적 통계는 <b>2026년 9월 8일</b> 집계분입니다.
+법령과 고시는 개정되며, 특히 지정 요건과 제외 사유는 차수별 공고에서 달라질 수 있습니다.
+<b>실제 신청 전에는 해당 차수의 공고문을 반드시 직접 확인해 주십시오.</b></p>
+</div>
+<div class="blk">
+<h4>문의</h4>
+<p><b>한국조달연구원 혁신제품지원센터 혁신판로부</b><br>
+02-796-8234 · <a href="https://www.kipcc.re.kr">www.kipcc.re.kr</a></p>
+</div>
+<p class="sign">한국조달연구원 혁신제품지원센터 혁신판로부</p>
+</div></footer>
+
+<script>
+/* 좌측 목차: 현재 읽는 장 표시 + 한 장씩 보기 */
+(function(){
+  var links=[].slice.call(document.querySelectorAll('#side a'));
+  if(!links.length) return;
+  var bands={}; [].forEach.call(document.querySelectorAll('[data-sec]'),function(b){bands[b.dataset.sec]=b});
+  function mark(id){ links.forEach(function(a){ a.classList.toggle('on', a.dataset.s===id) }); }
+
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting) mark(e.target.id) });
+    },{rootMargin:'-45% 0px -50% 0px',threshold:0});
+    document.querySelectorAll('section[id]').forEach(function(x){io.observe(x)});
+  }
+
+  var solo=false, cur='s0';
+  var btn=document.getElementById('solo'), hint=document.getElementById('solohint');
+  function show(id){ cur=id;
+    Object.keys(bands).forEach(function(k){ bands[k].classList.toggle('cur', k===id) });
+    mark(id); window.scrollTo({top:0,behavior:'auto'}); }
+  btn.addEventListener('click',function(){
+    solo=!solo; document.body.classList.toggle('solo',solo);
+    btn.classList.toggle('on',solo);
+    btn.textContent = solo ? '전체 보기로 돌아가기' : '한 장씩 보기';
+    hint.textContent = solo ? '목차에서 장을 고르시면 그 장만 보입니다' : '선택한 장만 띄웁니다';
+    if(solo) show(cur); else document.getElementById(cur).scrollIntoView({block:'start'});
+  });
+  links.forEach(function(a){ a.addEventListener('click',function(e){
+    if(solo){ e.preventDefault(); show(a.dataset.s); } else { cur=a.dataset.s; }
+  })});
+})();
+
+(function(){
+  var Q=['right','sale','dup','rnd','admin','field'], sel={};
+  var go=document.getElementById('go'), rs=document.getElementById('rs'),
+      hint=document.getElementById('hint'), res=document.getElementById('res');
+
+  document.querySelectorAll('.opt').forEach(function(l){
+    l.addEventListener('click',function(){
+      var i=l.querySelector('input'); if(!i) return;
+      setTimeout(function(){
+        l.closest('.opts').querySelectorAll('.opt').forEach(function(o){o.classList.remove('on')});
+        if(i.checked){ l.classList.add('on'); sel[i.name]=i.value; }
+        var n=Q.filter(function(k){return sel[k]}).length;
+        go.disabled=n<Q.length;
+        hint.textContent = n<Q.length ? (Q.length-n)+'개 문항이 남았습니다' : '선택이 끝났습니다';
+      },0);
+    });
+  });
+
+  rs.addEventListener('click',function(){
+    sel={}; res.className=''; res.innerHTML='';
+    document.querySelectorAll('.opt').forEach(function(o){o.classList.remove('on')});
+    document.querySelectorAll('.opt input').forEach(function(i){i.checked=false});
+    go.disabled=true; hint.textContent='6개 문항을 모두 선택해 주세요';
+    document.getElementById('s3').scrollIntoView({block:'start'});
+  });
+
+  /* 분야별 실제 지정 경로. 2026.9.8. 집계 기준 누적 건수. */
+  var FIELD={
+    env:{nm:'환경 · 에너지',
+      t1:[['산업통상부 에너지기술마켓',218,'한국전력공사'],
+          ['기후에너지환경부 우수연구개발',50,'한국환경산업기술원'],
+          ['기후에너지환경부 탄소중립',45,'한국환경산업기술원'],
+          ['기후에너지환경부 환경신기술(NET)',20,'한국환경산업기술원']],
+      t2:'미래대비 → 탄소중립·순환경제, 또는 국민생활문제 → 환경, 혁신성장지원 → 에너지신산업'},
+    city:{nm:'도시 · 교통 · 건설',
+      t1:[['국토교통부 SOC기술마켓',138,'국토교통과학기술진흥원'],
+          ['국토교통부 우수연구개발',51,'국토교통과학기술진흥원'],
+          ['국토교통부 스마트챌린지',14,'국토교통과학기술진흥원'],
+          ['국토교통부 건설신기술(NET)',5,'국토교통과학기술진흥원']],
+      t2:'혁신성장지원 → 스마트시티·미래형 모빌리티, 또는 국민생활문제 → 안전'},
+    ict:{nm:'AI · ICT · 데이터',
+      t1:[['과학기술정보통신부 우수연구개발',75,'한국산업기술진흥협회'],
+          ['과학기술정보통신부 디지털전문서비스',58,'한국지능정보사회진흥원'],
+          ['과학기술정보통신부 ICT기술마켓',49,'ICT기술마켓협의체']],
+      t2:'혁신성장지원 → 인공지능(AI)·디지털 신기술(콘텐츠·ICT)'},
+    elec:{nm:'전기 · 전자 · 기계',
+      t1:[['산업통상부 우수연구개발',133,'한국산업기술진흥원'],
+          ['산업통상부 차세대세계일류상품',21,'한국산업기술진흥원'],
+          ['산업통상부 NEP',20,'한국산업기술진흥원'],
+          ['산업통상부 산업신기술(NET)',14,'한국산업기술진흥원']],
+      t2:'혁신성장지원 → 스마트공장·로봇'},
+    safe:{nm:'안전 · 재난',
+      t1:[['행정안전부 재난안전제품인증',18,'한국산업기술평가관리원'],
+          ['경찰청 우수연구개발',16,'과학치안진흥센터'],
+          ['행정안전부 재난안전신기술(NET)',14,'한국산업기술평가관리원']],
+      t2:'국민생활문제 → 안전·전기차 화재'},
+    agri:{nm:'농림 · 수산 · 식품',
+      t1:[['농림축산식품부 농림식품신기술(NET)',42,'농림식품기술기획평가원'],
+          ['농림축산식품부 우수연구개발',33,'농림식품기술기획평가원'],
+          ['해양수산부 해양수산신기술(NET)',20,'해양수산과학기술진흥원'],
+          ['해양수산부 우수연구개발',18,'해양수산과학기술진흥원']],
+      t2:'혁신성장지원 → 스마트농어업'},
+    bio:{nm:'바이오 · 의료',
+      t1:[['보건복지부 보건신기술(NET)',10,'한국보건산업진흥원']],
+      t2:'혁신성장지원 → 바이오헬스, 또는 국민생활문제 → 건강·복지',
+      note:'유형 Ⅰ 경로가 전 분야 중 가장 좁습니다. 처음부터 유형 Ⅱ를 목표로 잡으시는 편이 현실적입니다.'},
+    etc:{nm:'그 밖의 분야',hd:'그 밖의 분야',t1:[],
+      t2:'2장의 분야표에서 가장 가까운 상세항목 하나를 고르십시오',
+      note:'분야가 뚜렷하지 않거나 여러 분야에 걸친 제품이라면, 전 분야가 대상인 유형 Ⅱ(조달청 공급자제안형)가 기본 경로입니다.'}
+  };
+  var LASTTXT='';
+
+  go.addEventListener('click',function(){
+    var r=sel.right, s=sel.sale, d=sel.dup, n=sel.rnd, a=sel.admin, f=sel.field;
+    var block=[], cond=[], paths=[], todo=[], cls='v-ok', bdg='신청 가능', ttl='', dsc='';
+    var t1open=(n==='yes'||n==='net'), t2stop=[];
+
+    if(d==='same') block.push({t:'이 제품으로는 신청할 수 없습니다',
+      d:'우수조달물품 또는 MAS 계약을 체결한 제품은 혁신제품으로 중복 지정되지 않습니다. 세부품명이나 핵심기술이 다른 <b>별도의 제품</b>으로 접근하셔야 합니다.'});
+    if(s==='full') t2stop.push({t:'유형 Ⅱ는 상용화 이전 요건에 걸립니다',
+      d:'본격적으로 판매 중인 제품은 유형 Ⅱ 대상이 아닙니다. 매출이 단가의 10배 이내이거나 최초 매출이 1년 이내라면 예외가 적용되니 <b>해당 제품의 매출 현황을 다시 확인</b>해 보십시오.'});
+    if(r==='none') t2stop.push({t:'유형 Ⅱ는 권리 확보가 먼저입니다',
+      d:'특허, 실용신안, NEP, NET 중 하나를 보유해야 유형 Ⅱ 신청이 가능합니다. 제품에 적용된 기술로 <b>특허 출원과 등록을 먼저 진행</b>하셔야 합니다. 등록까지 걸리는 기간을 생각하면 지금 시작하셔야 내년 신청이 가능합니다.'});
+    if(t2stop.length){ t2stop.forEach(function(x){ (t1open?cond:block).push(x); }); }
+
+    if(s==='chk') cond.push({t:'이 제품의 매출부터 집계해 보셔야 합니다',
+      d:'유형 Ⅱ는 상용화 이전 제품이 대상입니다. <b>이 제품만</b>의 누적 매출이 제품 단가의 10배를 넘지 않거나, 최초 매출이 1년 이내(벤처나라 등록제품은 2년)여야 합니다. 회사 전체 매출이 아니라 해당 제품 매출만 따로 보십시오. 10배를 넘고 1년도 지났다면 유형 Ⅱ는 어렵고 유형 Ⅰ 경로를 보셔야 합니다.'});
+    if(d==='chk') cond.push({t:'우수조달물품과 MAS 계약 여부를 확인하셔야 합니다',
+      d:'나라장터에서 우리 회사 이름으로 <b>우수조달물품 지정</b>이나 <b>다수공급자계약(MAS)</b>이 잡혀 있는지 보십시오. 있더라도 이 제품과 세부품명이나 핵심기술이 다르면 신청할 수 있습니다. 같은 제품이면 중복 지정이 되지 않습니다.'});
+    if(r==='pending') cond.push({t:'특허가 등록되어야 유형 Ⅱ 신청이 가능합니다',
+      d:'출원 중 상태로는 신청이 되지 않습니다. 접수 마감일 이전에 <b>등록 완료</b>되어야 합니다. 등록 예상 시점을 확인해 내년 어느 차수를 목표로 할지 정하십시오.<br><span class="note">공공연구기관 기술을 이전받아 사업화하는 경우에는 기술이전 업무협약서로 신청할 수 있습니다.</span>'});
+    if(a==='none') cond.push({t:'조달 행정 등록부터 하셔야 합니다',
+      d:'나라장터 입찰참가자격 등록과 물품식별번호 등록이 모두 필요합니다. <b>가장 오래 걸리는 준비</b>이므로 지금 시작하십시오.'});
+    if(a==='bid') cond.push({t:'물품식별번호를 함께 진행하십시오',
+      d:'입찰참가자격 등록만으로도 신청은 가능하지만, 그 상태로는 <b>평가 대상에 포함될 뿐 지정 절차가 진행되지 않습니다.</b> 신청과 동시에 제조물품 입찰참가등록과 물품식별번호 등록을 진행하셔야 합니다.'});
+
+    if(t1open && t2stop.length) paths.push({t:'유형 Ⅰ은 요건이 다릅니다. 여기가 길일 수 있습니다',
+      d:'위에 적은 특허와 상용화 제약은 <b>유형 Ⅱ의 요건</b>입니다. 유형 Ⅰ은 부처 R&amp;D 결과물이나 기술인증을 기반으로 하며 <b>부처마다 요건이 다릅니다.</b> 소관 부처 공고를 먼저 확인해 보십시오.'});
+    if(n==='yes') paths.push({t:'유형 Ⅰ. 소관 부처 경로를 먼저 확인하십시오',
+      d:'수행하신 R&amp;D의 소관 부처가 혁신제품을 지정하는지, 어떤 지정자격에 해당하는지 확인하십시오. 4장 지정 경로 지도에서 부처별 경로와 전담기관을 보실 수 있습니다. <b>부처 공고는 조달청과 일정이 다릅니다.</b>'});
+    if(n==='net') paths.push({t:'유형 Ⅰ. 기술인증 기반 경로가 열려 있습니다',
+      d:'보유하신 NET이나 NEP 등 부처 기술인증은 그 자체로 유형 Ⅰ 지정자격이 되는 경우가 많습니다. 산업신기술, 건설신기술, 환경신기술, 농림식품신기술 등이 그렇습니다. 인증을 발급한 부처의 혁신제품 지정 공고를 확인하십시오.'});
+    paths.push({t:'유형 Ⅱ. 조달청 공급자제안형 (누적 810건)',
+      d:'R&amp;D 이력 없이 특허만으로도 신청할 수 있는 가장 일반적인 경로입니다. 연 3~4차 공고되며, 2026년은 모두 마감되어 <b>차년도 계획 공고가 연말에 게시되기를</b> 기다리셔야 합니다.'});
+    if(s==='no'||s==='first') paths.push({t:'유형 Ⅱ. 수요자제안형도 보십시오 (연중 상시)',
+      d:'공공기관이 제안한 과제를 푸는 제품을 공모합니다. <b>연중 상시</b>라 지금도 가능합니다. 혁신장터에서 공모 중인 과제 가운데 우리 제품으로 풀 수 있는 것이 있는지 확인해 보십시오.'});
+
+    if(block.length){ cls='v-no'; bdg='먼저 풀 것이 있습니다';
+      ttl='이 제품을 그대로 신청하기에는 걸리는 조건이 있습니다';
+      dsc='길이 막힌 것은 아닙니다. 아래 걸림돌을 먼저 푸시거나 다른 제품으로 접근하시면 됩니다. 무엇부터 해야 하는지 아래에 정리했습니다.';
+    } else if(cond.length){ cls='v-cond'; bdg='조건부 가능';
+      ttl='요건은 갖추셨고 준비할 것이 남았습니다';
+      dsc='아래 항목을 해결하시면 신청할 수 있습니다. 지금 시작하시면 내년 1차를 목표로 잡을 수 있습니다.';
+    } else { cls='v-ok'; bdg='신청 가능';
+      ttl='주요 요건을 모두 갖추신 것으로 보입니다';
+      dsc='차년도 공고가 나오면 바로 신청하실 수 있는 상태입니다. 남은 일은 제안서 준비입니다.';
+    }
+
+    if(!block.length){
+      todo.push({t:'공공성 논리를 글로 정리하십시오',
+        d:'공공성 심사를 통과해야 혁신성 심사로 넘어갑니다. 어느 기관이, 어떤 현안 때문에, 지금 무엇이 없어서 곤란한가에 먼저 답하십시오.'});
+      if(a!=='both') todo.push({t:'조달 행정 등록을 마치십시오',
+        d:'나라장터 입찰참가자격 등록과 조달청 상품정보시스템 물품식별번호 등록입니다. 가장 오래 걸리는 준비입니다.'});
+      todo.push({t:'특허적용여부 확인서를 준비하십시오',
+        d:'한국특허기술진흥원에서 발급합니다. 보유 특허가 그 제품에 실제로 적용되었음을 확인하는 서류입니다.'});
+      todo.push({t:'신청할 분야와 상세항목을 정하십시오',
+        d:'공급자 제안형은 한 분야의 상세항목 1개만 신청할 수 있습니다. 2장의 분야표를 참고하십시오.'});
+      todo.push({t:'차년도 공고를 기다리십시오',
+        d:'혁신장터 공지사항에 연말 게시됩니다. 신청 기간이 3~4주로 짧으니 공고 전에 준비를 마쳐두셔야 합니다.'});
+    } else {
+      todo.push({t:'센터로 문의해 주십시오',
+        d:'상황이 저마다 달라 일반론으로 답하기 어렵습니다. 11장을 보시고 현황을 알려주시면 개별적으로 검토해 회신드리겠습니다.'});
+    }
+
+    function L(arr,ic){ return '<ul class="td">'+arr.map(function(x){
+      return '<li><span class="mk">'+ic+'</span><span><b>'+x.t+'</b><span>'+x.d+'</span></span></li>'; }).join('')+'</ul>'; }
+
+    /* 분야별 문: 4장 경로 지도를 이 기업 사정에 맞춰 뽑아 보여준다 */
+    var F=FIELD[f]||FIELD.etc, fh='';
+    if(F.t1.length){
+      fh+='<div class="tw"><table><thead><tr><th>유형 Ⅰ 경로</th>'+
+          '<th class="c">누적 지정</th><th>평가·전담기관</th></tr></thead><tbody>';
+      F.t1.forEach(function(x){ fh+='<tr><td class="nw"><b>'+x[0]+'</b></td>'+
+          '<td class="num">'+x[1]+'건</td><td>'+x[2]+'</td></tr>'; });
+      fh+='</tbody></table></div>';
+      fh+='<p class="note">유형 Ⅰ은 해당 부처의 R&amp;D나 기술인증을 보유하셔야 신청할 수 있습니다. '+
+          '보유하신 것이 있다면 그 부처 공고를 먼저 확인하십시오.</p>';
+    }
+    fh+='<p style="margin-top:14px"><b>유형 Ⅱ(조달청 공급자제안형)로 신청하신다면</b><br>'+
+        '<span class="note">신청 분야는 '+F.t2+' 가 가깝습니다. '+
+        '세 분야 중 하나, 상세항목 1개만 고르실 수 있습니다.</span></p>';
+    if(F.note) fh+='<p class="note" style="margin-top:10px"><b>'+F.note+'</b></p>';
+
+    var h='<div class="vd '+cls+'"><span class="bdg">'+bdg+'</span>'+
+          '<div><p class="vt">'+ttl+'</p><p class="vp">'+dsc+'</p></div></div><div class="rb">';
+    if(block.length) h+='<h4>먼저 풀어야 할 것</h4>'+L(block,'!');
+    if(cond.length)  h+='<h4>준비가 필요한 것</h4>'+L(cond,'△');
+    h+='<h4>갈 수 있는 길</h4>'+L(paths,'→');
+    h+='<h4>'+(F.hd||F.nm+' 분야')+'의 문</h4>'+fh;
+    h+='<h4>지금 할 일</h4>'+L(todo,'✓');
+    h+='<p class="note" style="margin-top:20px">이 결과는 입력하신 여섯 가지만으로 판단한 것입니다. '+
+       '실제 신청 가능 여부는 제품과 권리 관계, 공고 조건에 따라 달라지므로 '+
+       '<b>11장을 보시고 센터로 문의해 주시면 개별적으로 검토해 드리겠습니다.</b></p>'+
+       '<div class="cpw"><button class="btn gh" id="cp" type="button">결과 복사하기</button>'+
+       '<span class="note" id="cpm">메일 회신에 붙여넣으시면 됩니다</span></div></div>';
+    res.innerHTML=h; res.className='show';
+
+    /* 회신용 텍스트. 손으로 옮겨 적게 하면 아무도 회신하지 않는다. */
+    var T=['[혁신제품 지정 자가진단 결과]','',
+      '판정: '+bdg+' - '+ttl,'분야: '+F.nm,''];
+    if(block.length){T.push('먼저 풀어야 할 것');block.forEach(function(x){T.push(' * '+x.t)});T.push('')}
+    if(cond.length){T.push('준비가 필요한 것');cond.forEach(function(x){T.push(' * '+x.t)});T.push('')}
+    T.push('갈 수 있는 길');paths.forEach(function(x){T.push(' * '+x.t)});T.push('');
+    if(F.t1.length){T.push(F.nm+' 분야 유형 1 경로');
+      F.t1.forEach(function(x){T.push(' * '+x[0]+' '+x[1]+'건 ('+x[2]+')')});T.push('')}
+    T.push('유형 2 신청 분야: '+F.t2,'');
+    T.push('지금 할 일');todo.forEach(function(x){T.push(' * '+x.t)});
+    T.push('','(2026.10.15. 기준 지침서 자가진단)');
+    LASTTXT=T.join('\n');
+
+    var cp=document.getElementById('cp'), cpm=document.getElementById('cpm');
+    cp.addEventListener('click',function(){
+      function done(ok){ cpm.textContent = ok ? '복사했습니다. 메일 회신에 붙여넣으십시오.'
+                                              : '복사가 막혀 있습니다. 결과를 직접 선택해 복사해 주십시오.'; }
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(LASTTXT).then(function(){done(true)},function(){done(false)});
+      } else {
+        var ta=document.createElement('textarea'); ta.value=LASTTXT;
+        ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta);
+        ta.select(); var ok=false; try{ok=document.execCommand('copy')}catch(e){}
+        document.body.removeChild(ta); done(ok);
+      }
+    });
+    res.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+})();
+</script>
+</body>
+</html>
