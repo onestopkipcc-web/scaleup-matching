@@ -74,6 +74,7 @@ a{color:var(--teal);text-decoration-thickness:1px;text-underline-offset:2px}
 /* 카드 */
 .card{background:var(--teal-l);border-radius:14px;padding:26px 28px;margin:26px 0}
 .card>h4{margin-top:0}
+.card p,.flag p{text-wrap:balance}
 .card>:last-child{margin-bottom:0}
 .flag{background:var(--gold-l);border-radius:14px;padding:26px 28px;margin:26px 0;
   border-left:3px solid var(--gold-b)}
@@ -306,7 +307,7 @@ body.solo .cover{display:none}
 <body>
 
 <aside id="side">
-  <div class="bd"><b>혁신제품 지정 지침서</b><span>혁신제품지원센터 혁신판로부<br>2026. 10. 15. 기준</span></div>
+  <div class="bd"><b>혁신제품 지정 지침서</b><span>혁신제품지원센터 혁신판로부<br>2026. 10. 기준</span></div>
   <ol>
     <li><a href="#s0" data-s="s0"><span class="n">00</span><span>들어가며</span></a></li>
     <li><a href="#s1" data-s="s1"><span class="n">01</span><span>왜 혁신제품인가</span></a></li>
@@ -331,10 +332,10 @@ body.solo .cover{display:none}
   <div class="w">
     <p class="tag">원스톱 스케일업</p>
     <h1>혁신제품 지정 지침서</h1>
-    <p class="sub">아직 혁신제품으로 지정받지 않은 조달기업을 위한 안내입니다.
+    <p class="sub">아직 혁신제품으로 지정받지 않은 조달기업을 위한 안내입니다.<br>
       제도가 무엇인지부터, 우리 회사가 어느 길로 가야 하는지, 무엇부터 준비해야 하는지까지 순서대로 담았습니다.</p>
     <div class="meta">
-      <div><div class="k">작성 기준일</div><div class="v">2026. 10. 15.</div></div>
+      <div><div class="k">작성 기준일</div><div class="v">2026. 10.</div></div>
       <div><div class="k">지정 실적 집계</div><div class="v">2026. 9. 8.</div></div>
       <div><div class="k">발행</div><div class="v">한국조달연구원 혁신제품지원센터 혁신판로부</div></div>
     </div>
@@ -375,9 +376,9 @@ body.solo .cover{display:none}
 <table>
   <thead><tr><th>근거</th><th>반영 기준</th></tr></thead>
   <tbody>
-  <tr><td>「조달사업에 관한 법률」 제27조</td><td>2026. 10. 15. 시행 기준</td></tr>
-  <tr><td>「조달사업에 관한 법률 시행령」 제33조</td><td>2026. 10. 15. 시행 기준</td></tr>
-  <tr><td>「혁신제품 구매 운영 규정」(조달청 고시)</td><td>2026. 10. 15. 시행 기준</td></tr>
+  <tr><td>「조달사업에 관한 법률」 제27조</td><td>2026. 10. 시행 기준</td></tr>
+  <tr><td>「조달사업에 관한 법률 시행령」 제33조</td><td>2026. 10. 시행 기준</td></tr>
+  <tr><td>「혁신제품 구매 운영 규정」(조달청 고시)</td><td>2026. 10. 시행 기준</td></tr>
   <tr><td>혁신시제품 지정신청 공고(조달청)</td><td>2026년 4차 공고(접수 8.31.~9.18.) 기준</td></tr>
   <tr><td>혁신제품 지정 실적 통계</td><td>2026. 9. 8. 집계분</td></tr>
   <tr><td>시범구매 예산 및 구매목표 비율</td><td>2026년도 기준</td></tr>
@@ -483,8 +484,10 @@ body.solo .cover{display:none}
   <thead><tr><th>구분</th><th>유형 Ⅰ</th><th>유형 Ⅱ</th></tr></thead>
   <tbody>
   <tr><td><b>전제</b></td>
-      <td class="jt"><b>해당 부처의 국가 R&amp;D 과제를 수행</b>하고 그 결과물을 사업화한 제품이어야 합니다</td>
-      <td class="jt">R&amp;D 이력이 없어도 됩니다. 대신 <b>특허 등 권리</b>와 <b>TRL 7~9</b>가 필요합니다</td></tr>
+      <td class="jt"><b>해당 부처의 국가 R&amp;D 과제를 수행</b>하고 그 결과물을 사업화한 제품,
+          또는 각 부처가 혁신성·공공성을 인정한 제품(부처별 인정 자격)이어야 합니다</td>
+      <td class="jt">R&amp;D 이력이 없어도 됩니다. 대신 <b>특허 등 권리</b>와 <b>TRL 7~9</b>,
+          <b>상용화 이전</b> 요건이 필요합니다</td></tr>
   <tr><td><b>공고</b></td><td>부처별로 따로, 각자의 일정으로 공고합니다</td>
       <td>조달청이 연간 일정(연 3~4차)으로 공고합니다</td></tr>
   <tr><td><b>요건</b></td><td>부처마다 다릅니다. 소관 부처 공고를 확인하셔야 합니다</td>
@@ -495,8 +498,9 @@ body.solo .cover{display:none}
 
 <h3>유형 Ⅱ 안에서도 세 갈래가 있습니다</h3>
 <ul>
-<li><strong>공급자 제안형.</strong> 기업이 조달청 공고 분야에 맞춰 자사 제품을 먼저 신청합니다. 가장 일반적입니다.</li>
-<li><strong>수요자 제안형.</strong> 수요기관이나 기업, 국민이 제안한 과제를 공모하고 그 문제를 풀 제품을 모집합니다. <b>연중 상시</b>입니다.</li>
+<li><strong>공급자 제안형.</strong> 기업이 공공에 필요한 제품을 먼저 제안합니다. 가장 일반적입니다.</li>
+<li><strong>수요자 제안형.</strong> 수요기관·기업·국민이 제안한 과제를 공모하고 그 문제를 풀 제품을 모집합니다.
+    과제 목록은 1년간 유지되지만 <b>접수는 차수별 기간</b>에만 받습니다.</li>
 <li><strong>민간전문가(스카우터) 추천형.</strong> 전문가가 현장에서 유망 제품을 발굴해 추천합니다.</li>
 </ul>
 
@@ -538,12 +542,14 @@ body.solo .cover{display:none}
 
     <div class="qz">
       <p class="qt"><i>Q1</i>제품에 적용된 기술을 권리로 보유하고 계십니까?</p>
-      <p class="qh">유형 Ⅱ의 핵심 요건입니다. 등록이 끝나 있어야 하고, 통상실시권만으로는 되지 않습니다.</p>
+      <p class="qh">유형 Ⅱ의 핵심 요건입니다. 기한은 모두 <b>지정신청서 접수마감일</b>을 기준으로 봅니다.</p>
       <div class="opts">
         <label class="opt"><input type="radio" name="right" value="patent"><span class="ol"><b>특허 등록, 등록일로부터 7년 이내</b>회사(법인) 또는 대표자 명의로 등록권리자</span></label>
         <label class="opt"><input type="radio" name="right" value="util"><span class="ol"><b>실용신안 등록, 등록일로부터 3년 이내</b></span></label>
         <label class="opt"><input type="radio" name="right" value="nep"><span class="ol"><b>NEP(신제품) 또는 NET(신기술) 인증, 3년 이내</b></span></label>
-        <label class="opt"><input type="radio" name="right" value="pending"><span class="ol"><b>출원 중입니다</b>아직 등록 전</span></label>
+        <label class="opt"><input type="radio" name="right" value="ai"><span class="ol"><b>AI 소프트웨어입니다</b>저작권 등록 + 인공지능제품·서비스 확인서</span></label>
+        <label class="opt"><input type="radio" name="right" value="tt"><span class="ol"><b>공공연구기관 기술을 이전받았습니다</b>출원 중이어도 신청할 수 있습니다</span></label>
+        <label class="opt"><input type="radio" name="right" value="pending"><span class="ol"><b>출원 중입니다</b>이 상태로는 신청이 되지 않습니다</span></label>
         <label class="opt"><input type="radio" name="right" value="none"><span class="ol"><b>없거나 확인이 필요합니다</b></span></label>
       </div>
     </div>
@@ -554,7 +560,7 @@ body.solo .cover{display:none}
       <div class="opts">
         <label class="opt"><input type="radio" name="sale" value="no"><span class="ol"><b>아직 판매 전입니다</b>상업적 거래 없음</span></label>
         <label class="opt"><input type="radio" name="sale" value="first"><span class="ol"><b>최초 매출이 1년 이내입니다</b>벤처나라 등록제품은 2년 이내</span></label>
-        <label class="opt"><input type="radio" name="sale" value="small"><span class="ol"><b>매출이 제품 단가의 10배 이내입니다</b></span></label>
+        <label class="opt"><input type="radio" name="sale" value="small"><span class="ol"><b>이 제품의 매출이 제품 단가의 10배 이내입니다</b></span></label>
         <label class="opt"><input type="radio" name="sale" value="full"><span class="ol"><b>본격적으로 판매하고 있습니다</b></span></label>
         <label class="opt"><input type="radio" name="sale" value="chk"><span class="ol"><b>확인이 필요합니다</b>매출 현황을 다시 봐야 합니다</span></label>
       </div>
@@ -622,9 +628,9 @@ body.solo .cover{display:none}
 <p class="d">혁신제품은 한 문이 아니라 여러 문으로 되어 있습니다.
 어느 문이 우리 분야에 열려 있고 그 문이 실제로 얼마나 열리는지를 아는 것이 출발점입니다.</p></div>
 
-<p class="lead">부처와 지정자격을 합치면 신청 경로는 <strong>모두 42가지</strong>입니다.
-유형 Ⅰ이 37가지, 유형 Ⅱ가 5가지입니다. 그런데 경로마다 실제 지정 건수는 크게 다릅니다.
-아래는 그중 많이 지정되는 열 가지입니다.</p>
+<p class="lead">부처와 지정자격을 합치면 신청 경로는 여러 갈래로 나뉩니다.
+그런데 <strong>경로마다 실제 지정 건수는 크게 다릅니다.</strong>
+어느 문으로 가느냐에 따라 문의 넓이가 달라집니다. 아래는 그중 많이 지정되는 경로입니다.</p>
 
 <h3>가장 많이 지정되는 경로</h3>
 <div class="tw">
@@ -638,7 +644,7 @@ body.solo .cover{display:none}
   <tr><td class="c">Ⅰ</td><td class="nw"><b>국토교통부 SOC기술마켓</b></td><td class="num">138건</td><td>도시, 교통, 건설 인프라</td></tr>
   <tr><td class="c">Ⅰ</td><td class="nw"><b>지식재산처 우수특허기반 혁신제품</b></td><td class="num">138건</td><td>강한 특허를 보유한 기업</td></tr>
   <tr><td class="c">Ⅰ</td><td class="nw"><b>산업통상부 우수연구개발</b></td><td class="num">133건</td><td>산업부 R&amp;D 결과물</td></tr>
-  <tr><td class="c">Ⅱ</td><td class="nw"><b>조달청 수요자제안형</b></td><td class="num">101건</td><td>공모 과제를 푸는 제품. <b>연중 상시</b></td></tr>
+  <tr><td class="c">Ⅱ</td><td class="nw"><b>조달청 수요자제안형</b></td><td class="num">101건</td><td>공모 과제를 푸는 제품. <b>차수별 공고</b></td></tr>
   <tr><td class="c">Ⅰ</td><td class="nw"><b>과학기술정보통신부 우수연구개발</b></td><td class="num">75건</td><td>과기부 R&amp;D 결과물</td></tr>
   <tr><td class="c">Ⅰ</td><td class="nw"><b>지식재산처 우수발명품</b></td><td class="num">73건</td><td>발명 기반 제품</td></tr>
   </tbody>
@@ -647,33 +653,33 @@ body.solo .cover{display:none}
 <p class="src">2020년 제도 도입 이후 2026년 9월 8일까지 누적 지정 건수입니다.
 신청 건수는 집계되지 않으므로 <strong>합격률이 아닙니다.</strong> 각 경로가 실제로 얼마나 지정하는지를 보여주는 수치입니다.</p>
 
-<h3>우리 분야는 어느 문인가</h3>
+<h3>우리 제품은 어떤 분야에 속할까</h3>
 <div class="tw">
 <table>
   <thead><tr><th>제품 분야</th><th>유형 Ⅰ 주요 경로와 누적 건수</th><th>평가·전담기관</th></tr></thead>
   <tbody>
-  <tr><td><b>환경·에너지</b></td>
+  <tr><td class="nw"><b>환경·에너지</b></td>
       <td class="jt">산업부 에너지기술마켓 218 · 기후에너지환경부 우수연구개발 50 · 탄소중립 45 · 환경신기술 20</td>
       <td>한국전력공사<br>한국환경산업기술원</td></tr>
-  <tr><td><b>도시·교통·건설</b></td>
+  <tr><td class="nw"><b>도시·교통·건설</b></td>
       <td class="jt">국토부 SOC기술마켓 138 · 우수연구개발 51 · 스마트챌린지 14 · 건설신기술 5</td>
       <td>국토교통과학기술진흥원</td></tr>
-  <tr><td><b>AI·ICT·데이터</b></td>
+  <tr><td class="nw"><b>AI·ICT·데이터</b></td>
       <td>과기부 우수연구개발 75 · 디지털전문서비스 58 · ICT기술마켓 49</td>
       <td>한국산업기술진흥협회<br>한국지능정보사회진흥원</td></tr>
-  <tr><td><b>전기·전자·기계</b></td>
+  <tr><td class="nw"><b>전기·전자·기계</b></td>
       <td class="jt">산업부 우수연구개발 133 · 차세대세계일류상품 21 · NEP 20 · 산업신기술 14</td>
       <td>한국산업기술진흥원</td></tr>
-  <tr><td><b>안전·재난</b></td>
+  <tr><td class="nw"><b>안전·재난</b></td>
       <td class="jt">행안부 재난안전제품인증 18 · 재난안전신기술 14 · 경찰청 우수연구개발 16</td>
       <td>한국산업기술평가관리원<br>국립소방연구원</td></tr>
-  <tr><td><b>농림·수산·식품</b></td>
+  <tr><td class="nw"><b>농림·수산·식품</b></td>
       <td class="jt">농식품부 농림식품신기술 42 · 우수연구개발 33 · 해수부 해양수산신기술 20 · 우수연구개발 18</td>
       <td>농림식품기술기획평가원<br>해양수산과학기술진흥원</td></tr>
-  <tr><td><b>바이오·의료</b></td>
+  <tr><td class="nw"><b>바이오·의료</b></td>
       <td>보건복지부 보건신기술 10 <span class="note">(경로가 좁습니다)</span></td>
       <td>한국보건산업진흥원</td></tr>
-  <tr><td><b>목재·산림</b></td>
+  <tr><td class="nw"><b>목재·산림</b></td>
       <td>산림청 우수연구개발 11 · 목재신기술 3</td>
       <td>한국임업진흥원</td></tr>
   </tbody>
@@ -682,10 +688,10 @@ body.solo .cover{display:none}
 
 <div class="card">
 <h4>이 표를 읽는 법</h4>
-<p><strong>유형 Ⅰ 경로는 그 부처의 R&amp;D나 기술인증을 가지고 있을 때만 열립니다.</strong>
-해당 이력이 없다면 아무리 분야가 맞아도 신청할 수 없습니다.</p>
-<p>그 경우 <strong>유형 Ⅱ(조달청 공급자제안형, 누적 810건)가 기본 경로</strong>입니다.
-전 분야가 대상이고, R&amp;D 이력 없이 특허만으로도 신청할 수 있습니다.</p>
+<p><strong>유형 Ⅰ은 그 부처의 R&amp;D나 기술인증이 있을 때만 열립니다.</strong>
+이력이 없으면 분야가 맞아도 신청할 수 없습니다.</p>
+<p>그 경우 <strong>유형 Ⅱ(조달청 공급자제안형)가 기본 경로</strong>입니다.
+전 분야가 대상이고 특허만으로도 신청할 수 있습니다.</p>
 <p>바이오·의료처럼 유형 Ⅰ 경로가 좁은 분야라면 처음부터 유형 Ⅱ를 목표로 잡는 편이 현실적입니다.</p>
 </div>
 </section></div></div>
@@ -707,11 +713,11 @@ body.solo .cover{display:none}
   <text x="562" y="62" text-anchor="middle" class="sv-big sv-wh">TRL 7 ~ 9 단계</text>
   <text x="562" y="79" text-anchor="middle" class="sv-sm" fill="#C2DED8">혁신시제품 신청 가능 구간</text>
   <g class="sv-sm sv-mute">
-    <text x="470" y="112">7단계</text><text x="470" y="129" class="sv-sm sv-faint">시제품 개발 완료</text>
-    <text x="562" y="112" text-anchor="middle">8단계</text><text x="562" y="129" text-anchor="middle" class="sv-sm sv-faint">양산 검증 완료</text>
-    <text x="690" y="112" text-anchor="end">9단계</text><text x="690" y="129" text-anchor="end" class="sv-sm sv-faint">출시 직전</text>
+    <text x="472" y="112" text-anchor="middle">7단계</text><text x="472" y="129" text-anchor="middle" class="sv-sm sv-faint">시제품 개발 완료</text>
+    <text x="561" y="112" text-anchor="middle">8단계</text><text x="561" y="129" text-anchor="middle" class="sv-sm sv-faint">양산 검증 완료</text>
+    <text x="651" y="112" text-anchor="middle">9단계</text><text x="651" y="129" text-anchor="middle" class="sv-sm sv-faint">출시 직전</text>
   </g>
-  <path d="M470 94 L470 100 M562 94 L562 100 M672 94 L672 100" stroke="#C2DED8" stroke-width="1.5"/>
+  <path d="M517 94 L517 100 M606 94 L606 100" stroke="#C2DED8" stroke-width="1.5"/>
 </svg>
 </figure>
 
@@ -740,7 +746,8 @@ body.solo .cover{display:none}
 </div>
 
 <h3>셋. 기술 조건</h3>
-<p>특허, 실용신안, NEP, NET 중 하나를 권리로 보유하고 있어야 합니다.</p>
+<p>특허, 실용신안, NEP, NET, AI 소프트웨어 가운데 하나를 권리로 보유하고 있어야 합니다.
+기한은 모두 <strong>지정신청서 접수마감일</strong>을 기준으로 봅니다.</p>
 <div class="tw">
 <table>
   <thead><tr><th>권리</th><th>조건</th></tr></thead>
@@ -749,6 +756,7 @@ body.solo .cover{display:none}
   <tr><td><b>실용신안</b></td><td>등록일로부터 <b>3년 이내</b>, 권리자 또는 전용실시권자일 것</td></tr>
   <tr><td><b>신제품(NEP) 인증</b></td><td>최초 지정일로부터 <b>3년 이내</b></td></tr>
   <tr><td><b>신기술(NET) 인증</b></td><td>최초 지정일로부터 <b>3년 이내</b>, 해당 신기술의 적용이 확인된 제품</td></tr>
+  <tr><td class="nw"><b>AI 소프트웨어</b></td><td class="jt">「저작권법」에 따라 저작권을 등록하고, 한국인공지능진흥협회가 발급한 <b>인공지능제품·서비스 확인서</b>를 받은 소프트웨어. AI 소프트웨어와 물품이 결합된 제품이나 서비스(SaaS 등)는 제외됩니다</td></tr>
   </tbody>
 </table>
 </div>
@@ -767,12 +775,19 @@ body.solo .cover{display:none}
 </div>
 
 <h3>넷. 제조 조건</h3>
+<p>접수마감일까지 아래 세 가지 방식 가운데 하나를 골라 신청합니다.</p>
 <ul>
-<li><strong>단독 참여.</strong> 기술과 제조 설비를 모두 보유한 경우입니다.</li>
-<li><strong>협업 제조.</strong> 특정 제조기업과 1:1 협업입니다. 추진기업은 지식재산권과 입찰참가등록을,
-    참여기업은 입찰참가등록과 제조물품 등록, 물품식별번호 발급을 갖춰야 합니다.</li>
+<li><strong>단독 참여.</strong> 제조 설비를 보유하고, 제안제품을 제조물품으로 입찰참가등록한 뒤
+    물품식별번호 등록까지 마친 경우입니다.</li>
+<li><strong>협업체 참여.</strong> 기술을 가진 추진기업과 제조를 맡는 참여기업이 함께 신청합니다.
+    <strong>추진기업 한 곳에 참여기업은 최대 세 곳</strong>까지 가능합니다.
+    추진기업은 권리와 입찰참가등록을, 참여기업은 입찰참가등록과 제조물품 등록, 물품식별번호 발급을 갖춰야 합니다.</li>
+<li><strong>공동수급체 참여.</strong> 신산업기술개발제품으로 결정된
+    <strong>로봇, 자율주행차, 소부장 으뜸기업</strong>에만 열려 있습니다.
+    공동수급체(분담이행방식)를 구성해 신청합니다.</li>
 </ul>
-<p class="note">자율주행시스템이나 로봇 등 신산업 기술개발제품은 대기업, 중견기업, 중소기업 간 컨소시엄(공동수급체 분담이행)도 가능합니다.
+<p class="note">제조물품 입찰참가등록과 물품식별번호 등록을 아직 마치지 못하셨어도 신청은 됩니다.
+다만 그 상태로는 평가 대상에 포함될 뿐 지정 절차가 진행되지 않으므로, 신청과 동시에 등록을 진행하셔야 합니다.
 <span class="law">운영규정 §46</span></p>
 </section></div></div>
 
@@ -795,8 +810,10 @@ body.solo .cover{display:none}
       <p>현 체계상 물품분류번호가 있어야 지정 절차가 진행됩니다.</p></div></li>
   <li><span class="pn">03</span>
     <div><b>특허적용여부 확인서</b>
-      <span class="where">한국특허기술진흥원</span>
-      <p>보유한 특허가 그 제품에 실제로 적용되었음을 확인하는 서류입니다.</p></div></li>
+      <span class="where">한국특허기술진흥원 · 한국발명진흥회</span>
+      <p>보유한 특허가 그 제품에 실제로 적용되었음을 확인하는 서류입니다.
+      에너지신산업·환경·탄소중립·기후변화 대응 4개 분야는 <b>한국발명진흥회</b>가,
+      그 밖의 분야는 <b>한국특허기술진흥원</b>이 발급합니다.</p></div></li>
 </ol>
 
 <div class="flag">
@@ -819,7 +836,10 @@ body.solo .cover{display:none}
       첨부파일에서 별첨 1(제안서)과 별첨 2(규격서) 등을 내려받아 작성합니다.</span></li>
   <li><b>사전 서류 검토</b><span>제안서와 규격서, 특허 관련 서류의 구비 요건과 신청자 자격 조건을 먼저 확인합니다.</span></li>
   <li><b>혁신시제품 평가</b><span>공공성과 혁신성을 대면 발표로 함께 심사합니다.
-      <b>공공성 심사에서 적합 판정을 받은 경우에만</b> 혁신성 심사로 넘어갑니다.</span></li>
+      <b>공공성과 혁신성을 한 자리에서 함께 발표</b>합니다.
+       총 25분(발표 15분, 질의응답 10분)이고, 별도 발표자료 없이 제출하신 제안서와 규격서로 진행합니다.
+       다만 점수는 <b>공공성을 통과한 경우에만 혁신성 심사로 넘어갑니다.</b>
+       공공성에 합격하고 혁신성에서 떨어지셨다면 다음 신청 때는 공공성이 면제되고 혁신성만 다시 봅니다.</span></li>
   <li><b>추가 서류 제출</b><span>혁신성 심사를 통과한 업체만 상용화 관련 서류와 특허적용확인서, 최종 규격서를 냅니다.</span></li>
   <li><b>지정</b><span>조달정책심의위원회(공공수요발굴위원회)에서 심의해 지정합니다. 연 4회 있습니다.</span></li>
   <li><b>혁신장터 제품 등록</b><span>지정만으로 끝이 아닙니다.
@@ -987,7 +1007,7 @@ body.solo .cover{display:none}
   <tbody>
   <tr><td><b>공급자 제안형</b></td>
       <td class="jt">2차 3.3.~3.27. · 3차 5.26.~6.12. · 4차 8.31.~9.18. <span class="note">(모두 종료)</span></td></tr>
-  <tr><td><b>수요자 제안형</b></td><td><b>연중 상시</b></td></tr>
+  <tr><td><b>수요자 제안형</b></td><td class="jt"><b>차수별 공고</b> · 과제 목록은 1년간 유지</td></tr>
   <tr><td><b>민간전문가 추천형</b></td><td>연 3회</td></tr>
   </tbody>
 </table>
@@ -1005,8 +1025,7 @@ body.solo .cover{display:none}
 <li>공공성 논리를 글로 정리해 두기. <strong>어느 기관이, 어떤 문제 때문에, 이 제품을 사야 하는가</strong></li>
 <li>유형 Ⅰ이 가능하다면 <strong>해당 부처 공고 일정</strong>을 따로 확인하기. 부처마다 다릅니다</li>
 </ul>
-<p class="note" style="margin-top:14px">수요자 제안형은 연중 상시입니다.
-공모된 과제 중 우리 제품으로 풀 수 있는 것이 있는지 혁신장터에서 수시로 확인해 보시는 것도 방법입니다.</p>
+<p class="note" style="margin-top:14px">수요자 제안형은 차수별로 공고됩니다. 과제 목록은 1년간 유지되므로, 공모 중인 과제 가운데 우리 제품으로 풀 수 있는 것이 있는지 혁신장터에서 수시로 확인해 보시는 것도 방법입니다.</p>
 </div>
 </section></div></div>
 
@@ -1050,7 +1069,7 @@ body.solo .cover{display:none}
 </div>
 <div class="blk">
 <h4>기준일</h4>
-<p>본 지침서는 <b>2026년 10월 15일</b> 기준 법령과 고시, 공고를 반영했습니다.
+<p>본 지침서는 <b>2026년 10월</b> 기준 법령과 고시, 공고를 반영했습니다.
 지정 실적 통계는 <b>2026년 9월 8일</b> 집계분입니다.
 법령과 고시는 개정되며, 특히 지정 요건과 제외 사유는 차수별 공고에서 달라질 수 있습니다.
 <b>실제 신청 전에는 해당 차수의 공고문을 반드시 직접 확인해 주십시오.</b></p>
@@ -1186,6 +1205,8 @@ body.solo .cover{display:none}
       d:'나라장터에서 우리 회사 이름으로 <b>우수조달물품 지정</b>이나 <b>다수공급자계약(MAS)</b>이 잡혀 있는지 보십시오. 있더라도 이 제품과 세부품명이나 핵심기술이 다르면 신청할 수 있습니다. 같은 제품이면 중복 지정이 되지 않습니다.'});
     if(r==='pending') cond.push({t:'특허가 등록되어야 유형 Ⅱ 신청이 가능합니다',
       d:'출원 중 상태로는 신청이 되지 않습니다. 접수 마감일 이전에 <b>등록 완료</b>되어야 합니다. 등록 예상 시점을 확인해 내년 어느 차수를 목표로 할지 정하십시오.<br><span class="note">공공연구기관 기술을 이전받아 사업화하는 경우에는 기술이전 업무협약서로 신청할 수 있습니다.</span>'});
+    if(r==='tt') cond.push({t:'심사 전까지 권리 등록을 마치셔야 합니다',
+      d:'공공연구기관 기술을 이전받아 사업화하시는 경우에는 특허가 출원 중이어도 <b>기술이전 업무협약서</b>로 신청하실 수 있습니다. 다만 그것만으로는 평가 대상에 포함될 뿐이고, <b>계약심사협의회 심사 전까지</b> 특허 등의 권리(전용실시권 또는 통상실시권 포함) 등록을 완료해야 지정됩니다.'});
     if(a==='none') cond.push({t:'조달 행정 등록부터 하셔야 합니다',
       d:'나라장터 입찰참가자격 등록과 물품식별번호 등록이 모두 필요합니다. <b>가장 오래 걸리는 준비</b>이므로 지금 시작하십시오.'});
     if(a==='bid') cond.push({t:'물품식별번호를 함께 진행하십시오',
@@ -1199,8 +1220,8 @@ body.solo .cover{display:none}
       d:'보유하신 NET이나 NEP 등 부처 기술인증은 그 자체로 유형 Ⅰ 지정자격이 되는 경우가 많습니다. 산업신기술, 건설신기술, 환경신기술, 농림식품신기술 등이 그렇습니다. 인증을 발급한 부처의 혁신제품 지정 공고를 확인하십시오.'});
     paths.push({t:'유형 Ⅱ. 조달청 공급자제안형 (누적 810건)',
       d:'R&amp;D 이력 없이 특허만으로도 신청할 수 있는 가장 일반적인 경로입니다. 연 3~4차 공고되며, 2026년은 모두 마감되어 <b>차년도 계획 공고가 연말에 게시되기를</b> 기다리셔야 합니다.'});
-    if(s==='no'||s==='first') paths.push({t:'유형 Ⅱ. 수요자제안형도 보십시오 (연중 상시)',
-      d:'공공기관이 제안한 과제를 푸는 제품을 공모합니다. <b>연중 상시</b>라 지금도 가능합니다. 혁신장터에서 공모 중인 과제 가운데 우리 제품으로 풀 수 있는 것이 있는지 확인해 보십시오.'});
+    if(s==='no'||s==='first') paths.push({t:'유형 Ⅱ. 수요자제안형도 보십시오',
+      d:'수요기관·기업·국민이 제안한 과제를 푸는 제품을 공모합니다. <b>차수별로 공고</b>되고 과제 목록은 1년간 유지되므로, 혁신장터에서 공모 중인 과제 가운데 우리 제품으로 풀 수 있는 것이 있는지 확인해 보십시오.'});
 
     if(block.length){ cls='v-no'; bdg='먼저 풀 것이 있습니다';
       ttl='이 제품을 그대로 신청하기에는 걸리는 조건이 있습니다';
@@ -1272,7 +1293,7 @@ body.solo .cover{display:none}
       F.t1.forEach(function(x){T.push(' * '+x[0]+' '+x[1]+'건 ('+x[2]+')')});T.push('')}
     T.push('유형 2 신청 분야: '+F.t2,'');
     T.push('지금 할 일');todo.forEach(function(x){T.push(' * '+x.t)});
-    T.push('','(2026.10.15. 기준 지침서 자가진단)');
+    T.push('','(2026년 10월 기준 지침서 자가진단)');
     LASTTXT=T.join('\n');
 
     var cp=document.getElementById('cp'), cpm=document.getElementById('cpm');
