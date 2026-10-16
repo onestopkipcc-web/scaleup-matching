@@ -1279,14 +1279,17 @@ body.solo .cover{display:none}
     cp.addEventListener('click',function(){
       function done(ok){ cpm.textContent = ok ? '복사했습니다. 메일 회신에 붙여넣으십시오.'
                                               : '복사가 막혀 있습니다. 결과를 직접 선택해 복사해 주십시오.'; }
-      if(navigator.clipboard&&navigator.clipboard.writeText){
-        navigator.clipboard.writeText(LASTTXT).then(function(){done(true)},function(){done(false)});
-      } else {
+      /* 클립보드 API 는 사용자가 직접 누른 클릭만 받는다. 거부되면 구형 방식으로 되돌아간다. */
+      function legacy(){
         var ta=document.createElement('textarea'); ta.value=LASTTXT;
         ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta);
         ta.select(); var ok=false; try{ok=document.execCommand('copy')}catch(e){}
-        document.body.removeChild(ta); done(ok);
+        document.body.removeChild(ta); return ok;
       }
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(LASTTXT)
+          .then(function(){done(true)},function(){done(legacy())});
+      } else { done(legacy()); }
     });
     res.scrollIntoView({behavior:'smooth',block:'start'});
   });
