@@ -1080,6 +1080,153 @@ def build_sep_edu_html(company="", deadline="2026-09-09", is_reminder=False):
 </table>
 </body></html>"""
 
+
+def build_oct_edu_html(company="", deadline="2026-10-23", is_reminder=False):
+    """10월 교육(지식재산 전략 · 함영석 변리사) 신청 안내/리마인더 메일 HTML.
+    9월 교육과 같은 아이보리+네이비+골드 팔레트. 강의자료는 요약만 싣고 원본은 접수 종료 후 발송."""
+    from datetime import datetime as _dt, date as _date
+    _dl_short = "10/23(금)"
+    try:
+        _dl = _dt.strptime(deadline, "%Y-%m-%d").date()
+        _days = (_dl - _date.today()).days
+        _dday_txt = "마감" if _days < 0 else ("D-DAY" if _days == 0 else f"D-{_days}")
+        _wd = ['월','화','수','목','금','토','일'][_dl.weekday()]
+        _dl_short = f"{_dl.month}/{_dl.day}({_wd})"
+    except Exception:
+        _dday_txt = ""
+    _who = f"<b>{company}</b> 담당자님" if company else "담당자님"
+    _greeting = (f"10월 교육 신청이 <b style=\"color:#2A2620;\">{_dl_short}에 마감</b>되어 다시 안내드립니다. "
+                 "아직 신청하지 않으셨다면 마감 전에 회신으로 신청해 주세요."
+                 if is_reminder else "원스톱 10월 교육을 안내드립니다.")
+    _sub_label = "10월 무료 교육 · 마감 임박" if is_reminder else "10월 무료 교육"
+    _dl_label = f"~{_dl_short} 마감"
+    _curr = [
+        ("어떤 권리를 확보할 것인가 — 특허 · 상표 · 디자인",
+         "권리별 확보 전략을 실제 분쟁 사례로 정리합니다. 숙박앱 BM 특허 무효 사건, '덮죽' 상표 선점 논란, "
+         "정수기 디자인 분쟁에서 보는 '등록만으로는 이길 수 없는' 이유"),
+        ("등록하지 않은 권리 지키기 — 영업비밀 · 부정경쟁방지법",
+         "특허로 공개할지 영업비밀로 숨길지 판단하는 기준, 미등록 상표·제품 형태의 보호 범위와 한계, "
+         "2024년 개정으로 강화된 징벌적 손해배상(최대 5배)"),
+        ("해외 진출 전 브랜드 지키기",
+         "최근 5년간 3만 건이 넘는 K-브랜드 해외 무단선점 현황과, 진출국 상표 선출원·현지 네이밍 체크리스트"),
+        ("우리 회사 IP 포트폴리오 · 단계별 로드맵",
+         "아이디어 → 출시 전 → 성장 → 운영 단계별로 챙길 것. 우선·초고속심사 활용, 중소기업 수수료 70% 감면, "
+         "연차료 시점의 유지·포기 판단까지"),
+    ]
+    _curr_html = ""
+    for _i, (_t, _d) in enumerate(_curr):
+        _mb = "30px" if _i == len(_curr) - 1 else "12px"
+        _curr_html += f"""
+      <div style="margin-bottom:{_mb};padding:16px 18px;background:#FFFFFF;border:1px solid #E8E2D5;border-left:4px solid #C9A96A;border-radius:0 8px 8px 0;">
+        <p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#2A2620;">{_t}</p>
+        <p style="margin:0;font-size:12.5px;color:#6B6558;line-height:1.8;">{_d}</p>
+      </div>"""
+    return f"""<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#E6E9EE;font-family:'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#E6E9EE;padding:36px 0 52px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+  <!-- 헤더 -->
+  <tr>
+    <td style="background:#1B2A41;border-radius:14px 14px 0 0;padding:30px 30px 26px;border-bottom:2px solid #C9A96A;">
+      <table width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td valign="top">
+          <p style="margin:0 0 14px;font-size:11px;letter-spacing:2px;color:#C9A96A;font-weight:700;">원스톱 스케일업 · {_sub_label}</p>
+          <p style="margin:0 0 6px;font-size:13px;color:#B4C0CE;">기술·브랜드·디자인을 지키는</p>
+          <p style="margin:0 0 16px;font-size:26px;font-weight:700;color:#FFFFFF;line-height:1.3;">기업이 알아야 할 지식재산 전략</p>
+          <p style="margin:0;font-size:13px;color:#C5D0DC;line-height:1.7;">특허 &nbsp;|&nbsp; 상표 &nbsp;|&nbsp; 디자인 &nbsp;|&nbsp; 영업비밀</p>
+        </td>
+        <td width="74" align="right" valign="top">
+          <div style="background:linear-gradient(135deg,#C9A96A 0%,#B08D4F 100%);border-radius:12px;padding:10px 0;width:66px;text-align:center;">
+            <p style="margin:0;font-size:19px;font-weight:800;color:#1B2A41;line-height:1;">{_dday_txt}</p>
+            <p style="margin:4px 0 0;font-size:9px;font-weight:700;color:#1B2A41;letter-spacing:0.5px;">~{_dl_short}</p>
+          </div>
+        </td>
+      </tr></table>
+      <div style="margin-top:20px;">
+        <span style="display:inline-block;font-size:12px;color:#E8D5A8;background:rgba(201,169,106,0.14);border:1px solid rgba(201,169,106,0.45);padding:5px 12px;border-radius:6px;margin-right:6px;">무료 · 온라인 2시간</span>
+        <span style="display:inline-block;font-size:12px;color:#C5D0DC;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.18);padding:5px 12px;border-radius:6px;">변리사 직강 · 실제 분쟁 사례</span>
+      </div>
+    </td>
+  </tr>
+
+  <!-- 본문 -->
+  <tr>
+    <td style="background:#FBFAF7;padding:30px 30px 28px;word-break:keep-all;overflow-wrap:break-word;">
+
+      <p style="margin:0 0 16px;font-size:14px;color:#2A2620;">{_who}, 안녕하세요.</p>
+
+      <p style="margin:0 0 12px;font-size:13px;color:#5A5548;line-height:1.9;">
+        {_greeting}
+      </p>
+      <p style="margin:0 0 26px;font-size:13px;color:#5A5548;line-height:1.9;">
+        이번 교육은 <b style="color:#2A2620;">특허·상표·디자인을 언제, 어떻게 확보하고 관리할지</b>를
+        실제 분쟁 사례 중심으로 다룹니다. 해외 진출을 준비하는 기업이 놓치기 쉬운 상표 선점 문제도 함께 짚습니다.
+      </p>
+
+      <div style="margin-bottom:30px;padding:14px 18px;background:#F5F0E6;border:1px solid #E0D5BF;border-radius:8px;">
+        <p style="margin:0;font-size:13px;color:#5A5548;line-height:1.8;">💻 <b style="color:#2A2620;">비대면 Zoom</b>으로 진행되어 자리에서 부담 없이 참여하실 수 있습니다. 대표님, 기술·연구 담당자, 마케팅·영업 담당자 누구나 환영합니다.</p>
+      </div>
+
+      <p style="margin:0 0 14px;font-size:15px;font-weight:700;color:#2A2620;">📚 이런 걸 배웁니다</p>
+{_curr_html}
+
+      <!-- 일시 · 강사 -->
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;">
+        <tr>
+          <td width="50%" style="padding:16px 18px;background:#1B2A41;border-radius:8px 0 0 8px;">
+            <p style="margin:0 0 6px;font-size:11px;color:#C9A96A;font-weight:700;">일시</p>
+            <p style="margin:0;font-size:14px;color:#FFFFFF;font-weight:600;">10/28(수) 14:00 ~ 16:00</p>
+          </td>
+          <td width="50%" style="padding:16px 18px;background:#22344F;border-radius:0 8px 8px 0;">
+            <p style="margin:0 0 6px;font-size:11px;color:#C9A96A;font-weight:700;">방식 · 강사</p>
+            <p style="margin:0;font-size:14px;color:#FFFFFF;font-weight:600;">비대면 Zoom · 함영석 변리사</p>
+          </td>
+        </tr>
+      </table>
+
+      <!-- 강사 소개 -->
+      <div style="margin-bottom:30px;padding:18px 20px;background:#FFFFFF;border:1.5px solid #D8D0C0;border-radius:10px;">
+        <p style="margin:0 0 12px;font-size:11px;font-weight:700;color:#9A7B3F;letter-spacing:1.5px;">강사 소개</p>
+        <p style="margin:0 0 14px;font-size:16px;font-weight:700;color:#2A2620;">함영석 <span style="font-size:12px;font-weight:400;color:#8A8478;margin-left:6px;">변리사</span></p>
+        <table cellpadding="0" cellspacing="0" style="font-size:12.5px;color:#5A5548;line-height:1.9;">
+          <tr><td width="28" valign="top" style="color:#C9A96A;font-weight:700;">현)</td><td>청운국제특허법인 (LEE &amp; PARK) 변리사</td></tr>
+        </table>
+      </div>
+
+      <!-- 신청 방법 -->
+      <div style="background:#F5F0E6;border:1.5px solid #D8C9A8;border-radius:10px;padding:18px 20px;">
+        <p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#2A2620;">📩 신청 방법 <span style="color:#B0894A;font-size:12px;font-weight:600;margin-left:4px;">{_dl_label}</span></p>
+        <p style="margin:0 0 10px;font-size:13px;color:#5A5548;line-height:1.8;">이 메일에 아래 정보를 <b style="color:#1B2A41;">회신</b>해 주세요.</p>
+        <p style="margin:0;font-size:13px;color:#5A5548;line-height:2.0;">
+          · 기업명<br>
+          · 담당자명 / 연락처<br>
+          · 참석 인원 (추가 참석자 있으면 함께)
+        </p>
+      </div>
+
+      <div style="margin-top:14px;padding:14px 18px;background:#FFFFFF;border:1px solid #E8E2D5;border-radius:8px;">
+        <p style="margin:0;font-size:12px;color:#6B6558;line-height:1.9;">📎 <b style="color:#2A2620;">줌 링크와 교육 자료</b>는 접수 종료 후 신청하신 모든 기업께 일괄 발송해 드립니다.</p>
+      </div>
+
+    </td>
+  </tr>
+
+  <!-- 푸터 -->
+  <tr>
+    <td style="background:#1B2A41;border-radius:0 0 14px 14px;padding:20px 30px;border-top:2px solid #C9A96A;">
+      <p style="margin:0;font-size:12px;color:#B4C0CE;line-height:1.9;">혁신제품지원센터 원스톱 스케일업 운영팀<br><a href="mailto:onestop.kipcc@gmail.com" style="color:#C9A96A !important;text-decoration:none;">onestop.kipcc@gmail.com</a></p>
+      <p style="margin:10px 0 0;font-size:11px;color:#7A96B2;">함께 참석하실 사내 담당자분들께도 공유 부탁드립니다.</p>
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
+</body></html>"""
+
 API_KEY          = "Nt604D"
 BASE_URL         = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do"
 SELECTED_FILE    = "선정기업_명단.xlsx"   # ← 핵심 변경
@@ -2332,7 +2479,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v0929-29"
+BUILD_TAG = "v1020-30"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -7199,10 +7346,8 @@ JSON만 응답 (코드블록 없이):
                 "직접 작성",
                 "첫 안내 메일 (선정 축하 + 회신 요청)",
                 "선정 기업 축하 및 프로그램 안내",
-                "7월 교육 프로그램 신청 안내",
-                "8월 교육 리마인더 (미신청 대상)",
-                "9월 교육 신청 안내",
-                "9월 교육 리마인더 (미신청 대상)",
+                "10월 교육 신청 안내",
+                "10월 교육 리마인더 (미신청 대상)",
                 "함께하기 회원소개 가입 안내",
                 "CES 혁신상 밋업 신청 안내",
                 "교육 프로그램 수요조사",
@@ -7215,6 +7360,14 @@ JSON만 응답 (코드블록 없이):
         )
 
         TEMPLATES = {
+            "10월 교육 신청 안내": {
+                "subject": "[원스톱 스케일업] 10월 무료 교육 신청 안내 (~10/23) — 기업이 알아야 할 지식재산 전략",
+                "body": "10월 28일(수) 14~16시 Zoom으로 진행되는 지식재산(특허·상표·디자인) 전략 교육을 안내드립니다. 10/23(금)까지 회신으로 신청해 주세요.",
+            },
+            "10월 교육 리마인더 (미신청 대상)": {
+                "subject": "[원스톱 스케일업] 10월 무료 교육 신청 마감 안내 (~10/23) — 지식재산 전략",
+                "body": "10월 교육 신청이 10/23(금)에 마감되어 다시 안내드립니다. 마감 전에 회신으로 신청해 주세요.",
+            },
             "9월 교육 신청 안내": {
                 "subject": "[원스톱 스케일업] 9월 무료 교육 신청 안내 (~9/9) — 실무에 바로 적용하는 디지털 마케팅",
                 "body": "9월 16일(수) 14~16시 Zoom으로 진행되는 디지털 마케팅 교육을 안내드립니다. 9/9(수)까지 회신으로 신청해 주세요.",
@@ -7536,7 +7689,7 @@ onestop.kipcc@gmail.com""",
 
         if df_target.empty and not direct_input_email:
             st.warning("발송 대상 기업이 없습니다.")
-        elif (not mail_subject or not mail_body) and template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 리마인더 (미신청 대상)", "9월 교육 신청 안내", "9월 교육 리마인더 (미신청 대상)", "함께하기 회원소개 가입 안내", "CES 혁신상 밋업 신청 안내"):
+        elif (not mail_subject or not mail_body) and template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 리마인더 (미신청 대상)", "9월 교육 신청 안내", "9월 교육 리마인더 (미신청 대상)", "10월 교육 신청 안내", "10월 교육 리마인더 (미신청 대상)", "함께하기 회원소개 가입 안내", "CES 혁신상 밋업 신청 안내"):
             st.info("제목과 본문을 작성하면 미리보기가 표시됩니다.")
         else:
             sample_company = df_target.iloc[0]['기업명'] if not df_target.empty else "샘플기업"
@@ -7559,6 +7712,13 @@ onestop.kipcc@gmail.com""",
             if template_choice == "함께하기 회원소개 가입 안내":
                 _nm = df_target.iloc[0].get('기업명','') if not df_target.empty else ''
                 sample_html = build_together_html(company=_nm, 담당자='')
+                st.components.v1.html(sample_html, height=1400, scrolling=True)
+
+            # 10월 교육 안내/리마인더 전용 HTML 미리보기
+            elif template_choice in ("10월 교육 신청 안내", "10월 교육 리마인더 (미신청 대상)"):
+                _co_nm = df_target.iloc[0].get('기업명','') if not df_target.empty else ''
+                sample_html = build_oct_edu_html(company=_co_nm,
+                    is_reminder=(template_choice == "10월 교육 리마인더 (미신청 대상)"))
                 st.components.v1.html(sample_html, height=1400, scrolling=True)
 
             # 9월 교육 안내/리마인더 전용 HTML 미리보기
@@ -8013,6 +8173,9 @@ onestop.kipcc@gmail.com""",
                     if template_choice == "함께하기 회원소개 가입 안내":
                         html_body = build_together_html(
                             company=str(row.get('기업명','')), 담당자='')
+                    elif template_choice in ("10월 교육 신청 안내", "10월 교육 리마인더 (미신청 대상)"):
+                        html_body = build_oct_edu_html(company=str(row.get('기업명','')),
+                            is_reminder=(template_choice == "10월 교육 리마인더 (미신청 대상)"))
                     elif template_choice in ("9월 교육 신청 안내", "9월 교육 리마인더 (미신청 대상)"):
                         html_body = build_sep_edu_html(company=str(row.get('기업명','')),
                             is_reminder=(template_choice == "9월 교육 리마인더 (미신청 대상)"))
@@ -8275,7 +8438,7 @@ onestop.kipcc@gmail.com""",
                           <a href="{form_link}" style="font-size:13px;color:#10B981;">{form_link}</a>
                         </div>"""
 
-                    if template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 리마인더 (미신청 대상)", "9월 교육 신청 안내", "9월 교육 리마인더 (미신청 대상)", "함께하기 회원소개 가입 안내", "CES 혁신상 밋업 신청 안내"):
+                    if template_choice not in ("7월 교육 프로그램 신청 안내", "8월 교육 리마인더 (미신청 대상)", "9월 교육 신청 안내", "9월 교육 리마인더 (미신청 대상)", "10월 교육 신청 안내", "10월 교육 리마인더 (미신청 대상)", "함께하기 회원소개 가입 안내", "CES 혁신상 밋업 신청 안내"):
                         html_body = f"""<!DOCTYPE html>
     <html lang="ko"><head><meta charset="UTF-8"></head>
     <body style="margin:0;padding:0;background:#F2F4F7;
