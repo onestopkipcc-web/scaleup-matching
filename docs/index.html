@@ -668,7 +668,35 @@ GDP의 약 9%, 정부 예산의 약 3분의 1입니다.<br>
   <div class="dxb">
 
     <div class="qz">
-      <p class="qt"><i>Q1</i>제품에 적용된 기술을 권리로 보유하고 계십니까?</p>
+      <p class="qt"><i>Q1</i>제품이 어느 분야에 가까우십니까?</p>
+      <p class="qh">분야에 따라 열려 있는 문이 다릅니다.<br>
+가장 가까운 하나를 골라 주십시오.</p>
+      <div class="opts">
+        <label class="opt"><input type="radio" name="field" value="env"><span class="ol"><b>환경 · 에너지</b>정수, 대기, 폐기물, 신재생, 에너지 절감 등</span></label>
+        <label class="opt"><input type="radio" name="field" value="city"><span class="ol"><b>도시 · 교통 · 건설</b>도로, 시설물, 스마트시티, 건축자재 등</span></label>
+        <label class="opt"><input type="radio" name="field" value="ict"><span class="ol"><b>AI · ICT · 데이터</b>소프트웨어, 영상분석, 플랫폼, 통신 등</span></label>
+        <label class="opt"><input type="radio" name="field" value="elec"><span class="ol"><b>전기 · 전자 · 기계</b>부품, 장비, 계측, 제조설비 등</span></label>
+        <label class="opt"><input type="radio" name="field" value="safe"><span class="ol"><b>안전 · 재난</b>소방, 방재, 보안, 작업안전 등</span></label>
+        <label class="opt"><input type="radio" name="field" value="agri"><span class="ol"><b>농림 · 수산 · 식품</b>농업기계, 축산, 양식, 식품가공 등</span></label>
+        <label class="opt"><input type="radio" name="field" value="bio"><span class="ol"><b>바이오 · 의료</b>의료기기, 진단, 헬스케어 등</span></label>
+        <label class="opt"><input type="radio" name="field" value="etc"><span class="ol"><b>그 밖의 분야이거나 여러 분야에 걸칩니다</b></span></label>
+      </div>
+    </div>
+
+    <div class="qz">
+      <p class="qt"><i>Q2</i>국가 R&amp;D 과제를 수행하고 그 결과물을 제품화하셨습니까?</p>
+      <p class="qh">유형 Ⅰ로 갈 수 있는지가 여기서 갈립니다.<br>
+중기부, 산업부, 과기부 등 부처 R&amp;D를 말합니다.</p>
+      <div class="opts">
+        <label class="opt"><input type="radio" name="rnd" value="yes"><span class="ol"><b>있습니다</b>최근 수행한 부처 R&amp;D 결과물을 사업화했습니다</span></label>
+        <label class="opt"><input type="radio" name="rnd" value="net"><span class="ol"><b>부처 기술인증(NET·NEP·신기술 등)을 보유하고 있습니다</b></span></label>
+        <label class="opt"><input type="radio" name="rnd" value="no"><span class="ol"><b>없습니다</b>자체 개발한 제품입니다</span></label>
+        <label class="opt"><input type="radio" name="rnd" value="chk"><span class="ol"><b>확인이 필요합니다</b>과제 수행 이력을 찾아봐야 합니다</span></label>
+      </div>
+    </div>
+
+    <div class="qz">
+      <p class="qt"><i>Q3</i>제품에 적용된 기술을 권리로 보유하고 계십니까?</p>
       <p class="qh">유형 Ⅱ의 핵심 요건입니다.<br>
 기한은 모두 <b>지정신청서 접수마감일</b>을 기준으로 봅니다.</p>
       <div class="opts">
@@ -678,12 +706,13 @@ GDP의 약 9%, 정부 예산의 약 3분의 1입니다.<br>
         <label class="opt"><input type="radio" name="right" value="ai"><span class="ol"><b>AI 소프트웨어입니다</b>저작권 등록 + 인공지능제품·서비스 확인서</span></label>
         <label class="opt"><input type="radio" name="right" value="tt"><span class="ol"><b>공공연구기관 기술을 이전받았습니다</b>출원 중이어도 신청할 수 있습니다</span></label>
         <label class="opt"><input type="radio" name="right" value="pending"><span class="ol"><b>출원 중입니다</b>이 상태로는 신청이 되지 않습니다</span></label>
-        <label class="opt"><input type="radio" name="right" value="none"><span class="ol"><b>없거나 확인이 필요합니다</b></span></label>
+        <label class="opt"><input type="radio" name="right" value="none"><span class="ol"><b>없습니다</b>아직 출원도 하지 않았습니다</span></label>
+        <label class="opt"><input type="radio" name="right" value="chk"><span class="ol"><b>확인이 필요합니다</b>어떤 권리가 있는지 다시 봐야 합니다</span></label>
       </div>
     </div>
 
     <div class="qz">
-      <p class="qt"><i>Q2</i>이 제품을 이미 판매하고 계십니까?</p>
+      <p class="qt"><i>Q4</i>이 제품을 이미 판매하고 계십니까?</p>
       <p class="qh">유형 Ⅱ는 상용화 이전이 원칙입니다.<br>
 다만 예외가 둘 있습니다.</p>
       <div class="opts">
@@ -696,7 +725,7 @@ GDP의 약 9%, 정부 예산의 약 3분의 1입니다.<br>
     </div>
 
     <div class="qz">
-      <p class="qt"><i>Q3</i>이 제품으로 우수조달물품 지정이나 다수공급자계약(MAS)을 가지고 계십니까?</p>
+      <p class="qt"><i>Q5</i>이 제품으로 우수조달물품 지정이나 다수공급자계약(MAS)을 가지고 계십니까?</p>
       <p class="qh">같은 제품으로 두 제도를 동시에 가져갈 수 없습니다.<br>
 동일 여부는 물품식별번호나 세부품명, 핵심기술로 판단합니다.</p>
       <div class="opts">
@@ -708,39 +737,13 @@ GDP의 약 9%, 정부 예산의 약 3분의 1입니다.<br>
     </div>
 
     <div class="qz">
-      <p class="qt"><i>Q4</i>국가 R&amp;D 과제를 수행하고 그 결과물을 제품화하셨습니까?</p>
-      <p class="qh">유형 Ⅰ로 갈 수 있는지가 여기서 갈립니다.<br>
-중기부, 산업부, 과기부 등 부처 R&amp;D를 말합니다.</p>
-      <div class="opts">
-        <label class="opt"><input type="radio" name="rnd" value="yes"><span class="ol"><b>있습니다</b>최근 수행한 부처 R&amp;D 결과물을 사업화했습니다</span></label>
-        <label class="opt"><input type="radio" name="rnd" value="net"><span class="ol"><b>부처 기술인증(NET·NEP·신기술 등)을 보유하고 있습니다</b></span></label>
-        <label class="opt"><input type="radio" name="rnd" value="no"><span class="ol"><b>없습니다</b>자체 개발 제품이거나 확인이 필요합니다</span></label>
-      </div>
-    </div>
-
-    <div class="qz">
-      <p class="qt"><i>Q5</i>조달 행정 절차는 어디까지 되어 있습니까?</p>
+      <p class="qt"><i>Q6</i>조달 행정 절차는 어디까지 되어 있습니까?</p>
       <p class="qh">기술과 별개로 이것이 되어 있지 않으면 지정 절차가 진행되지 않습니다.</p>
       <div class="opts">
         <label class="opt"><input type="radio" name="admin" value="both"><span class="ol"><b>입찰참가자격 등록과 물품식별번호 모두 완료</b></span></label>
         <label class="opt"><input type="radio" name="admin" value="bid"><span class="ol"><b>입찰참가자격 등록만 되어 있습니다</b>물품식별번호는 아직</span></label>
-        <label class="opt"><input type="radio" name="admin" value="none"><span class="ol"><b>둘 다 아직이거나 확인이 필요합니다</b></span></label>
-      </div>
-    </div>
-
-    <div class="qz">
-      <p class="qt"><i>Q6</i>제품이 어느 분야에 가까우십니까?</p>
-      <p class="qh">분야에 따라 열려 있는 문이 다릅니다.<br>
-가장 가까운 하나를 골라 주십시오.</p>
-      <div class="opts">
-        <label class="opt"><input type="radio" name="field" value="env"><span class="ol"><b>환경 · 에너지</b>정수, 대기, 폐기물, 신재생, 에너지 절감 등</span></label>
-        <label class="opt"><input type="radio" name="field" value="city"><span class="ol"><b>도시 · 교통 · 건설</b>도로, 시설물, 스마트시티, 건축자재 등</span></label>
-        <label class="opt"><input type="radio" name="field" value="ict"><span class="ol"><b>AI · ICT · 데이터</b>소프트웨어, 영상분석, 플랫폼, 통신 등</span></label>
-        <label class="opt"><input type="radio" name="field" value="elec"><span class="ol"><b>전기 · 전자 · 기계</b>부품, 장비, 계측, 제조설비 등</span></label>
-        <label class="opt"><input type="radio" name="field" value="safe"><span class="ol"><b>안전 · 재난</b>소방, 방재, 보안, 작업안전 등</span></label>
-        <label class="opt"><input type="radio" name="field" value="agri"><span class="ol"><b>농림 · 수산 · 식품</b>농업기계, 축산, 양식, 식품가공 등</span></label>
-        <label class="opt"><input type="radio" name="field" value="bio"><span class="ol"><b>바이오 · 의료</b>의료기기, 진단, 헬스케어 등</span></label>
-        <label class="opt"><input type="radio" name="field" value="etc"><span class="ol"><b>그 밖의 분야이거나 여러 분야에 걸칩니다</b></span></label>
+        <label class="opt"><input type="radio" name="admin" value="none"><span class="ol"><b>둘 다 아직입니다</b></span></label>
+        <label class="opt"><input type="radio" name="admin" value="chk"><span class="ol"><b>확인이 필요합니다</b>등록 상태를 모르겠습니다</span></label>
       </div>
     </div>
 
@@ -1459,6 +1462,12 @@ GDP의 약 9%, 정부 예산의 약 3분의 1입니다.<br>
       d:'출원 중 상태로는 신청이 되지 않습니다. 접수 마감일 이전에 <b>등록 완료</b>되어야 합니다. 등록 예상 시점을 확인해 내년 어느 차수를 목표로 할지 정하시면 됩니다.<br><span class="note">공공연구기관 기술을 이전받아 사업화하는 경우에는 기술이전 업무협약서로 신청할 수 있습니다.</span>'});
     if(r==='tt') cond.push({t:'심사 전까지 권리 등록을 마치셔야 합니다',
       d:'공공연구기관 기술을 이전받아 사업화하시는 경우에는 특허가 출원 중이어도 <b>기술이전 업무협약서</b>로 신청하실 수 있습니다. 다만 그것만으로는 평가 대상에 포함될 뿐이고, <b>계약심사협의회 심사 전까지</b> 특허 등의 권리(전용실시권 또는 통상실시권 포함) 등록을 완료해야 지정됩니다.'});
+    if(r==='chk') cond.push({t:'보유하신 권리부터 확인하셔야 합니다',
+      d:'특허·실용신안·NEP·NET 중 무엇을 가지고 있는지, <b>등록일이 언제인지</b> 먼저 보십시오. 특허는 등록일로부터 7년, 실용신안은 3년, NEP·NET은 3년 이내여야 합니다. 기한은 모두 지정신청서 접수마감일 기준입니다. 명의가 회사(법인)나 대표자로 되어 있는지도 함께 확인하셔야 합니다.'});
+    if(n==='chk') cond.push({t:'부처 R&amp;D 수행 이력을 찾아보셔야 합니다',
+      d:'중기부·산업부·과기부 등 <b>부처 R&amp;D 과제를 수행한 적이 있는지</b> 확인해 보십시오. 있다면 유형 Ⅰ이라는 다른 문이 열립니다. 유형 Ⅰ은 상용화 이전 요건이 없어서, 이미 판매 중인 제품에는 오히려 이쪽이 맞습니다.'});
+    if(a==='chk') cond.push({t:'조달 행정 등록 상태를 확인하셔야 합니다',
+      d:'나라장터에서 우리 회사의 <b>입찰참가자격 등록</b>과 제품의 <b>물품식별번호</b>가 잡혀 있는지 보십시오. 둘 다 안 되어 있으면 가장 오래 걸리는 준비라 지금 시작하시는 게 좋습니다.'});
     if(a==='none') cond.push({t:'조달 행정 등록부터 하셔야 합니다',
       d:'나라장터 입찰참가자격 등록과 물품식별번호 등록이 모두 필요합니다. <b>가장 오래 걸리는 준비</b>라 지금 시작하시는 게 좋습니다.'});
     if(a==='bid') cond.push({t:'물품식별번호도 함께 진행하기',
