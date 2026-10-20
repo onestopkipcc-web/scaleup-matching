@@ -1797,6 +1797,231 @@ def gmail_send(raw_b64):
     resp.raise_for_status()
     return resp.json()
 
+# ── 안내메일 보관함 ───────────────────────────────────
+# 지금까지 내보낸 안내메일을 기록으로 남긴다.
+# 고쳐 쓰는 곳이 아니라 "그때 뭐라고 보냈는지" 다시 보는 곳이다.
+#
+# 모으는 길이 둘이다.
+#  · Gmail 보낸메일함 — 앱에서 보낸 것. 제목으로 묶어 자동 수집한다.
+#  · 그룹웨어(더존)   — Gmail에 흔적이 없다. HTML을 직접 올린다.
+#
+# 본문은 드라이브에 함께 저장한다. Gmail에서 지워져도 기록은 남아야 한다.
+
+ARCHIVE_FILE = "메일보관함.json"
+
+_ARCH_TEST = re.compile(r'^\s*\[TEST\]\s*')
+_ARCH_REPLY = re.compile(r'^\s*(?:Re|RE|Fwd|FW|FWD)\s*[:：]', re.I)
+_ARCH_OURS = re.compile(r'\[원스톱[^\]]*\]')
+
+
+def arch_base(subject):
+    """회차마다 달라지는 날짜와 건수를 치운다. 뒷부분은 손대지 않는다."""
+    s = _ARCH_TEST.sub('', subject or '')
+    s = re.sub(r'\d{4}\s*[.\-/]\s*\d{1,2}\s*[.\-/]\s*\d{1,2}', '{날짜}', s)
+    s = re.sub(r'맞춤 지원공고\s*\d+건', '맞춤 지원공고 {n}건', s)
+    return s.strip()
+
+
+def arch_split(base):
+    """마지막 '—' 앞뒤로 가른다. 없으면 뒤는 빈 문자열."""
+    i = base.rfind('—')
+    if i < 0:
+        return base, ''
+    return base[:i].strip(), base[i + 1:].strip()
+
+
+def arch_group_key(subject):
+    """한 통짜리(직접 올린 것)의 묶음 키. 뒷부분을 그대로 둔다."""
+    return arch_base(subject)
+
+
+def arch_kind(subject):
+    s = subject or ''
+    if re.search(r'교육|밋업|세미나|강의', s):      return '교육'
+    if re.search(r'공고', s):                        return '공고 매칭'
+    if re.search(r'실적|집계|회신|등록|공유|자료', s): return '안내·요청'
+    return '기타'
+
+
+def _arch_day(ts_ms):
+    return datetime.fromtimestamp(int(ts_ms) / 1000).strftime('%Y-%m-%d')
+
+
+def gmail_sent_ids():
+    """보낸메일함 전체 id. 목록만 받으므로 빠르다."""
+    ids, token = [], None
+    while True:
+        p = {'q': 'in:sent', 'maxResults': 500}
+        if token:
+            p['pageToken'] = token
+        r = gapi('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/messages',
+                 params=p)
+        r.raise_for_status()
+        j = r.json()
+        ids += [m['id'] for m in j.get('messages', [])]
+        token = j.get('nextPageToken')
+        if not token:
+            break
+    return ids
+
+
+def gmail_meta_many(ids, progress=None):
+    """제목·수신자·시각만 받는다. 본문은 받지 않는다.
+
+    한 통씩 받으면 1,800통에 몇 분이 걸려서 8가닥으로 나눠 받는다.
+    실패한 건은 네 번까지 다시 받고, 끝내 못 받으면 몇 건인지 돌려준다.
+    """
+    import time as _t
+    from concurrent.futures import ThreadPoolExecutor
+
+    creds = get_creds()
+    if not creds:
+        raise Exception("구글 인증 실패")
+    sess = requests.Session()
+    sess.headers['Authorization'] = f'Bearer {creds.token}'
+    url = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/{}'
+    par = {'format': 'metadata', 'metadataHeaders': ['Subject', 'To', 'Date']}
+
+    out, done, failed = [], [0], []
+
+    def one(mid):
+        for attempt in range(4):
+            try:
+                r = sess.get(url.format(mid), params=par, timeout=30)
+                if r.status_code == 200:
+                    return r.json()
+                _t.sleep(1.2 * (attempt + 1))
+            except Exception:
+                _t.sleep(1.2 * (attempt + 1))
+        failed.append(mid)
+        return None
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        for j in ex.map(one, ids):
+            done[0] += 1
+            if progress and done[0] % 40 == 0:
+                progress(done[0], len(ids))
+            if not j:
+                continue
+            h = {x['name']: x['value']
+                 for x in j.get('payload', {}).get('headers', [])}
+            out.append({'id': j['id'], 'subject': h.get('Subject', ''),
+                        'to': h.get('To', ''),
+                        'ts': int(j.get('internalDate', 0))})
+    if progress:
+        progress(len(ids), len(ids))
+    return out, failed
+
+
+def gmail_html(msg_id):
+    """메일 한 통의 HTML 본문을 꺼낸다. 없으면 빈 문자열."""
+    import base64 as _b64
+    r = gapi('GET',
+             f'https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}',
+             params={'format': 'full'})
+    if not r.ok:
+        return ''
+
+    def walk(p):
+        if p.get('mimeType') == 'text/html' and p.get('body', {}).get('data'):
+            return p['body']['data']
+        for c in (p.get('parts') or []):
+            got = walk(c)
+            if got:
+                return got
+        return ''
+
+    data = walk(r.json().get('payload', {}))
+    if not data:
+        return ''
+    try:
+        pad = '=' * (-len(data) % 4)
+        return _b64.urlsafe_b64decode(data + pad).decode('utf-8', 'replace')
+    except Exception:
+        return ''
+
+
+def arch_collect_gmail(progress=None, min_count=3):
+    """보낸메일함을 훑어 묶음으로 만든다.
+
+    [TEST]와 답장·전달은 뺀다. min_count 통 미만은 개별 메일로 보고 뺀다.
+    """
+    ids = gmail_sent_ids()
+    metas, failed = gmail_meta_many(ids, progress=progress)
+
+    real = [m for m in metas
+            if not _ARCH_TEST.match(m['subject'] or '')
+            and not _ARCH_REPLY.match(m['subject'] or '')]
+
+    # 제목 앞부분이 같은 것끼리 모은 뒤, 뒷부분이 통마다 다르면 그때만
+    # {기업명}으로 본다. 「… — 8월 교육 신청 안내」처럼 뒷부분이 내용인
+    # 제목까지 지워버리지 않으려는 것이다.
+    heads = {}
+    for m in real:
+        b = arch_base(m['subject'])
+        h, t = arch_split(b)
+        heads.setdefault(h, []).append((m, t))
+
+    groups = {}
+    for h, lst in heads.items():
+        tails = {t for _, t in lst}
+        if len(tails) > 1:
+            key = f"{h} — {{기업명}}"
+        else:
+            t = next(iter(tails))
+            key = f"{h} — {t}" if t else h
+        groups.setdefault(key, []).extend(m for m, _ in lst)
+
+    items = []
+    for key, rows in groups.items():
+        # 숨은참조로 한 번에 보낸 것은 1통으로 남는다. 우리 머리말이 붙어
+        # 있으면 통수가 적어도 단체 발송으로 보고 남긴다.
+        if len(rows) < min_count and not _ARCH_OURS.search(key):
+            continue
+        rows.sort(key=lambda x: x['ts'])
+        last = rows[-1]
+        items.append({
+            'key': key,
+            'kind': arch_kind(last['subject']),
+            'channel': 'Gmail',
+            'first': _arch_day(rows[0]['ts']),
+            'last': _arch_day(last['ts']),
+            'count': len(rows),
+            'sample_subject': last['subject'],
+            'msg_id': last['id'],
+            'html': gmail_html(last['id']),
+        })
+    items.sort(key=lambda x: x['last'], reverse=True)
+    return items, {'총': len(ids), '테스트·답장 제외': len(real),
+                   '묶음': len(items), '못 받은 건': len(failed)}
+
+
+def arch_load(drive):
+    raw = drive_download(drive, ARCHIVE_FILE)
+    if not raw:
+        return {'updated': '', 'items': []}
+    try:
+        d = json.loads(raw.decode('utf-8'))
+        d.setdefault('items', [])
+        d.setdefault('updated', '')
+        return d
+    except Exception:
+        return {'updated': '', 'items': []}
+
+
+def arch_save(drive, data):
+    return drive_upload(drive, ARCHIVE_FILE,
+                        json.dumps(data, ensure_ascii=False, indent=1).encode('utf-8'),
+                        'application/json')
+
+
+def arch_merge(old_items, new_gmail_items):
+    """Gmail 수집분은 갈아끼우고, 직접 올린 그룹웨어 항목은 그대로 둔다."""
+    manual = [x for x in (old_items or []) if x.get('channel') != 'Gmail']
+    merged = list(new_gmail_items) + manual
+    merged.sort(key=lambda x: x.get('last', ''), reverse=True)
+    return merged
+
 # ── calendar API (requests 기반) ───────────────────────
 def cal_list_events(cal_id, private_prop=None):
     params = {'maxResults': 10}
@@ -2479,7 +2704,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1020-31"
+BUILD_TAG = "v1020-33"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -4061,7 +4286,7 @@ with st.sidebar:
     # 라디오는 하나로 두되(선택 상태를 나눌 수 없으므로) 구분선으로 묶어 보여준다.
     _MENU_GROUPS = [
         ("운영",   ["대시보드", "공고·매칭", "발송"]),
-        ("데이터", ["기업 관리", "발송 이력", "클릭 반응", "교육 신청 집계"]),
+        ("데이터", ["기업 관리", "발송 이력", "클릭 반응", "교육 신청 집계", "메일 보관함"]),
         ("도구",   ["안내 메일", "캘린더", "설정", "시스템 명세"]),
     ]
     _MENU = [m for _, items in _MENU_GROUPS for m in items]
@@ -8982,6 +9207,144 @@ elif page == "발송 이력":
             with pd.ExcelWriter(buf, engine='openpyxl') as w: df_h.to_excel(w, index=False)
             st.download_button("📥 엑셀 다운로드", buf.getvalue(), HISTORY_FILE,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+elif page == "메일 보관함":
+    drive = _get_drive()
+    st.title("메일 보관함")
+    info_box("메일 보관함",
+        """
+    지금까지 기업에 내보낸 안내메일 기록
+
+    **Gmail** — 앱에서 보낸 것. 제목으로 묶어 자동 수집
+    **그룹웨어** — Gmail에 안 남는다. HTML을 직접 올린다
+
+    고쳐 쓰는 곳이 아니라 그때 뭐라고 보냈는지 다시 보는 곳이다.
+        """,
+        "제목 표준은 8. 교육 프로그램 POOL / 0. 안내메일 템플릿 보관 / 0_메일 제목·파일명 표준.md")
+
+    _data = arch_load(drive)
+    _items = _data.get('items', [])
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("보관 항목", f"{len(_items)}건")
+    c2.metric("Gmail", f"{sum(1 for x in _items if x.get('channel') == 'Gmail')}건")
+    c3.metric("그룹웨어", f"{sum(1 for x in _items if x.get('channel') != 'Gmail')}건")
+    c4.metric("마지막 갱신", _data.get('updated', '—') or '—')
+
+    # ── Gmail 수집 ───────────────────────────────────
+    cb1, cb2 = st.columns([1, 3])
+    with cb1:
+        _go = st.button("🔄 Gmail에서 수집", use_container_width=True)
+    with cb2:
+        st.caption("보낸메일함 전체를 훑는다. 1,800통 기준 1~2분. "
+                   "[TEST]와 답장·전달은 빠지고, 3통 미만도 개별 메일로 보고 뺀다.")
+
+    if _go:
+        _bar = st.progress(0.0, text="보낸메일함 목록 읽는 중…")
+
+        def _prog(done, total):
+            _bar.progress(min(done / max(total, 1), 1.0),
+                          text=f"제목 읽는 중… {done:,} / {total:,}통")
+
+        try:
+            _new, _stat = arch_collect_gmail(progress=_prog)
+            _bar.empty()
+            _data['items'] = arch_merge(_items, _new)
+            _data['updated'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+            if arch_save(drive, _data):
+                st.success(f"수집 완료 — 보낸메일 {_stat['총']:,}통에서 묶음 {_stat['묶음']}건")
+                if _stat['못 받은 건']:
+                    st.warning(f"{_stat['못 받은 건']}통은 못 받았다. 다시 눌러 주십시오.")
+                st.rerun()
+        except Exception as _e:
+            _bar.empty()
+            st.error(f"수집 실패: {_e}")
+
+    st.divider()
+
+    # ── 그룹웨어로 보낸 것 직접 올리기 ───────────────
+    with st.expander("➕ 그룹웨어로 보낸 메일 올리기", expanded=False):
+        st.caption("더존 그룹웨어로 내보낸 메일은 Gmail에 안 남는다. "
+                   "만들 때 썼던 HTML을 그대로 올리면 된다.")
+        _uf = st.file_uploader("HTML 파일", type=['html', 'htm'], key="arch_up")
+        _u1, _u2 = st.columns(2)
+        _udate = _u1.date_input("보낸 날", value=datetime.now(), key="arch_date")
+        _ucnt = _u2.number_input("보낸 통수", min_value=0, value=0, step=1, key="arch_cnt")
+        _utitle = st.text_input("제목", key="arch_title",
+                                placeholder="[원스톱 스케일업] 10월 무료 교육 신청 안내 (~10/23) — …")
+        if st.button("보관함에 넣기", disabled=not (_uf and _utitle)):
+            _html = _uf.read().decode('utf-8', 'replace')
+            _items.append({
+                'key': arch_group_key(_utitle),
+                'kind': arch_kind(_utitle),
+                'channel': '그룹웨어',
+                'first': _udate.strftime('%Y-%m-%d'),
+                'last': _udate.strftime('%Y-%m-%d'),
+                'count': int(_ucnt) or None,
+                'sample_subject': _utitle,
+                'msg_id': '',
+                'html': _html,
+            })
+            _items.sort(key=lambda x: x.get('last', ''), reverse=True)
+            _data['items'] = _items
+            _data['updated'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+            if arch_save(drive, _data):
+                st.success("넣었습니다.")
+                st.rerun()
+
+    if not _items:
+        st.info("아직 보관된 메일이 없다. 위 「Gmail에서 수집」을 눌러 주십시오.")
+    else:
+        # ── 거르기 ───────────────────────────────────
+        f1, f2, f3 = st.columns([1, 1, 2])
+        _kinds = ['전체'] + sorted({x.get('kind', '기타') for x in _items})
+        _kind = f1.selectbox("종류", _kinds, key="arch_f_kind")
+        _ch = f2.selectbox("통로", ['전체', 'Gmail', '그룹웨어'], key="arch_f_ch")
+        _q = f3.text_input("제목 검색", key="arch_f_q", placeholder="교육, 공고, 지침서 …")
+
+        _view = [x for x in _items
+                 if (_kind == '전체' or x.get('kind') == _kind)
+                 and (_ch == '전체' or x.get('channel') == _ch)
+                 and (not _q or _q.lower() in (x.get('key', '') or '').lower())]
+
+        st.caption(f"{len(_view)}건")
+
+        _labels = []
+        for x in _view:
+            _d = x.get('first', '')
+            if x.get('last') and x.get('last') != _d:
+                _d += f" ~ {x['last'][5:]}"
+            _n = f"{x['count']}통" if x.get('count') else "—"
+            _labels.append(f"{_d}  ·  {_n}  ·  [{x.get('channel','')}]  {x.get('key','')}")
+
+        _pick = st.radio("보관 목록", range(len(_view)),
+                         format_func=lambda i: _labels[i],
+                         label_visibility="collapsed", key="arch_pick")
+
+        if _view:
+            _it = _view[_pick]
+            st.divider()
+            st.markdown(f"**{_it.get('sample_subject','')}**")
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("보낸 날", _it.get('first', '—'))
+            m2.metric("통수", f"{_it['count']}통" if _it.get('count') else "—")
+            m3.metric("통로", _it.get('channel', '—'))
+            m4.metric("종류", _it.get('kind', '—'))
+
+            _html = _it.get('html') or ''
+            if not _html:
+                st.warning("본문이 저장되어 있지 않다. 다시 수집하면 채워진다.")
+            else:
+                pv1, pv2 = st.tabs(["👁 미리보기", "📋 붙여넣기용 코드"])
+                with pv1:
+                    st.components.v1.html(_html, height=1100, scrolling=True)
+                with pv2:
+                    st.caption("그룹웨어 메일 쓰기에 그대로 붙여넣으면 된다.")
+                    st.code(_html, language="html")
+                    st.download_button(
+                        "HTML 파일로 내려받기", _html.encode('utf-8'),
+                        file_name=f"{_it.get('first','')}_{_it.get('kind','')}.html",
+                        mime="text/html")
 
 elif page == "설정":
     drive = _get_drive()
