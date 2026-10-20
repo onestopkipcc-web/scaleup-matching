@@ -1386,8 +1386,8 @@ a:focus-visible,button:focus-visible,summary:focus-visible,.opt:focus-within{out
     /* 분야별 문: 4장 경로 지도를 이 기업 사정에 맞춰 뽑아 보여준다 */
     var F=FIELD[f]||FIELD.etc, fh='';
     if(F.t1.length){
-      fh+='<p class="tw-hint">표가 잘리면 좌우로 밀어 보실 수 있습니다.</p>
-<div class="tw" tabindex="0" role="region" aria-label="가로로 스크롤할 수 있는 표"><table><thead><tr><th>유형 Ⅰ 경로</th>'+
+      fh+='<p class="tw-hint">표가 잘리면 좌우로 밀어 보실 수 있습니다.</p>'+
+          '<div class="tw" tabindex="0" role="region" aria-label="가로로 스크롤할 수 있는 표"><table><thead><tr><th>유형 Ⅰ 경로</th>'+
           '<th class="c">누적 지정</th><th>평가·전담기관</th></tr></thead><tbody>';
       F.t1.forEach(function(x){ fh+='<tr><td class="nw"><b>'+x[0]+'</b></td>'+
           '<td class="num">'+x[1]+'건</td><td>'+x[2]+'</td></tr>'; });
