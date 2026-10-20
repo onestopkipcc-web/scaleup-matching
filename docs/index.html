@@ -82,6 +82,7 @@ a{color:var(--teal);text-decoration-thickness:1px;text-underline-offset:2px}
 .flag>:last-child{margin-bottom:0}
 
 /* 표 */
+.tw table{min-width:560px}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:24px 0}
 table{width:100%;border-collapse:collapse;font-size:15.5px;min-width:440px}
 th,td{padding:14px 16px;text-align:center;vertical-align:middle}
@@ -180,6 +181,10 @@ figcaption{font-size:13.5px;color:var(--faint);margin-top:12px;text-align:center
 .prep .pn{font-size:15px;font-weight:800;color:var(--teal);background:var(--teal-l);
   border-radius:9px;height:34px;display:flex;align-items:center;justify-content:center}
 .prep b{font-size:17px;color:var(--ink);display:block;letter-spacing:-.02em}
+/* 라벨용 규칙이 문단 속 강조까지 블록으로 만들던 것을 되돌린다 */
+.prep p b,.prep p strong,.flow span b,.flow span strong,.flow p b,
+.q span b,.q p b,.td span b{display:inline;font-size:inherit;color:inherit;
+  letter-spacing:inherit;margin:0;font-weight:700}
 .prep .where{display:inline-block;font-size:13px;color:var(--teal-d);background:var(--teal-l);
   border-radius:6px;padding:3px 10px;margin:7px 0 10px;font-weight:600}
 .prep p{margin:0;font-size:15.5px;color:var(--mute);line-height:1.72}
@@ -376,12 +381,12 @@ body.solo .cover{display:none}
 <table>
   <thead><tr><th>근거</th><th>반영 기준</th></tr></thead>
   <tbody>
-  <tr><td>「조달사업에 관한 법률」 제27조</td><td>2026. 10. 시행 기준</td></tr>
-  <tr><td>「조달사업에 관한 법률 시행령」 제33조</td><td>2026. 10. 시행 기준</td></tr>
-  <tr><td>「혁신제품 구매 운영 규정」(조달청 고시)</td><td>2026. 10. 시행 기준</td></tr>
-  <tr><td>혁신시제품 지정신청 공고(조달청)</td><td>2026년 4차 공고(접수 8.31.~9.18.) 기준</td></tr>
-  <tr><td>혁신제품 지정 실적 통계</td><td>2026. 9. 8. 집계분</td></tr>
-  <tr><td>시범구매 예산 및 구매목표 비율</td><td>2026년도 기준</td></tr>
+  <tr><td class="nw">「조달사업에 관한 법률」 제27조</td><td>2026. 10. 시행 기준</td></tr>
+  <tr><td class="nw">「조달사업에 관한 법률 시행령」 제33조</td><td>2026. 10. 시행 기준</td></tr>
+  <tr><td class="nw">「혁신제품 구매 운영 규정」(조달청 고시)</td><td>2026. 10. 시행 기준</td></tr>
+  <tr><td class="nw">혁신시제품 지정신청 공고(조달청)</td><td>2026년 4차 공고(접수 8.31.~9.18.) 기준</td></tr>
+  <tr><td class="nw">혁신제품 지정 실적 통계</td><td>2026. 9. 8. 집계분</td></tr>
+  <tr><td class="nw">시범구매 예산 및 구매목표 비율</td><td>2026년도 기준</td></tr>
   </tbody>
 </table>
 </div>
@@ -423,7 +428,7 @@ body.solo .cover{display:none}
 <div class="tw">
 <table>
   <thead><tr><th>구분</th><th class="c">중앙행정기관</th><th class="c">지방자치단체</th><th class="c">공공기관</th><th class="c">지방공기업</th></tr></thead>
-  <tbody><tr><td>구매목표 비율</td><td class="c">1.4%</td><td class="c">1.9%</td><td class="c">2.2%</td><td class="c">2.8%</td></tr></tbody>
+  <tbody><tr><td class="nw">구매목표 비율</td><td class="c">1.4%</td><td class="c">1.9%</td><td class="c">2.2%</td><td class="c">2.8%</td></tr></tbody>
 </table>
 </div>
 <p class="src">2026년도 기준입니다. 비율은 연도별로 조정됩니다.</p>
@@ -635,16 +640,16 @@ body.solo .cover{display:none}
 <h3>가장 많이 지정되는 경로</h3>
 <div class="tw">
 <table>
-  <thead><tr><th class="c">유형</th><th class="nw">경로</th><th class="c">누적 지정</th><th>이런 기업에게</th></tr></thead>
+  <thead><tr><th class="c">유형</th><th class="nw">경로</th><th class="c">누적 지정</th><th class="nw">이런 기업에게</th></tr></thead>
   <tbody>
   <tr><td class="c">Ⅱ</td><td class="nw"><b>조달청 공급자제안형</b></td><td class="num">810건</td><td>R&amp;D 이력 없이 특허만 있어도 되는 가장 일반적인 길</td></tr>
   <tr><td class="c">Ⅰ</td><td class="nw"><b>중소벤처기업부 우수연구개발</b></td><td class="num">594건</td><td>중기부 R&amp;D 과제를 수행한 기업. 유형 Ⅰ 중 최대</td></tr>
-  <tr><td class="c">Ⅰ</td><td class="nw"><b>산업통상부 에너지기술마켓</b></td><td class="num">218건</td><td>에너지와 환경 분야 기술</td></tr>
+  <tr><td class="c">Ⅰ</td><td class="nw"><b>산업통상부 에너지기술마켓</b></td><td class="num">218건</td><td>에너지·환경 기술</td></tr>
   <tr><td class="c">Ⅱ</td><td class="nw"><b>조달청 스카우터 추천</b></td><td class="num">170건</td><td>전문가 추천 경로. 생각보다 활발합니다</td></tr>
-  <tr><td class="c">Ⅰ</td><td class="nw"><b>국토교통부 SOC기술마켓</b></td><td class="num">138건</td><td>도시, 교통, 건설 인프라</td></tr>
-  <tr><td class="c">Ⅰ</td><td class="nw"><b>지식재산처 우수특허기반 혁신제품</b></td><td class="num">138건</td><td>강한 특허를 보유한 기업</td></tr>
+  <tr><td class="c">Ⅰ</td><td class="nw"><b>국토교통부 SOC기술마켓</b></td><td class="num">138건</td><td>도시·교통·건설</td></tr>
+  <tr><td class="c">Ⅰ</td><td class="nw"><b>지식재산처 우수특허기반 혁신제품</b></td><td class="num">138건</td><td>강한 특허 보유</td></tr>
   <tr><td class="c">Ⅰ</td><td class="nw"><b>산업통상부 우수연구개발</b></td><td class="num">133건</td><td>산업부 R&amp;D 결과물</td></tr>
-  <tr><td class="c">Ⅱ</td><td class="nw"><b>조달청 수요자제안형</b></td><td class="num">101건</td><td>공모 과제를 푸는 제품. <b>차수별 공고</b></td></tr>
+  <tr><td class="c">Ⅱ</td><td class="nw"><b>조달청 수요자제안형</b></td><td class="num">101건</td><td>공모 과제를 푸는 제품</td></tr>
   <tr><td class="c">Ⅰ</td><td class="nw"><b>과학기술정보통신부 우수연구개발</b></td><td class="num">75건</td><td>과기부 R&amp;D 결과물</td></tr>
   <tr><td class="c">Ⅰ</td><td class="nw"><b>지식재산처 우수발명품</b></td><td class="num">73건</td><td>발명 기반 제품</td></tr>
   </tbody>
@@ -656,7 +661,7 @@ body.solo .cover{display:none}
 <h3>우리 제품은 어떤 분야에 속할까</h3>
 <div class="tw">
 <table>
-  <thead><tr><th>제품 분야</th><th>유형 Ⅰ 주요 경로와 누적 건수</th><th>평가·전담기관</th></tr></thead>
+  <thead><tr><th>제품 분야</th><th class="nw">유형 Ⅰ 주요 경로와 누적 건수</th><th>평가·전담기관</th></tr></thead>
   <tbody>
   <tr><td class="nw"><b>환경·에너지</b></td>
       <td class="jt">산업부 에너지기술마켓 218 · 기후에너지환경부 우수연구개발 50 · 탄소중립 45 · 환경신기술 20</td>
@@ -752,10 +757,10 @@ body.solo .cover{display:none}
 <table>
   <thead><tr><th>권리</th><th>조건</th></tr></thead>
   <tbody>
-  <tr><td><b>특허</b></td><td>등록일로부터 <b>7년 이내</b>, 권리자 또는 전용실시권자일 것</td></tr>
-  <tr><td><b>실용신안</b></td><td>등록일로부터 <b>3년 이내</b>, 권리자 또는 전용실시권자일 것</td></tr>
-  <tr><td><b>신제품(NEP) 인증</b></td><td>최초 지정일로부터 <b>3년 이내</b></td></tr>
-  <tr><td><b>신기술(NET) 인증</b></td><td>최초 지정일로부터 <b>3년 이내</b>, 해당 신기술의 적용이 확인된 제품</td></tr>
+  <tr><td class="nw"><b>특허</b></td><td>등록일로부터 <b>7년 이내</b>, 권리자 또는 전용실시권자일 것</td></tr>
+  <tr><td class="nw"><b>실용신안</b></td><td>등록일로부터 <b>3년 이내</b>, 권리자 또는 전용실시권자일 것</td></tr>
+  <tr><td class="nw"><b>신제품(NEP) 인증</b></td><td>최초 지정일로부터 <b>3년 이내</b></td></tr>
+  <tr><td class="nw"><b>신기술(NET) 인증</b></td><td>최초 지정일로부터 <b>3년 이내</b>, 해당 신기술의 적용이 확인된 제품</td></tr>
   <tr><td class="nw"><b>AI 소프트웨어</b></td><td class="jt">「저작권법」에 따라 저작권을 등록하고, 한국인공지능진흥협회가 발급한 <b>인공지능제품·서비스 확인서</b>를 받은 소프트웨어. AI 소프트웨어와 물품이 결합된 제품이나 서비스(SaaS 등)는 제외됩니다</td></tr>
   </tbody>
 </table>
@@ -1005,10 +1010,10 @@ body.solo .cover{display:none}
 <table>
   <thead><tr><th>구분</th><th>2026년 일정</th></tr></thead>
   <tbody>
-  <tr><td><b>공급자 제안형</b></td>
+  <tr><td class="nw"><b>공급자 제안형</b></td>
       <td class="jt">2차 3.3.~3.27. · 3차 5.26.~6.12. · 4차 8.31.~9.18. <span class="note">(모두 종료)</span></td></tr>
-  <tr><td><b>수요자 제안형</b></td><td class="jt"><b>차수별 공고</b> · 과제 목록은 1년간 유지</td></tr>
-  <tr><td><b>민간전문가 추천형</b></td><td>연 3회</td></tr>
+  <tr><td class="nw"><b>수요자 제안형</b></td><td class="jt"><b>차수별 공고</b> · 과제 목록은 1년간 유지</td></tr>
+  <tr><td class="nw"><b>민간전문가 추천형</b></td><td>연 3회</td></tr>
   </tbody>
 </table>
 </div>
