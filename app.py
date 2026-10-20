@@ -76,8 +76,10 @@ if not check_password():
 # ── 상수 ──────────────────────────────────────────────
 DRIVE_FOLDER_ID  = "1iWGYjaoslqST45ggDlg-IPMLaUHCYmV_"
 LOGO_URL = "https://raw.githubusercontent.com/onestopkipcc-web/scaleup-matching/main/logo.png"
-# 전체 공고 마감일 공통 캘린더 (메일 본문 버튼 링크)
-CALENDAR_LINK = "https://calendar.google.com/calendar/u/6?cid=OTA3OGE0OTk1MGE0N2I0NmRkYjM1MTEwNDA4ODZmM2EwMTZiNzVjYTE3MTY5ZWMxMTEzZTU2OTJiNzMyNzM3NUBncm91cC5jYWxlbmRhci5nb29nbGUuY29t"
+# 공고 마감일을 모아두는 내부 운영용 캘린더.
+# 기업에게는 구독 링크를 보내지 않는다 — 구독한 캘린더는 알림이 가지 않는다.
+# 기업에게 가는 알림은 메일에 첨부하는 .ics 가 맡는다. build_ics 참고.
+COMMON_CAL_ID = "9078a49950a47b46ddb3511040886f3a016b75ca17169ec1113e5692b7327375@group.calendar.google.com"
 
 # 클릭 추적 (Apps Script 웹앱) — 메일 링크를 이 URL 경유로 감싸 클릭을 기록
 CLICK_TRACK_URL = "https://script.google.com/macros/s/AKfycbyqjB9JmN6BAHSjBHH7Okup4HJZ8l4ToI-6Y0icbSYWKQn8NJAMpjEcuR4pi0tSOpSH/exec"
@@ -2274,6 +2276,111 @@ def parse_deadline(s):
         return datetime.strptime(re.sub(r'\.', '-', end), "%Y-%m-%d")
     except: return None
 
+
+# ── 마감일 알림 파일(.ics) ─────────────────────────────
+# 구독형 캘린더로는 기업에게 알림이 가지 않는다. 구독한 캘린더의 알림은
+# 기본이 꺼짐이고, 이벤트에 넣은 reminders 는 캘린더 주인에게만 적용된다.
+#
+# .ics 는 구독이 아니라 복사다. 기업이 열어서 추가하면 '자기 일정'이 되고
+# 파일에 같이 담긴 VALARM 이 그대로 자기 알림이 된다.
+# 아웃룩·네이버·구글·애플 모두 VALARM 을 읽는다. 로그인도 필요 없다.
+
+def _ics_esc(t):
+    """RFC 5545 — 쉼표·세미콜론·역슬래시·줄바꿈을 피한다."""
+    return (str(t or '').replace('\\', '\\\\').replace(';', '\\;')
+            .replace(',', '\\,').replace('\r\n', '\\n')
+            .replace('\n', '\\n').replace('\r', '\\n'))
+
+
+def _ics_fold(line):
+    """한 줄이 75옥텟을 넘으면 접는다.
+
+    바이트로 세되 글자 가운데서 자르지 않는다. 한글이 쪼개지면
+    받는 쪽에서 깨진 글자가 나온다.
+    """
+    if len(line.encode('utf-8')) <= 73:
+        return line
+    parts, cur = [], b''
+    for ch in line:
+        e = ch.encode('utf-8')
+        if len(cur) + len(e) > 73:
+            parts.append(cur.decode('utf-8'))
+            cur = b''
+        cur += e
+    if cur:
+        parts.append(cur.decode('utf-8'))
+    return '\r\n '.join(parts)
+
+
+def _ics_deadline(n):
+    """공고에서 마감일을 꺼낸다. 접수기간이 우선, 없으면 마감일 칸."""
+    dl = parse_deadline(n.get('접수기간', '') or '')
+    if dl:
+        return dl
+    raw = str(n.get('마감일', '') or '').strip()
+    if not raw:
+        return None
+    try:
+        return datetime.strptime(re.sub(r'[./]', '-', raw)[:10], '%Y-%m-%d')
+    except Exception:
+        return None
+
+
+def build_ics(company, notices, now=None):
+    """안내한 공고의 마감일을 담은 .ics 를 만든다. 없으면 None.
+
+    종일 일정으로 넣고 7일 전·3일 전 알림을 붙인다.
+    UID 는 공고와 기업으로 고정해, 같은 공고를 다시 안내해도
+    캘린더에서 하나로 합쳐지고 두 번 쌓이지 않는다.
+    """
+    import hashlib
+    from datetime import timedelta as _td
+    stamp = (now or datetime.utcnow()).strftime('%Y%m%dT%H%M%SZ')
+
+    body = []
+    for n in notices or []:
+        dl = _ics_deadline(n)
+        nm = str(n.get('공고명', '') or '').strip()
+        if not dl or not nm:
+            continue
+        pid = str(n.get('공고ID', '') or n.get('pblancId', '') or '')
+        key = hashlib.md5((pid or nm).encode('utf-8')).hexdigest()[:16]
+        who = hashlib.md5(str(company).encode('utf-8')).hexdigest()[:8]
+        link = str(n.get('공고링크', '') or '')
+        desc = f"주관기관: {n.get('주관기관','')}\n원스톱 스케일업이 안내드린 공고입니다.\n{link}"
+        body += [
+            'BEGIN:VEVENT',
+            f'UID:{key}-{who}@kipcc.re.kr',
+            f'DTSTAMP:{stamp}',
+            f'DTSTART;VALUE=DATE:{dl.strftime("%Y%m%d")}',
+            f'DTEND;VALUE=DATE:{(dl + _td(days=1)).strftime("%Y%m%d")}',
+            f'SUMMARY:[마감] {_ics_esc(nm)}',
+            f'DESCRIPTION:{_ics_esc(desc)}',
+        ]
+        if link:
+            body.append(f'URL:{_ics_esc(link)}')
+        body += ['TRANSP:TRANSPARENT']
+        for days in (7, 3):
+            body += ['BEGIN:VALARM', 'ACTION:DISPLAY',
+                     f'TRIGGER:-P{days}D',
+                     f'DESCRIPTION:[D-{days}] {_ics_esc(nm)}',
+                     'END:VALARM']
+        body.append('END:VEVENT')
+
+    if not body:
+        return None
+
+    lines = ['BEGIN:VCALENDAR', 'VERSION:2.0',
+             'PRODID:-//KIPCC//onestop-scaleup//KO',
+             'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+             'X-WR-CALNAME:원스톱 스케일업 공고 마감일',
+             'X-WR-TIMEZONE:Asia/Seoul'] + body + ['END:VCALENDAR']
+    return ('\r\n'.join(_ics_fold(x) for x in lines) + '\r\n').encode('utf-8')
+
+
+def ics_event_count(ics_bytes):
+    return ics_bytes.decode('utf-8').count('BEGIN:VEVENT') if ics_bytes else 0
+
 def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=None):
     pid = notice.get('pblancId', '')
     if (row['기업명'], pid) in already_sent: return None
@@ -2704,7 +2811,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1020-33"
+BUILD_TAG = "v1020-34"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -3411,14 +3518,15 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
     <div style="background:#FFFFFF;border-radius:10px;
                 padding:16px 18px;border:1.5px solid #D8D0C0;margin:16px 0;">
       <p style="margin:0 0 4px;color:#7E6433;font-weight:700;font-size:11px;">
-        📅 공고 마감일 캘린더
+        📅 마감일 알림 받기
       </p>
-      <p style="margin:0 0 10px;font-size:12px;color:#6B6558;">
-        전체 지원사업 공고 마감일을 한눈에 확인하세요.
+      <p style="margin:0 0 8px;font-size:12px;color:#6B6558;line-height:1.85;">
+        이 메일에 <b>일정 파일(.ics)</b>을 첨부해 두었습니다.<br>
+        열어서 추가하시면 위 공고 마감일이 캘린더에 들어가고,
+        <b>7일 전과 3일 전에 알림</b>이 갑니다.
       </p>
-      {"<a href='"+CALENDAR_LINK+"' style='display:inline-block;background:#C9A96A;color:#3A2E15;padding:8px 18px;border-radius:7px;text-decoration:none;font-size:12px;font-weight:700;'>📅 전체 공고 캘린더 보기 →</a>" if CALENDAR_LINK else ""}
-      <p style="margin:10px 0 0;font-size:11px;color:#786B4E;line-height:1.7;">
-        💡 <b>맞춤 캘린더 + D-7·D-3 알림</b>을 원하시면 Gmail 주소를 답장으로 알려주세요.
+      <p style="margin:8px 0 0;font-size:11px;color:#786B4E;line-height:1.75;">
+        아웃룩 · 네이버 · 구글 · 애플 캘린더 모두 됩니다. 구독이나 로그인은 필요 없습니다.
       </p>
     </div>"""
 
@@ -6799,6 +6907,8 @@ elif page == "발송":
         if st.button("📤 발송 실행", type="primary") or st.session_state.get('_send_preview_co'):
             from email.mime.multipart import MIMEMultipart
             from email.mime.text import MIMEText
+            from email.mime.base import MIMEBase
+            from email import encoders as _encoders
             from email.header import Header
             from email.utils import formataddr
             import base64
@@ -6943,9 +7053,17 @@ elif page == "발송":
                     st.session_state.pop('_send_preview_co', None)
                     st.stop()
 
+                # 마감일 알림 파일. 마감일이 있는 공고가 없으면 None 이고
+                # 그때는 첨부 없이 보낸다. 실패해도 발송은 막지 않는다.
+                try:
+                    _ics = build_ics(company, notices)
+                except Exception as _ie:
+                    _ics = None
+                    logs.append(f"⚠ {company} 일정 파일 생성 실패 — 첨부 없이 발송 ({_ie})")
+
                 recipients = get_test_recipients() if test_mode else [co_email]
                 for to in recipients:
-                    msg = MIMEMultipart('alternative')
+                    msg = MIMEMultipart('mixed') if _ics else MIMEMultipart('alternative')
                     # 한글 표시 이름·제목은 RFC 2047 로 인코딩해야 클라이언트에서 안 깨진다.
                     msg['From']    = formataddr(
                         (str(Header(MAIL_FROM_NAME, 'utf-8')), MAIL_FROM_ADDR))
@@ -6955,31 +7073,27 @@ elif page == "발송":
                     msg['Subject'] = Header(
                         ("[TEST] " if test_mode else "")
                         + mail_subject(company, _mail_meta), 'utf-8')
-                    msg.attach(MIMEText(html,'html','utf-8'))
+                    if _ics:
+                        _alt = MIMEMultipart('alternative')
+                        _alt.attach(MIMEText(html, 'html', 'utf-8'))
+                        msg.attach(_alt)
+                        _part = MIMEBase('text', 'calendar',
+                                         charset='utf-8', method='PUBLISH')
+                        _part.set_payload(_ics)
+                        _encoders.encode_base64(_part)
+                        _part.add_header('Content-Disposition', 'attachment',
+                                         filename='scaleup-deadlines.ics')
+                        msg.attach(_part)
+                    else:
+                        msg.attach(MIMEText(html, 'html', 'utf-8'))
                     gmail_send(base64.urlsafe_b64encode(msg.as_bytes()).decode())
                     logs.append(f"✅ {company} → {to}" + (f" (+Cc {len(cc_list)})" if cc_list and not test_mode else ""))
 
-                # 테스트 모드에서는 캘린더 등록을 건너뜀 (실제 캘린더 오염 방지)
-                for n in ([] if test_mode else notices):
-                    dl  = parse_deadline(n.get('접수기간','')); pid = n.get('공고ID','')
-                    if not dl or not pid: continue
-                    desc  = f"주관기관: {n.get('주관기관','')}\n공고링크: {n.get('공고링크','')}\n안내기업: {company}"
-                    cids  = [cal_id] if cal_id else []
-                    if company in ind_cals and ind_cals[company].get('calendar_id'):
-                        cids.append(ind_cals[company]['calendar_id'])
-                    for cid in cids:
-                        try:
-                            if cal_list_events(cid, f"pblancId={pid}").get('items'): continue
-                        except: pass
-                        for days,label in [(0,"마감"),(7,"D-7"),(3,"D-3")]:
-                            d = (dl-timedelta(days=days)).strftime('%Y-%m-%d')
-                            cal_insert_event(cid, {
-                                'summary':f"[{label}] {n.get('공고명','')}",
-                                'description':desc,
-                                'start':{'date':d,'timeZone':'Asia/Seoul'},
-                                'end':  {'date':d,'timeZone':'Asia/Seoul'},
-                                'extendedProperties':{'private':{'pblancId':pid}},
-                            })
+                # 예전에는 여기서 기업마다 calendar_id.txt 와 기업별 캘린더에
+                # 마감·D-7·D-3 세 건씩 넣으려 했다. 그 캘린더들이 모두 사라져
+                # 회차마다 수백 번을 404 로 헛돌고 있었다. 반환값을 보지 않아
+                # 실패가 드러나지도 않았다. 공통 캘린더 등록은 발송이 끝난 뒤
+                # 아래에서 한 번만 한다. 기업에게 가는 알림은 .ics 첨부가 맡는다.
 
                 _co_rows = [{"기업명":company,"pblancId":n.get('공고ID',''),
                         "공고명":n.get('공고명',''),"발송일":datetime.today().strftime("%Y-%m-%d"),
