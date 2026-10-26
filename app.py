@@ -89,6 +89,14 @@ LOGO_URL = "https://raw.githubusercontent.com/onestopkipcc-web/scaleup-matching/
 # 기업에게 가는 알림은 메일에 첨부하는 .ics 가 맡는다. build_ics 참고.
 COMMON_CAL_ID = "9078a49950a47b46ddb3511040886f3a016b75ca17169ec1113e5692b7327375@group.calendar.google.com"
 
+# 기업에게 보내는 캘린더 주소.
+# 예전 주소는 /u/6 이 들어 있었다 — 담당자 브라우저의 7번째 구글 계정을 가리키는
+# 주소라 받는 쪽에서는 열리지 않는다. 669통에 그대로 나갔다.
+# render?cid= 형태가 '이 캘린더를 추가하시겠습니까?' 로 바로 뜨는 공개 주소다.
+import urllib.parse as _up_cal
+CALENDAR_LINK = ("https://calendar.google.com/calendar/render?cid="
+                 + _up_cal.quote(COMMON_CAL_ID, safe=""))
+
 # 클릭 추적 (Apps Script 웹앱) — 메일 링크를 이 URL 경유로 감싸 클릭을 기록
 CLICK_TRACK_URL = "https://script.google.com/macros/s/AKfycbyqjB9JmN6BAHSjBHH7Okup4HJZ8l4ToI-6Y0icbSYWKQn8NJAMpjEcuR4pi0tSOpSH/exec"
 CLICK_LOG_SHEET_ID = "1-gYegpHysgSvF1TgQB7Rfh3rs_tNfrE4NS3F1xLef0o"  # 클릭추적_로그 시트
@@ -2506,12 +2514,33 @@ def presend_checks(approved, df_hist, df_companies, test_mode, today=None):
                 f'보낼 기업 {n_co}개사 · 공고 {len(rows)}건',
                 f'기업당 평균 {len(rows)/max(n_co,1):.1f}건'))
 
-    # ── ⑥ 마감일 알림 파일 ────────────────────────────
-    has_dl = int(dl.notna().sum())
-    out.append(('경고' if has_dl < len(rows) else '통과',
-                f'마감일이 없어 일정 파일에 안 담기는 공고 {len(rows)-has_dl}건',
-                '그 공고는 캘린더 알림에서 빠집니다.' if has_dl < len(rows)
-                else '모든 공고가 일정 파일에 담깁니다'))
+    # ── ⑥ 승인했지만 메일에 안 실리는 공고 ────────────
+    #     접수기간이 '세부사업별 상이' 이거나 '예산 소진시까지' 인 공고는
+    #     can_include_notice 관문에서 빠진다. 승인 숫자만 보면 모른다.
+    try:
+        _drop, _byco = [], {}
+        for _r in approved:
+            _co = _r.get('기업명', '')
+            _ok, _why = can_include_notice(_r, _co)
+            _byco.setdefault(_co, [0, 0])
+            _byco[_co][0] += 1
+            if _ok:
+                _byco[_co][1] += 1
+            else:
+                _drop.append(_why)
+        import collections as _cl
+        _dc = _cl.Counter(_drop)
+        _empty = [c for c, (a, b) in _byco.items() if b == 0]
+        out.append(('경고' if _drop else '통과',
+                    f'승인했지만 메일에 안 실리는 공고 {len(_drop)}건',
+                    ' · '.join(f'{k} {v}건' for k, v in _dc.most_common())
+                    if _drop else '승인한 공고가 모두 실립니다'))
+        out.append(('치명' if _empty else '통과',
+                    f'공고가 한 건도 안 실리는 기업 {len(_empty)}개사',
+                    ', '.join(_empty[:6]) if _empty
+                    else '모든 기업에 공고가 한 건 이상 실립니다'))
+    except Exception as _ge:
+        out.append(('경고', '메일 수록 여부를 확인하지 못했습니다', str(_ge)[:80]))
 
     return out
 
@@ -2976,7 +3005,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1026-39"
+BUILD_TAG = "v1026-40"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -3617,40 +3646,8 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
             rows_html += notice_card_simple(n, i)
         rows_html += "</div>"
 
-    # ── 전체 반응 버튼 ────────────────────────
-    import urllib.parse as _up_fb
-    fb_subj = _up_fb.quote(f"[원스톱 피드백] {company}")
-    fb_good = _up_fb.quote("[이번 주 공고 안내 피드백]\n반응: 도움됐어요\n\n[추가 의견]\n\n[Gmail 주소]\n")
-    fb_bad  = _up_fb.quote("[이번 주 공고 안내 피드백]\n반응: 별로였어요\n\n[추가 의견]\n어떤 점이 아쉬우셨나요?\n\n[Gmail 주소]\n")
-    fb_msg  = _up_fb.quote("[이번 주 공고 안내 피드백]\n\n[추가 의견]\n\n[더 받고 싶은 분야/키워드]\n\n[Gmail 주소]\n")
-    rows_html += f"""
-    <div style="border-top:1px solid #E8E2D5;
-                margin-top:20px;padding-top:16px;text-align:center;">
-      <p style="margin:0 0 12px;font-size:12px;color:#757066;">
-        이번 공고 안내가 도움이 됐나요?
-      </p>
-      <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_good}"
-         style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                font-weight:600;color:#7E6433;background:#F3EDE0;
-            border:1px solid #E0D5BF;border-radius:8px;text-decoration:none;">
-        👍 도움됐어요
-      </a>
-      <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_bad}"
-         style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                font-weight:600;color:#757066;background:#EDEBE5;
-            border:1px solid #DDD8CE;border-radius:8px;text-decoration:none;">
-        👎 별로였어요
-      </a>
-      <a href="mailto:onestop.kipcc@gmail.com?subject={fb_subj}&body={fb_msg}"
-         style="display:inline-block;margin:0 4px;padding:8px 18px;font-size:13px;
-                font-weight:600;color:#757066;
-                background:#F3F1EC;
-                border:1px solid #DDD8CE;
-                border-radius:8px;text-decoration:none;">
-        💬 의견 남기기
-      </a>
-    </div>"""
-
+    # 전체 반응 버튼(👍 도움됐어요 / 👎 별로였어요 / 💬 의견)은 뺐다.
+    # 여섯 회차 446통에 넣었지만 회신이 한 건도 없었다. 자리만 차지한다.
 
     import urllib.parse as _up
     kw_subject = _up.quote(f"[원스톱 피드백] {company}")
@@ -3683,16 +3680,18 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
     <div style="background:#FFFFFF;border-radius:10px;
                 padding:16px 18px;border:1.5px solid #D8D0C0;margin:16px 0;">
       <p style="margin:0 0 4px;color:#7E6433;font-weight:700;font-size:11px;">
-        📅 마감일 알림 받기
+        📅 공고 마감일 캘린더
       </p>
-      <p style="margin:0 0 8px;font-size:12px;color:#6B6558;line-height:1.85;">
-        이 메일에 <b>일정 파일(.ics)</b>을 첨부해 두었습니다.<br>
-        열어서 추가하시면 위 공고 마감일이 캘린더에 들어가고,
-        <b>7일 전과 3일 전에 알림</b>이 갑니다.
+      <p style="margin:0 0 10px;font-size:12px;color:#6B6558;line-height:1.85;">
+        안내드린 공고의 마감일을 한곳에 모아두었습니다.<br>
+        구독하시면 새 공고가 올라올 때마다 자동으로 채워집니다.
       </p>
-      <p style="margin:8px 0 0;font-size:11px;color:#786B4E;line-height:1.75;">
-        아웃룩 · 네이버 · 구글 · 애플 캘린더 모두 됩니다. 구독이나 로그인은 필요 없습니다.
-      </p>
+      <a href="{CALENDAR_LINK}"
+         style="display:inline-block;background:#C9A96A;color:#3A2E15;
+                padding:8px 18px;border-radius:7px;text-decoration:none;
+                font-size:12px;font-weight:700;">
+        캘린더 구독하기 →
+      </a>
     </div>"""
 
     together_sec = f"""
@@ -3705,11 +3704,17 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
         원스톱 스케일업 참여 기업의 제품·기술과 협력 희망 분야를 소개하는 공간입니다.
         등록하시면 다른 기업·기관이 귀사를 찾아보고 협력을 제안할 수 있습니다.
       </p>
-      <a href="http://kipcc.eumsvr.com"
+      <a href="https://www.kipcc.re.kr/join"
+         style="display:inline-block;margin:0 6px 0 0;padding:9px 20px;
+                font-size:12px;font-weight:700;color:#1B2A41;background:#C9A96A;
+                border-radius:6px;text-decoration:none;">
+        회원가입 →
+      </a>
+      <a href="https://www.kipcc.re.kr/"
          style="display:inline-block;padding:9px 20px;font-size:12px;font-weight:700;
-                color:#1B2A41;background:#C9A96A;border-radius:6px;
-                text-decoration:none;">
-        회원소개 등록하기 →
+                color:#C9A96A;background:transparent;border:1px solid #C9A96A;
+                border-radius:6px;text-decoration:none;">
+        센터 홈 →
       </a>
     </div>"""
 
@@ -6782,6 +6787,9 @@ elif page == "공고·매칭":
                         with b1:
                             lbl = "✅ 승인" if current != "○" else "↩ 승인취소"
                             btn_type = "primary" if current != "○" else "secondary"
+                            _inc_ok, _inc_why = can_include_notice(r, r.get('기업명',''))
+                            if not _inc_ok:
+                                st.caption(f"⚠ 승인하셔도 메일에 실리지 않습니다 — {_inc_why}")
                             if st.button(lbl, key=f"o_{key}_{i}", use_container_width=True, type=btn_type):
                                 set_decision(key, "" if current=="○" else "○", '담당자')
                                 # rerun 대신 상태만 변경 → 전체 재렌더링 없이 버튼 상태만 반영
@@ -7186,8 +7194,6 @@ elif page == "발송":
         if st.button("📤 발송 실행", type="primary", disabled=_blk)                 or st.session_state.get('_send_preview_co'):
             from email.mime.multipart import MIMEMultipart
             from email.mime.text import MIMEText
-            from email.mime.base import MIMEBase
-            from email import encoders as _encoders
             from email.header import Header
             from email.utils import formataddr
             import base64
@@ -7332,17 +7338,12 @@ elif page == "발송":
                     st.session_state.pop('_send_preview_co', None)
                     st.stop()
 
-                # 마감일 알림 파일. 마감일이 있는 공고가 없으면 None 이고
-                # 그때는 첨부 없이 보낸다. 실패해도 발송은 막지 않는다.
-                try:
-                    _ics = build_ics(company, notices)
-                except Exception as _ie:
-                    _ics = None
-                    logs.append(f"⚠ {company} 일정 파일 생성 실패 — 첨부 없이 발송 ({_ie})")
-
+                # 마감일 알림은 .ics 첨부 대신 공통 캘린더 구독 링크로 간다.
+                # 첨부는 네이버·아웃룩에서 '수락/미정/거절' 회의 초대처럼 보였다.
+                # build_ics 는 남겨둔다 — 나중에 추적되는 링크로 다시 쓸 수 있다.
                 recipients = get_test_recipients() if test_mode else [co_email]
                 for to in recipients:
-                    msg = MIMEMultipart('mixed') if _ics else MIMEMultipart('alternative')
+                    msg = MIMEMultipart('alternative')
                     # 한글 표시 이름·제목은 RFC 2047 로 인코딩해야 클라이언트에서 안 깨진다.
                     msg['From']    = formataddr(
                         (str(Header(MAIL_FROM_NAME, 'utf-8')), MAIL_FROM_ADDR))
@@ -7352,19 +7353,7 @@ elif page == "발송":
                     msg['Subject'] = Header(
                         ("[TEST] " if test_mode else "")
                         + mail_subject(company, _mail_meta), 'utf-8')
-                    if _ics:
-                        _alt = MIMEMultipart('alternative')
-                        _alt.attach(MIMEText(html, 'html', 'utf-8'))
-                        msg.attach(_alt)
-                        _part = MIMEBase('text', 'calendar',
-                                         charset='utf-8', method='PUBLISH')
-                        _part.set_payload(_ics)
-                        _encoders.encode_base64(_part)
-                        _part.add_header('Content-Disposition', 'attachment',
-                                         filename='scaleup-deadlines.ics')
-                        msg.attach(_part)
-                    else:
-                        msg.attach(MIMEText(html, 'html', 'utf-8'))
+                    msg.attach(MIMEText(html, 'html', 'utf-8'))
                     gmail_send(base64.urlsafe_b64encode(msg.as_bytes()).decode())
                     logs.append(f"✅ {company} → {to}" + (f" (+Cc {len(cc_list)})" if cc_list and not test_mode else ""))
 
