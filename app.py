@@ -210,12 +210,6 @@ def load_review_state(drive, round_id=None, keep_reject=None):
     st.session_state['decision_src'] = {k: v for k, v in _srcs.items() if k in state}
     return state, saved_round, saved_at, same
 
-class _noop_ctx:
-    """실무자 화면에서 블록 하나를 통째로 건너뛸 때 쓰는 빈 컨텍스트."""
-    def __enter__(self):  return self
-    def __exit__(self, *a): return False
-
-
 def set_decision(key, value, source):
     """승인(○)·제외(✕)를 찍으면서 그 결정이 어디서 나왔는지 함께 남긴다.
     source: 'AI 자동 승인' / 'AI 자동 제외' / '담당자' / '🟡 자동 보완'
@@ -3013,7 +3007,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1026-41"
+BUILD_TAG = "v1026-44"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -4604,98 +4598,102 @@ with st.sidebar:
     # 진단 추출과 판단 기록 모두 가끔 쓰는 기능이라, 사이드바를 길게 차지하지
     # 않도록 한 묶음으로 접어둔다.
     st.divider()
-    with st.expander("📦 데이터 내보내기", expanded=False) if not _IS_STAFF else _noop_ctx():
-        st.caption("🔍 진단용 결과 추출")
-        _mr = st.session_state.get('match_results', [])
-        if _mr:
-            import io as _io
-            _ai = st.session_state.get('ai_analysis', {})
-            _rv = st.session_state.get('review_state', {})
-            _df = pd.DataFrame(_mr).fillna('')
-            def _key(r):
-                return f"{r.get('기업명','')}_{r.get('공고ID','')}"
-            _ai_fields = ['추천여부','적합도','한줄요약','업종일치','자격충족',
-                          '지역적합','수요일치','판단근거','주의사항']
-            for _f in _ai_fields:
-                _df['AI_'+_f] = _df.apply(lambda r: _ai.get(_key(r), {}).get(_f, ''), axis=1)
-            _stat = {'○':'승인','✕':'제외'}
-            _df['검토상태'] = _df.apply(lambda r: _stat.get(_rv.get(_key(r), ''), '미검토'), axis=1)
-            def _agg(g):
-                s = g['관련도'].astype(str)
-                rec = g['AI_추천여부']; stt = g['검토상태']
-                return pd.Series({
-                    '매칭건수': len(g),
-                    '★★★': (s=='★★★').sum(), '★★': (s=='★★').sum(),
-                    'AI추천': (rec=='추천').sum(), 'AI검토': (rec=='검토').sum(),
-                    'AI비추천': (rec=='비추천').sum(), 'AI미분석': (rec=='').sum(),
-                    '승인': (stt=='승인').sum(), '제외': (stt=='제외').sum(),
-                    '미검토': (stt=='미검토').sum(),
-                })
-            _summary = _df.groupby('기업명').apply(_agg).reset_index()
-            _buf = _io.BytesIO()
-            with pd.ExcelWriter(_buf, engine='openpyxl') as _w:
-                _summary.to_excel(_w, index=False, sheet_name='기업별요약')
-                _df.to_excel(_w, index=False, sheet_name='매칭상세')
-            st.download_button(
-                "📥 진단용 결과 다운로드",
-                data=_buf.getvalue(),
-                file_name=f"매칭진단_{datetime.today().strftime('%Y%m%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-            )
-            st.caption(f"기업 {_df['기업명'].nunique()}곳 · 매칭 {len(_df)}건")
-        else:
-            st.caption("매칭 결과 없음 — 먼저 매칭·AI 분석을 실행하세요")
-
-        st.divider()
-        st.caption("📊 판단 기록 (회차별 판단·반응 누적)")
-        if st.button("🔄 갱신 (클릭·반응 수집)", key="declog_refresh", use_container_width=True):
-            with st.spinner("클릭 로그·반응 회신 수집 중..."):
-                _dd   = _get_drive()
-                _drid = current_round_id()
-                _craw = load_click_log()          # 원본 — 회차 귀속에 시각이 필요하다
-                _cmap = build_click_map(_craw)
-                _rmap = collect_reactions()
-                _smap = load_send_progress(_dd, _drid).get('sent', {}) if _drid else {}
-                _ok_d, _cnt_d = record_decision_log(_dd, _drid, _smap, _cmap, _rmap, _craw)
-            if _ok_d:
-                _mr_now = st.session_state.get('match_results', [])
-                st.success(
-                    f"갱신 완료 — 누적 {_cnt_d}행"
-                    + ("" if _mr_now else
-                       " (이번 회차 매칭 결과가 없어 과거 회차의 클릭·출처만 손질했습니다)"))
+    # 진단용 추출·판단 기록은 담당자 도구다. 전에는 빈 컨텍스트로 갈랐는데,
+    # 파이썬은 with 본문을 건너뛸 수 없으니 접힘만 벗겨져 오히려 실무자에게
+    # 활짝 펼쳐져 있었다. 감추려면 블록 자체를 안 타야 한다.
+    if not _IS_STAFF:
+        with st.expander("📦 데이터 내보내기", expanded=False):
+            st.caption("🔍 진단용 결과 추출")
+            _mr = st.session_state.get('match_results', [])
+            if _mr:
+                import io as _io
+                _ai = st.session_state.get('ai_analysis', {})
+                _rv = st.session_state.get('review_state', {})
+                _df = pd.DataFrame(_mr).fillna('')
+                def _key(r):
+                    return f"{r.get('기업명','')}_{r.get('공고ID','')}"
+                _ai_fields = ['추천여부','적합도','한줄요약','업종일치','자격충족',
+                              '지역적합','수요일치','판단근거','주의사항']
+                for _f in _ai_fields:
+                    _df['AI_'+_f] = _df.apply(lambda r: _ai.get(_key(r), {}).get(_f, ''), axis=1)
+                _stat = {'○':'승인','✕':'제외'}
+                _df['검토상태'] = _df.apply(lambda r: _stat.get(_rv.get(_key(r), ''), '미검토'), axis=1)
+                def _agg(g):
+                    s = g['관련도'].astype(str)
+                    rec = g['AI_추천여부']; stt = g['검토상태']
+                    return pd.Series({
+                        '매칭건수': len(g),
+                        '★★★': (s=='★★★').sum(), '★★': (s=='★★').sum(),
+                        'AI추천': (rec=='추천').sum(), 'AI검토': (rec=='검토').sum(),
+                        'AI비추천': (rec=='비추천').sum(), 'AI미분석': (rec=='').sum(),
+                        '승인': (stt=='승인').sum(), '제외': (stt=='제외').sum(),
+                        '미검토': (stt=='미검토').sum(),
+                    })
+                _summary = _df.groupby('기업명').apply(_agg).reset_index()
+                _buf = _io.BytesIO()
+                with pd.ExcelWriter(_buf, engine='openpyxl') as _w:
+                    _summary.to_excel(_w, index=False, sheet_name='기업별요약')
+                    _df.to_excel(_w, index=False, sheet_name='매칭상세')
+                st.download_button(
+                    "📥 진단용 결과 다운로드",
+                    data=_buf.getvalue(),
+                    file_name=f"매칭진단_{datetime.today().strftime('%Y%m%d')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+                st.caption(f"기업 {_df['기업명'].nunique()}곳 · 매칭 {len(_df)}건")
             else:
-                st.warning("판단 기록이 비어 있거나 저장에 실패했습니다.")
+                st.caption("매칭 결과 없음 — 먼저 매칭·AI 분석을 실행하세요")
 
-        if '_declog_cache' not in st.session_state:
-            st.session_state['_declog_cache'] = load_decision_log(_get_drive())
-        _rows_d = st.session_state.get('_declog_cache') or []
-        if _rows_d:
-            import io as _io2
-            _dfd  = pd.DataFrame(_rows_d)
-            _bufd = _io2.BytesIO()
-            with pd.ExcelWriter(_bufd, engine='openpyxl') as _wd:
-                _dfd.to_excel(_wd, index=False, sheet_name='전체')
-                if '회차ID' in _dfd.columns:
-                    _sm_d = _dfd.groupby('회차ID').agg(
-                        매칭건수=('공고ID', 'count'),
-                        승인=('최종결정', lambda s: (s == '승인').sum()),
-                        제외=('최종결정', lambda s: (s == '제외').sum()),
-                        발송=('발송여부', lambda s: s.isin(['Y', '참고']).sum()),
-                        클릭=('클릭여부', lambda s: (s == 'Y').sum()),
-                    ).reset_index()
-                    _sm_d.to_excel(_wd, index=False, sheet_name='회차별 요약')
-            st.download_button(
-                "📥 판단 기록 다운로드",
-                data=_bufd.getvalue(),
-                file_name=f"판단기록_{datetime.today().strftime('%Y%m%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-            )
-            _nr = _dfd['회차ID'].nunique() if '회차ID' in _dfd.columns else 0
-            st.caption(f"누적 {len(_dfd)}행 · 회차 {_nr}개")
-        else:
-            st.caption("아직 기록 없음 — 검토 완료 저장·발송 후 쌓입니다")
+            st.divider()
+            st.caption("📊 판단 기록 (회차별 판단·반응 누적)")
+            if st.button("🔄 갱신 (클릭·반응 수집)", key="declog_refresh", use_container_width=True):
+                with st.spinner("클릭 로그·반응 회신 수집 중..."):
+                    _dd   = _get_drive()
+                    _drid = current_round_id()
+                    _craw = load_click_log()          # 원본 — 회차 귀속에 시각이 필요하다
+                    _cmap = build_click_map(_craw)
+                    _rmap = collect_reactions()
+                    _smap = load_send_progress(_dd, _drid).get('sent', {}) if _drid else {}
+                    _ok_d, _cnt_d = record_decision_log(_dd, _drid, _smap, _cmap, _rmap, _craw)
+                if _ok_d:
+                    _mr_now = st.session_state.get('match_results', [])
+                    st.success(
+                        f"갱신 완료 — 누적 {_cnt_d}행"
+                        + ("" if _mr_now else
+                           " (이번 회차 매칭 결과가 없어 과거 회차의 클릭·출처만 손질했습니다)"))
+                else:
+                    st.warning("판단 기록이 비어 있거나 저장에 실패했습니다.")
+
+            if '_declog_cache' not in st.session_state:
+                st.session_state['_declog_cache'] = load_decision_log(_get_drive())
+            _rows_d = st.session_state.get('_declog_cache') or []
+            if _rows_d:
+                import io as _io2
+                _dfd  = pd.DataFrame(_rows_d)
+                _bufd = _io2.BytesIO()
+                with pd.ExcelWriter(_bufd, engine='openpyxl') as _wd:
+                    _dfd.to_excel(_wd, index=False, sheet_name='전체')
+                    if '회차ID' in _dfd.columns:
+                        _sm_d = _dfd.groupby('회차ID').agg(
+                            매칭건수=('공고ID', 'count'),
+                            승인=('최종결정', lambda s: (s == '승인').sum()),
+                            제외=('최종결정', lambda s: (s == '제외').sum()),
+                            발송=('발송여부', lambda s: s.isin(['Y', '참고']).sum()),
+                            클릭=('클릭여부', lambda s: (s == 'Y').sum()),
+                        ).reset_index()
+                        _sm_d.to_excel(_wd, index=False, sheet_name='회차별 요약')
+                st.download_button(
+                    "📥 판단 기록 다운로드",
+                    data=_bufd.getvalue(),
+                    file_name=f"판단기록_{datetime.today().strftime('%Y%m%d')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                )
+                _nr = _dfd['회차ID'].nunique() if '회차ID' in _dfd.columns else 0
+                st.caption(f"누적 {len(_dfd)}행 · 회차 {_nr}개")
+            else:
+                st.caption("아직 기록 없음 — 검토 완료 저장·발송 후 쌓입니다")
 
 # 구글 서비스 — 필요할 때 get_creds()로 직접 인증
 
@@ -4703,9 +4701,138 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════
 # 대시보드
 # ══════════════════════════════════════════════════════
+def render_staff_home(df_c, df_n, df_h):
+    """실무자 홈 — 이번 회차가 어디까지 왔는지, 무엇을 보고 정하는지.
+
+    담당자 대시보드는 회차별 반응률·운영 기록·클릭 안 한 기업까지 담는다.
+    실무자에게는 그게 '지금 무엇을 해야 하나'를 가린다. 흐름과 판단 기준만
+    남긴다. 숫자는 이미 세션에 있는 것(매칭 결과·검토 상태·AI 판정)을 쓰므로
+    드라이브를 더 읽지 않는다.
+    """
+    _res = st.session_state.get('match_results', []) or []
+    _rv  = st.session_state.get('review_state', {}) or {}
+    _ai  = st.session_state.get('ai_analysis', {}) or {}
+
+    def _k(r):
+        return f"{r.get('기업명','')}_{r.get('공고ID','')}"
+
+    _n_ok   = sum(1 for r in _res if _rv.get(_k(r), '') == '○')
+    _n_no   = sum(1 for r in _res if _rv.get(_k(r), '') == '✕')
+    _n_todo = sum(1 for r in _res if _rv.get(_k(r), '') == '')
+    _n_rec  = sum(1 for r in _res if (_ai.get(_k(r)) or {}).get('추천여부') == '추천')
+    _n_chk  = sum(1 for r in _res if (_ai.get(_k(r)) or {}).get('추천여부') == '검토')
+    _co_ok  = len({r.get('기업명','') for r in _res if _rv.get(_k(r), '') == '○'})
+
+    # 보낼 수 있는 공고 — 마감이 아직 안 지난 것
+    _active = 0
+    if not df_n.empty and '마감일' in df_n.columns:
+        _today = datetime.today().strftime('%Y-%m-%d')
+        _active = int((df_n['마감일'].astype(str) >= _today).sum())
+    _sel_co = int((df_c['선정구분'] == '선정').sum()) if '선정구분' in df_c.columns else len(df_c)
+    _month_h = 0
+    if not df_h.empty and '발송일' in df_h.columns:
+        _ym = datetime.today().strftime('%Y-%m')
+        _month_h = int(df_h['발송일'].astype(str).str.startswith(_ym).sum())
+
+    _rid = current_round_id()
+    st.caption(f"회차 {_rid or '— 아직 매칭을 돌리지 않았습니다'}"
+               f"  ·  기준일 {datetime.today().strftime('%Y-%m-%d')}")
+
+    s1, s2, s3, s4 = st.columns(4)
+    s1.metric("안내 대상 기업", f"{_sel_co}개사")
+    s2.metric("보낼 수 있는 공고", f"{_active:,}건", f"전체 {len(df_n):,}건")
+    s3.metric("이번 회차 승인", f"{_n_ok:,}건", f"{_co_ok}개사")
+    s4.metric("이번 달 발송", f"{_month_h}건")
+
+    st.divider()
+
+    # ── 흐름 5단계 ────────────────────────────────────
+    STEPS = [
+        ("1", "공고 모으기",
+         f"보낼 수 있는 공고 {_active:,}건",
+         "기업마당에서 매일 아침 자동으로 받아옵니다. 손대실 것 없습니다.",
+         _active > 0),
+        ("2", "기업별로 고르기",
+         f"{len(_res):,}건 찾음" if _res else "아직 안 돌렸습니다",
+         "기업의 업종·관심분야·지역을 공고와 맞춰 점수를 냅니다. "
+         "이미 보낸 공고와 마감이 지난 공고는 여기서 자동으로 빠집니다.",
+         bool(_res)),
+        ("3", "안 맞는 것 거르기",
+         f"추천 {_n_rec:,} · 검토 {_n_chk:,} · 제외 {_n_no:,}" if _res else "—",
+         "점수만으로는 못 거르는 것이 있습니다. 판금 가공 전시회에 핀테크 "
+         "기업이 71점으로 올라오는 식입니다. 그런 것을 AI가 뺍니다.",
+         _n_no > 0),
+        ("4", "남은 것 확인하기",
+         f"승인 {_n_ok:,}건 · 아직 {_n_todo:,}건" if _res else "—",
+         "같은 공고가 여러 기업에 걸립니다. 기업을 하나씩 넘기지 마시고 "
+         "'공고 하나를 여러 기업에 한 번에 처리'를 쓰시면 빠릅니다.",
+         _n_ok > 0 and _n_todo == 0),
+        ("5", "보내기",
+         f"{_n_ok:,}건 대기" if _n_ok else "승인하시면 열립니다",
+         "'보내기 전 점검'을 통과해야 발송 버튼이 열립니다. "
+         "테스트 모드로 먼저 한 통 받아보시고 실제 발송하십시오.",
+         False),
+    ]
+    for _no, _title, _stat, _desc, _done in STEPS:
+        _mark = "✅" if _done else ("⏳" if _no == "4" and _res else "⬜")
+        st.markdown(
+            f"**{_mark} {_no}. {_title}**"
+            f"<span style='color:#9AA4B2;font-size:13px;margin-left:10px;'>{_stat}</span>",
+            unsafe_allow_html=True)
+        st.caption("　　" + _desc)
+
+    st.divider()
+
+    # ── 판단 기준 ─────────────────────────────────────
+    with st.expander("📖 무엇을 보고 정하나 — 화면의 숫자와 표시 읽는 법", expanded=False):
+        st.markdown("""
+#### 점수
+공고와 기업이 얼마나 맞는지를 아래를 더해서 냅니다.
+
+| 보는 것 | 가중치 |
+|---|---|
+| 지원대상이 맞나 (조달기업·수출기업 …) | ×3 |
+| 사업 성격이 맞나 (공공조달·해외진출 …) | ×2 |
+| 기업 키워드가 공고에 나오나 | ×2 |
+| 핵심수요 태그가 맞나 | ×3 (맞으면 +8) |
+| 같은 지역인가 | +2~3 |
+| 다른 지역 한정인가 | −5 |
+
+지난 두 회차를 세어 보면 **점수가 높을수록 실제로 더 눌렀습니다.**
+40점대는 6%, 60점 이상은 29%가 공고를 열어봤습니다.
+
+#### ★ 별점은 점수가 아닙니다
+지금 별점은 **지역**을 뜻합니다. 같은 지역이면 ★★★, 다른 지역 한정이면
+★★로 한 단계 내려갑니다. 그래서 30점짜리와 70점짜리가 똑같이 ★★★입니다.
+**별점 대신 점수를 보십시오.**
+
+#### AI 판정
+* **추천** — 바로 보내도 되는 것
+* **검토** — 사람이 봐야 하는 것. 대부분 *설립 몇 년 됐는지 몰라서* 입니다
+  (선정기업 명단에 설립연도가 비어 있으면 업력 조건을 확인할 수 없습니다)
+* **비추천** — 업종이 안 맞거나 다른 지역 한정. 자동으로 빠집니다
+
+#### ⚠ 승인하셔도 메일에 실리지 않습니다
+접수기간이 `세부사업별 상이` 이거나 `예산 소진시까지` 인 공고입니다.
+언제 끝나는지 알 수 없어서, 이미 끝난 공고를 보내지 않으려고 뺍니다.
+승인 버튼 위에 이 문구가 보이면 다른 공고를 하나 더 승인해 주십시오.
+
+---
+
+#### 승인할지 말지 헷갈리실 때
+* 이 기업이 **실제로 신청할 수 있는** 공고인가 — 업종·자격·지역
+* 포상·표창처럼 **이미 실적이 있어야** 하는 공고는 아닌가
+* 애매하면 **넘기셔도 됩니다.** 안 보내서 생기는 손해보다, 안 맞는 걸
+  보내서 다음부터 안 열게 되는 손해가 큽니다
+        """)
+
+    st.caption("막히는 데가 있으면 담당자에게 알려주십시오. "
+               "숫자가 오래된 것 같으면 위의 🔄 새로고침을 누르시면 됩니다.")
+
+
 if page == "대시보드":
     drive = _get_drive()
-    st.title("📊 운영 대시보드")
+    st.title("이번 회차, 어디까지 왔나" if _IS_STAFF else "📊 운영 대시보드")
 
     _c1, _c2 = st.columns([5, 1])
     _c2.caption("")
@@ -4723,6 +4850,13 @@ if page == "대시보드":
         # 가벼운 요약이 있으면 그걸 쓰고, 없을 때만 전문 파일을 읽는다.
         _det_sum = read_json_cached(DETAIL_SUMMARY_FILE)
         df_det = pd.DataFrame() if _det_sum else read_excel_cached(DETAIL_FILE)
+
+    # ── 실무자 홈 ─────────────────────────────────────
+    # 아래 담당자 화면은 회차별 반응률·운영 기록까지 담는다. 실무자에게는
+    # 그게 '지금 무엇을 해야 하나'를 가리므로 흐름과 기준만 보여주고 멈춘다.
+    if _IS_STAFF:
+        render_staff_home(df_c, df_n, df_h)
+        st.stop()
 
     # ── 상단 핵심 지표 4개 ─────────────────────────────
     m1, m2, m3, m4 = st.columns(4)
@@ -6795,8 +6929,12 @@ elif page == "공고·매칭":
                         with b1:
                             lbl = "✅ 승인" if current != "○" else "↩ 승인취소"
                             btn_type = "primary" if current != "○" else "secondary"
-                            _inc_ok, _inc_why = can_include_notice(r, r.get('기업명',''))
-                            if not _inc_ok:
+                            # 이 루프의 공고는 row 다(r 은 위쪽 컴프리헨션 변수여서
+                            # 블록을 안 거치면 아예 없다 — 그래서 NameError 가 났다).
+                            _inc_ok, _inc_why = can_include_notice(
+                                row, row.get('기업명', ''),
+                                st.session_state.get('ai_analysis', {}))
+                            if not _inc_ok and _inc_why != '담당자 제외(✕)':
                                 st.caption(f"⚠ 승인하셔도 메일에 실리지 않습니다 — {_inc_why}")
                             if st.button(lbl, key=f"o_{key}_{i}", use_container_width=True, type=btn_type):
                                 set_decision(key, "" if current=="○" else "○", '담당자')
