@@ -62,9 +62,17 @@ def check_password():
         pw = st.text_input("비밀번호", type="password",
                            placeholder="비밀번호 입력", label_visibility="collapsed")
         if st.button("로그인", use_container_width=True, type="primary"):
-            correct = st.secrets.get("password", "dbwlgns")
-            if pw == correct:
+            # 비밀번호로 역할이 갈린다. 실무자는 회차 운영에 필요한 화면만 본다.
+            # 기능을 지운 게 아니라 메뉴에 안 올릴 뿐이고, 담당자는 전부 본다.
+            admin_pw = st.secrets.get("password", "dbwlgns")
+            staff_pw = st.secrets.get("password_staff", "")
+            if pw == admin_pw:
                 st.session_state["authenticated"] = True
+                st.session_state["role"] = "admin"
+                st.rerun()
+            elif staff_pw and pw == staff_pw:
+                st.session_state["authenticated"] = True
+                st.session_state["role"] = "staff"
                 st.rerun()
             else:
                 st.error("비밀번호가 올바르지 않습니다")
@@ -193,6 +201,12 @@ def load_review_state(drive, round_id=None, keep_reject=None):
     _srcs = saved.get('decision_src', {}) or {}
     st.session_state['decision_src'] = {k: v for k, v in _srcs.items() if k in state}
     return state, saved_round, saved_at, same
+
+class _noop_ctx:
+    """실무자 화면에서 블록 하나를 통째로 건너뛸 때 쓰는 빈 컨텍스트."""
+    def __enter__(self):  return self
+    def __exit__(self, *a): return False
+
 
 def set_decision(key, value, source):
     """승인(○)·제외(✕)를 찍으면서 그 결정이 어디서 나왔는지 함께 남긴다.
@@ -2962,7 +2976,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1026-38"
+BUILD_TAG = "v1026-39"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -4543,11 +4557,20 @@ with st.sidebar:
     # 메뉴 그룹핑
     # 예전에는 '▸ 운영' 캡션 하나 아래 11개가 한 덩어리였다. 성격이 달라 찾기 어렵다.
     # 라디오는 하나로 두되(선택 상태를 나눌 수 없으므로) 구분선으로 묶어 보여준다.
-    _MENU_GROUPS = [
-        ("운영",   ["대시보드", "공고·매칭", "발송"]),
-        ("데이터", ["기업 관리", "발송 이력", "클릭 반응", "교육 신청 집계", "메일 보관함"]),
-        ("도구",   ["안내 메일", "캘린더", "설정", "시스템 명세"]),
-    ]
+    # 실무자는 회차를 돌리는 데 필요한 네 가지만 본다.
+    # 기업 명단·가중치·제외 키워드를 건드리면 매칭이 틀어지므로 담당자만 본다.
+    _IS_STAFF = st.session_state.get("role") == "staff"
+    if _IS_STAFF:
+        _MENU_GROUPS = [
+            ("회차 운영", ["대시보드", "공고·매칭", "발송"]),
+            ("확인",      ["발송 이력"]),
+        ]
+    else:
+        _MENU_GROUPS = [
+            ("운영",   ["대시보드", "공고·매칭", "발송"]),
+            ("데이터", ["기업 관리", "발송 이력", "클릭 반응", "교육 신청 집계", "메일 보관함"]),
+            ("도구",   ["안내 메일", "캘린더", "설정", "시스템 명세"]),
+        ]
     _MENU = [m for _, items in _MENU_GROUPS for m in items]
     _GROUP_OF = {m: g for g, items in _MENU_GROUPS for m in items}
 
@@ -4558,6 +4581,7 @@ with st.sidebar:
     page = st.radio("메뉴", _MENU, format_func=_menu_label,
                     label_visibility="collapsed")
     st.caption(f"지금 보는 화면 — {_GROUP_OF.get(page, '')} / {page}")
+    st.caption("👤 " + ("실무자" if _IS_STAFF else "담당자"))
     st.divider()
     test_mode = st.toggle("테스트 모드", value=True)
     if test_mode: st.warning("테스트 메일 발송")
@@ -4567,7 +4591,7 @@ with st.sidebar:
     # 진단 추출과 판단 기록 모두 가끔 쓰는 기능이라, 사이드바를 길게 차지하지
     # 않도록 한 묶음으로 접어둔다.
     st.divider()
-    with st.expander("📦 데이터 내보내기", expanded=False):
+    with st.expander("📦 데이터 내보내기", expanded=False) if not _IS_STAFF else _noop_ctx():
         st.caption("🔍 진단용 결과 추출")
         _mr = st.session_state.get('match_results', [])
         if _mr:
@@ -9473,12 +9497,16 @@ elif page == "발송 이력":
             if len(df_h) > 200:
                 st.caption(f"※ 최근 200건만 표시 (전체 {len(df_h)}건)")
 
+            if _IS_STAFF:
+                st.caption("보기 전용입니다. 이 표를 고치면 중복 발송 방지가 깨져서, "
+                           "수정은 담당자만 할 수 있습니다.")
             edited = st.data_editor(df_show_h, use_container_width=True, hide_index=True,
+                disabled=_IS_STAFF,
                 column_config={
                     "신청여부":st.column_config.SelectboxColumn("신청여부",options=["","Y","N"]),
                     "선정결과":st.column_config.SelectboxColumn("선정결과",options=["","선정","미선정","대기"]),
                 })
-            if st.button("💾 드라이브 저장"):
+            if st.button("💾 드라이브 저장", disabled=_IS_STAFF):
                 with st.spinner("저장 중..."):
                     # 편집된 부분을 전체 df_h에 반영
                     df_h.iloc[-len(edited):] = edited.values
@@ -9489,7 +9517,7 @@ elif page == "발송 이력":
             st.markdown("**📅 공통 캘린더 일괄 등록**")
             st.caption("send_history의 마감일 있는 공고를 공통 캘린더에 일괄 등록합니다. 이미 등록된 공고는 스킵됩니다.")
 
-            if st.button("📅 캘린더 일괄 등록 실행", type="primary"):
+            if st.button("📅 캘린더 일괄 등록 실행", type="primary", disabled=_IS_STAFF):
                 _CAL_ID = "9078a49950a47b46ddb3511040886f3a016b75ca17169ec1113e5692b7327375@group.calendar.google.com"
                 # CALID_FILE 값 무시 (잘못된 ID 저장됨)
 
