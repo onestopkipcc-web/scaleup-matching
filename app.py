@@ -76,6 +76,20 @@ def check_password():
                 st.rerun()
             else:
                 st.error("비밀번호가 올바르지 않습니다")
+        # 배포본에서 비밀번호가 왜 안 맞는지 알아내는 유일한 창구.
+        # 주소 끝에 ?diag=1 을 붙이면 '어떤 키가 들어와 있나'만 보여준다.
+        # 값도 길이도 찍지 않는다 — 있다/없다 뿐이다. 공개 저장소이므로
+        # 이 코드가 노출돼도 새로 드러나는 것이 없어야 한다.
+        try:
+            if st.query_params.get("diag") == "1":
+                _keys = sorted(st.secrets.keys())
+                st.caption("설정에 들어온 키: " + (", ".join(_keys) or "(없음)"))
+                st.caption("password 있음: "
+                           + ("예" if str(st.secrets.get("password", "")) else "아니오")
+                           + " · password_staff 있음: "
+                           + ("예" if str(st.secrets.get("password_staff", "")) else "아니오"))
+        except Exception as _de:
+            st.caption(f"설정을 읽지 못했습니다 — {type(_de).__name__}")
     return False
 
 if not check_password():
@@ -3007,7 +3021,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1026-44"
+BUILD_TAG = "v1026-45"
 
 NOTICE_TEXT_CAP = 8000
 
