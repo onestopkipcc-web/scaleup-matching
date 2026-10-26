@@ -2487,9 +2487,14 @@ def presend_checks(approved, df_hist, df_companies, test_mode, today=None):
                 else '한 통 안 중복 없음'))
 
     # ── ③ 마감 ────────────────────────────────────────
-    dl = pd.to_datetime(rows.get('마감일'), errors='coerce')
-    past = int((dl.dt.date < today).sum())
-    near = int(((dl.dt.date >= today) & (dl.dt.date <= today + _dt.timedelta(days=3))).sum())
+    # 마감일이 전부 비어 있으면 .dt.date 가 datetime64 로 남아 date 와 비교가
+    # 안 된다(TypeError). '세부사업별 상이' 공고만 승인된 회차가 실제로 그렇다.
+    # Timestamp 로 비교하고 빈 값은 notna 로 걸러낸다.
+    dl  = pd.to_datetime(rows.get('마감일'), errors='coerce')
+    _t0 = pd.Timestamp(today)
+    _ok_dl = dl.notna()
+    past = int((_ok_dl & (dl < _t0)).sum())
+    near = int((_ok_dl & (dl >= _t0) & (dl <= _t0 + pd.Timedelta(days=3))).sum())
     out.append(('치명' if past else '통과',
                 f'마감이 지난 공고 {past}건',
                 '이미 끝난 공고를 안내하게 됩니다.' if past else '마감 지난 공고 없음'))
@@ -2535,10 +2540,13 @@ def presend_checks(approved, df_hist, df_companies, test_mode, today=None):
                     f'승인했지만 메일에 안 실리는 공고 {len(_drop)}건',
                     ' · '.join(f'{k} {v}건' for k, v in _dc.most_common())
                     if _drop else '승인한 공고가 모두 실립니다'))
-        out.append(('치명' if _empty else '통과',
-                    f'공고가 한 건도 안 실리는 기업 {len(_empty)}개사',
-                    ', '.join(_empty[:6]) if _empty
-                    else '모든 기업에 공고가 한 건 이상 실립니다'))
+        # 빈손 기업은 발송 루프가 이미 건너뛴다(빈 메일 방지). 막을 일이 아니라
+        # 알려줄 일이다. 한 곳이 막혀 49개사 발송이 멈추는 쪽이 더 나쁘다.
+        out.append(('경고' if _empty else '통과',
+                    f'공고가 한 건도 안 실리는 기업 {len(_empty)}개사 — 발송에서 자동 제외됩니다',
+                    (', '.join(_empty[:6]) + (' 외' if len(_empty) > 6 else '')
+                     + ' · 보낼 공고를 더 승인하시거나, 그대로 두시면 이 기업만 건너뜁니다')
+                    if _empty else '모든 기업에 공고가 한 건 이상 실립니다'))
     except Exception as _ge:
         out.append(('경고', '메일 수록 여부를 확인하지 못했습니다', str(_ge)[:80]))
 
@@ -3005,7 +3013,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1026-40"
+BUILD_TAG = "v1026-41"
 
 NOTICE_TEXT_CAP = 8000
 
