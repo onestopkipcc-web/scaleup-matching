@@ -2381,9 +2381,39 @@ def build_ics(company, notices, now=None):
 def ics_event_count(ics_bytes):
     return ics_bytes.decode('utf-8').count('BEGIN:VEVENT') if ics_bytes else 0
 
-def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=None):
+def notice_base_title(t):
+    """공고 제목에서 회차·연도·수정 표시를 걷어내 '같은 사업인지' 보게 만든다.
+
+    기업마당은 공고를 고치면 새 pblancId 로 다시 올린다. 제목만 '변경 공고',
+    '수정공고' 가 붙는다. ID 로만 보면 다른 공고라 중복 방지를 빠져나간다.
+
+        2026년 해외규격인증획득지원사업(전략지원) 참여기업 모집 공고
+        2026년 해외규격인증획득지원사업(전략지원) 참여기업 모집 변경 공고
+            → 둘 다 '해외규격인증획득지원사업참여기업모집공고'
+    """
+    t = str(t or '')
+    t = re.sub(r'^\[[^\]]*\]\s*', '', t)                        # [지역] 머리말
+    t = re.sub(r'\([^)]*\)', '', t)                               # (괄호) 안
+    t = re.sub(r'\d{4}\s*년도?', '', t)                           # 2026년
+    t = re.sub(r'제?\s*\d+\s*차|\d+\s*분기|[상하]반기', '', t)    # 3차·2분기·하반기
+    t = re.sub(r'수정|재공고|변경|정정|추가|연장|게시\s*안내', '', t)
+    return re.sub(r'[^0-9A-Za-z가-힣]', '', t).lower()
+
+
+def company_key(name):
+    """(주)·주식회사·띄어쓰기 차이를 지운 기업 이름."""
+    return re.sub(r'\s|\(주\)|\(유\)|주식회사|㈜', '', str(name))
+
+
+def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=None,
+                 sent_titles=None):
     pid = notice.get('pblancId', '')
     if (row['기업명'], pid) in already_sent: return None
+    # 같은 사업이 수정·재공고로 다시 올라온 경우 — ID 는 달라도 이미 보낸 것으로 본다
+    if sent_titles is not None:
+        if (company_key(row['기업명']),
+            notice_base_title(notice.get('공고명', ''))) in sent_titles:
+            return None
     dl = notice.get('마감일', '')
     if dl:
         try:
@@ -2733,6 +2763,7 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=
         "매칭근거":     _build_reason(stars, matched_target, matched_type, matched_co,
                                 matched_demand, location_score, matched_industry),
         "공고링크":     notice.get('공고링크',''),
+        "기준제목":     notice_base_title(notice.get('공고명','')),
         "공고유형":     "맞춤",   # 매칭 실행 시 공통/맞춤 재분류됨
         "담당자검토":   "",
         "검토의견":     "",
@@ -2811,7 +2842,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1020-34"
+BUILD_TAG = "v1026-36"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -5602,6 +5633,11 @@ elif page == "공고·매칭":
                     return n_dict
 
                 already_sent = set(zip(df_h['기업명'], df_h['pblancId'])) if not df_h.empty else set()
+                # 같은 사업이 '수정공고'로 다시 올라오면 ID 가 달라져 위 검사를 빠져나간다.
+                # 제목에서 회차·연도·수정 표시를 걷어낸 값으로 한 번 더 막는다.
+                sent_titles = (set(zip(df_h['기업명'].map(company_key),
+                                       df_h['공고명'].map(notice_base_title)))
+                               if not df_h.empty and '공고명' in df_h.columns else set())
                 all_results  = []
                 prog         = st.progress(0, text="매칭 준비 중...")
                 status_area  = st.empty()
@@ -5627,7 +5663,8 @@ elif page == "공고·매칭":
                         for _, n in df_n.iterrows():
                             try:
                                 r = score_notice(enrich(n.to_dict()), row, already_sent,
-                                                 HIGH, MID, feedback_map, kw_config)
+                                                 HIGH, MID, feedback_map, kw_config,
+                                                 sent_titles=sent_titles)
                                 if r:
                                     scored.append(r)
                             except Exception as e_inner:
@@ -5644,6 +5681,20 @@ elif page == "공고·매칭":
                             elif cnt >= 2:  r['점수'] -= 3
 
                         scored.sort(key=lambda x: -x['점수'])
+
+                        # 한 기업에게 비슷한 공고가 두 건 가지 않게 한다.
+                        # 창조 엔지니어링은 9/29 한 통에 '지정기간 연장(2차)'와
+                        # '연장(1차)'를 같이 받았다. 점수 높은 쪽만 남긴다.
+                        _seen_base, _uniq = set(), []
+                        for _r in scored:
+                            _b = _r.get('기준제목', '')
+                            if _b and _b in _seen_base:
+                                continue
+                            if _b:
+                                _seen_base.add(_b)
+                            _uniq.append(_r)
+                        scored = _uniq
+
                         top = scored[:max_per]
 
                         for r in top:
@@ -5822,6 +5873,73 @@ elif page == "공고·매칭":
                 elif "추천만" in ai_view_filter:
                     filtered = filtered[filtered['___ai_rec'] == '추천']
                     st.info(f"AI 추천 {len(filtered)}건만 표시 중")
+
+                # ── 공고 하나를 여러 기업에 한 번에 ─────────────
+                # 같은 공고가 수십 개사에 걸리는 일이 매 회차 생긴다.
+                # 기업을 하나씩 넘기며 누르면 공고 하나에 수십 번이다.
+                with st.expander("📌 공고 하나를 여러 기업에 한 번에 처리", expanded=False):
+                    st.caption("같은 공고가 여러 기업에 걸렸을 때, 기업을 넘기지 않고 "
+                               "공고 단위로 승인하거나 제외합니다. 지금 화면 필터가 걸러낸 범위 안에서만 처리합니다.")
+
+                    _rv_now = st.session_state.get('review_state', {})
+
+                    def _dec_of(_r):
+                        return _rv_now.get(f"{_r['기업명']}_{_r.get('공고ID','')}", '')
+
+                    _by_nt = (filtered.assign(_결정=filtered.apply(_dec_of, axis=1))
+                              .groupby('공고명')
+                              .agg(기업수=('기업명', 'nunique'),
+                                   미결정=('_결정', lambda v: int((v == '').sum())),
+                                   평균점수=('점수', 'mean'))
+                              .reset_index())
+                    _by_nt = _by_nt[_by_nt['미결정'] > 0].sort_values(
+                        ['미결정', '평균점수'], ascending=[False, False])
+
+                    if _by_nt.empty:
+                        st.success("아직 정하지 않은 공고가 없습니다.")
+                    else:
+                        _opts = [
+                            f"{int(r['미결정'])}개사 · 평균 {r['평균점수']:.0f}점 — {r['공고명']}"
+                            for _, r in _by_nt.iterrows()
+                        ]
+                        _pick = st.multiselect(
+                            "공고 고르기 (미결정 건이 많은 순)", _opts, key="bulk_notice_pick",
+                            help="여러 개를 함께 고르셔도 됩니다.")
+                        _names = [_opts.index(x) for x in _pick]
+                        _sel_nt = set(_by_nt.iloc[_names]['공고명']) if _names else set()
+
+                        _target = filtered[filtered['공고명'].isin(_sel_nt)].copy()
+                        _target = _target[_target.apply(lambda r: _dec_of(r) == '', axis=1)]
+
+                        if len(_target):
+                            st.info(f"고르신 공고 {len(_sel_nt)}건 → 아직 정하지 않은 "
+                                    f"**{len(_target)}건 / {_target['기업명'].nunique()}개사**가 처리됩니다.")
+                            _bn1, _bn2 = st.columns(2)
+                            with _bn1:
+                                if st.button(f"✅ {len(_target)}건 승인", type="primary",
+                                             key="bulk_notice_ok", use_container_width=True):
+                                    for _, _r in _target.iterrows():
+                                        set_decision(f"{_r['기업명']}_{_r.get('공고ID','')}",
+                                                     "○", '담당자')
+                                    st.session_state['bulk_notice_msg'] = (
+                                        f"✅ {len(_target)}건 승인했습니다. "
+                                        f"'검토 완료 저장'을 눌러야 드라이브에 남습니다.")
+                                    st.rerun()
+                            with _bn2:
+                                if st.button(f"❌ {len(_target)}건 제외",
+                                             key="bulk_notice_no", use_container_width=True):
+                                    for _, _r in _target.iterrows():
+                                        set_decision(f"{_r['기업명']}_{_r.get('공고ID','')}",
+                                                     "✕", '담당자')
+                                    st.session_state['bulk_notice_msg'] = (
+                                        f"❌ {len(_target)}건 제외했습니다. "
+                                        f"'검토 완료 저장'을 눌러야 드라이브에 남습니다.")
+                                    st.rerun()
+                        elif _sel_nt:
+                            st.success("고르신 공고는 이미 다 정해져 있습니다.")
+
+                    if st.session_state.get('bulk_notice_msg'):
+                        st.warning(st.session_state.pop('bulk_notice_msg'))
 
                 # ── 0건 기업 자동 보완 승인 ──────────────────
                 with st.expander("🟡 0건 기업 자동 보완 승인 (검토 상위)", expanded=False):
