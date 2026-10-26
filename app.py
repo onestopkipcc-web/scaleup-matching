@@ -3021,7 +3021,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1026-45"
+BUILD_TAG = "v1026-46"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -4754,8 +4754,12 @@ def render_staff_home(df_c, df_n, df_h):
 
     s1, s2, s3, s4 = st.columns(4)
     s1.metric("안내 대상 기업", f"{_sel_co}개사")
-    s2.metric("보낼 수 있는 공고", f"{_active:,}건", f"전체 {len(df_n):,}건")
-    s3.metric("이번 회차 승인", f"{_n_ok:,}건", f"{_co_ok}개사")
+    # delta 를 그냥 두면 '전체 6,105건'이 초록 ↑ 로 붙어 늘어난 것처럼 보인다.
+    # 여기 보조 숫자는 증감이 아니라 맥락이므로 색을 끈다.
+    s2.metric("보낼 수 있는 공고", f"{_active:,}건", f"전체 {len(df_n):,}건",
+              delta_color="off")
+    s3.metric("이번 회차 승인", f"{_n_ok:,}건", f"{_co_ok}개사",
+              delta_color="off")
     s4.metric("이번 달 발송", f"{_month_h}건")
 
     st.divider()
