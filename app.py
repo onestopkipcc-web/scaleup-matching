@@ -2382,27 +2382,147 @@ def ics_event_count(ics_bytes):
     return ics_bytes.decode('utf-8').count('BEGIN:VEVENT') if ics_bytes else 0
 
 def notice_base_title(t):
-    """공고 제목에서 회차·연도·수정 표시를 걷어내 '같은 사업인지' 보게 만든다.
+    """공고 제목에서 '수정·재공고' 표시만 걷어내 같은 공고인지 본다.
 
-    기업마당은 공고를 고치면 새 pblancId 로 다시 올린다. 제목만 '변경 공고',
-    '수정공고' 가 붙는다. ID 로만 보면 다른 공고라 중복 방지를 빠져나간다.
+    기업마당은 공고를 고치면 새 pblancId 로 다시 올린다. 제목에만
+    '변경 공고', '수정공고' 가 붙는다. ID 로만 보면 다른 공고라
+    중복 방지를 빠져나간다. 지난 446건에서 14건이 그렇게 나갔다.
 
-        2026년 해외규격인증획득지원사업(전략지원) 참여기업 모집 공고
-        2026년 해외규격인증획득지원사업(전략지원) 참여기업 모집 변경 공고
-            → 둘 다 '해외규격인증획득지원사업참여기업모집공고'
+        … 참여기업 모집 공고
+        … 참여기업 모집 변경 공고      →  같은 공고로 본다
+
+    차수와 분기는 남긴다. 3차를 받은 기업에게 4차는 새 기회다.
+
+        3차 중소기업 CBAM대응 인프라구축 …
+        4차 중소기업 CBAM대응 인프라구축 …   →  다른 공고로 본다
     """
     t = str(t or '')
-    t = re.sub(r'^\[[^\]]*\]\s*', '', t)                        # [지역] 머리말
-    t = re.sub(r'\([^)]*\)', '', t)                               # (괄호) 안
-    t = re.sub(r'\d{4}\s*년도?', '', t)                           # 2026년
-    t = re.sub(r'제?\s*\d+\s*차|\d+\s*분기|[상하]반기', '', t)    # 3차·2분기·하반기
-    t = re.sub(r'수정|재공고|변경|정정|추가|연장|게시\s*안내', '', t)
-    return re.sub(r'[^0-9A-Za-z가-힣]', '', t).lower()
+    t = re.sub(r'^\[[^\]]*\]\s*', '', t)                       # [지역] 머리말
+    t = re.sub(r'\d{4}\s*년도?', '', t)                          # 2026년
+    t = re.sub(r'수정\s*공고|재\s*공고|변경\s*공고|정정\s*공고', '공고', t)
+    t = re.sub(r'수정|정정|게시\s*안내', '', t)
+    t = re.sub(r'[^0-9A-Za-z가-힣]', '', t).lower()
+    return re.sub(r'(공고)+$', '공고', t)                          # 끝의 '공고' 반복
 
 
 def company_key(name):
     """(주)·주식회사·띄어쓰기 차이를 지운 기업 이름."""
     return re.sub(r'\s|\(주\)|\(유\)|주식회사|㈜', '', str(name))
+
+
+def presend_checks(approved, df_hist, df_companies, test_mode, today=None):
+    """발송 직전 점검.
+
+    경우의 수를 미리 다 떠올리는 건 불가능하다. 대신 '항상 참이어야 하는 것'
+    몇 가지를 적어두고 매번 본다. 어긋나면 그때 드러난다.
+
+    실제로 조용히 지나간 적이 있는 것들이다.
+      · 같은 사업이 '수정공고'로 다시 나간 일 17건 (ID 가 달라 검사를 빠져나감)
+      · 한 메일에 비슷한 공고 둘 (창조 엔지니어링 9/29)
+      · 죽은 캘린더에 수백 번 404 — 반환값을 안 봐서 몇 달간 안 보였다
+
+    돌려주는 것: [(수준, 제목, 설명), ...]
+      수준 '치명' 이 하나라도 있으면 발송을 막는다.
+    """
+    import datetime as _dt
+    today = today or _dt.date.today()
+    out = []
+
+    if not approved:
+        return [('치명', '승인된 공고가 없습니다', "'공고·매칭 → 검토 & 승인'에서 먼저 승인해 주십시오.")]
+
+    rows = pd.DataFrame(approved)
+    ck = company_key
+    bt = notice_base_title
+
+    # ── ① 같은 기업에 같은 공고 ────────────────────────
+    if df_hist is not None and not df_hist.empty and 'pblancId' in df_hist.columns:
+        seen_id = set(zip(df_hist['기업명'].astype(str), df_hist['pblancId'].astype(str)))
+        hit = [(a, b) for a, b in zip(rows['기업명'].astype(str),
+                                      rows['공고ID'].astype(str)) if (a, b) in seen_id]
+        out.append(('치명' if hit else '통과',
+                    f'전에 보낸 공고가 또 들어감 {len(hit)}건',
+                    '같은 기업에 같은 공고를 다시 보내는 것입니다.' if hit
+                    else '같은 기업·같은 공고 중복 없음'))
+
+        if '공고명' in df_hist.columns:
+            seen_bt = set(zip(df_hist['기업명'].map(ck), df_hist['공고명'].map(bt)))
+            hit2 = rows[[(ck(a), bt(b)) in seen_bt
+                         for a, b in zip(rows['기업명'], rows['공고명'])]]
+            out.append(('치명' if len(hit2) else '통과',
+                        f'수정·재공고로 같은 사업이 또 들어감 {len(hit2)}건',
+                        ' / '.join(str(x)[:40] for x in hit2['공고명'].head(3)) if len(hit2)
+                        else '제목이 사실상 같은 공고 없음'))
+
+    # ── ② 한 통 안에서 비슷한 공고 둘 ──────────────────
+    rows['_ck'] = rows['기업명'].map(ck)
+    rows['_bt'] = rows['공고명'].map(bt)
+    dd = rows.groupby(['_ck', '_bt']).size()
+    dd = dd[dd > 1]
+    out.append(('치명' if len(dd) else '통과',
+                f'한 기업에 비슷한 공고 둘 이상 {len(dd)}건',
+                '같은 메일 안에 거의 같은 공고가 함께 들어갑니다.' if len(dd)
+                else '한 통 안 중복 없음'))
+
+    # ── ③ 마감 ────────────────────────────────────────
+    dl = pd.to_datetime(rows.get('마감일'), errors='coerce')
+    past = int((dl.dt.date < today).sum())
+    near = int(((dl.dt.date >= today) & (dl.dt.date <= today + _dt.timedelta(days=3))).sum())
+    out.append(('치명' if past else '통과',
+                f'마감이 지난 공고 {past}건',
+                '이미 끝난 공고를 안내하게 됩니다.' if past else '마감 지난 공고 없음'))
+    out.append(('경고' if near else '통과',
+                f'3일 안에 마감되는 공고 {near}건',
+                '받고 나서 준비할 시간이 거의 없습니다.' if near else 'D-3 이내 없음'))
+
+    # ── ④ 수신자 ──────────────────────────────────────
+    if not test_mode and df_companies is not None and not df_companies.empty \
+            and '이메일' in df_companies.columns:
+        em = (df_companies.set_index(df_companies['기업명'].astype(str))['이메일']
+              .astype(str).to_dict())
+        noemail = sorted({c for c in rows['기업명'].astype(str)
+                          if '@' not in em.get(c, '')})
+        out.append(('치명' if noemail else '통과',
+                    f'이메일이 없는 기업 {len(noemail)}개사',
+                    ', '.join(noemail[:5]) if noemail else '수신자 주소 모두 확인'))
+
+    # ── ⑤ 서로 안 맞는 숫자 ───────────────────────────
+    n_co = rows['기업명'].nunique()
+    out.append(('경고' if n_co == 0 else '통과',
+                f'보낼 기업 {n_co}개사 · 공고 {len(rows)}건',
+                f'기업당 평균 {len(rows)/max(n_co,1):.1f}건'))
+
+    # ── ⑥ 마감일 알림 파일 ────────────────────────────
+    has_dl = int(dl.notna().sum())
+    out.append(('경고' if has_dl < len(rows) else '통과',
+                f'마감일이 없어 일정 파일에 안 담기는 공고 {len(rows)-has_dl}건',
+                '그 공고는 캘린더 알림에서 빠집니다.' if has_dl < len(rows)
+                else '모든 공고가 일정 파일에 담깁니다'))
+
+    return out
+
+
+def render_presend_checks(checks):
+    """점검 결과를 화면에 올리고, 막아야 하면 True 를 돌려준다."""
+    bad = [c for c in checks if c[0] == '치명']
+    warn = [c for c in checks if c[0] == '경고']
+    ok = [c for c in checks if c[0] == '통과']
+
+    if bad:
+        st.error(f"⛔ 보내기 전에 풀어야 할 것이 {len(bad)}가지 있습니다.")
+        for _, t, d in bad:
+            st.markdown(f"- **{t}** — {d}")
+    elif warn:
+        st.warning(f"⚠️ 확인하실 것이 {len(warn)}가지 있습니다. 보내실 수는 있습니다.")
+    else:
+        st.success("✅ 점검 통과 — 보내셔도 됩니다.")
+
+    with st.expander(f"점검 내역 {len(checks)}가지 보기", expanded=bool(bad)):
+        for lv, t, d in checks:
+            mark = {'치명': '⛔', '경고': '⚠️', '통과': '✅'}[lv]
+            st.markdown(f"{mark} **{t}**")
+            st.caption(f"　　{d}")
+    return bool(bad)
 
 
 def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=None,
@@ -2842,7 +2962,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1026-36"
+BUILD_TAG = "v1026-38"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -6984,6 +7104,19 @@ elif page == "발송":
                 for co in zero_cos:
                     st.write(f"• {co}")
 
+        # ── 발송 직전 점검 ──────────────────────────
+        # 조용히 지나가던 것들을 여기서 잡는다.
+        st.divider()
+        st.subheader("보내기 전 점검")
+        try:
+            _chk = presend_checks(approved, df_h, _df_c_top, test_mode)
+            _blocked = render_presend_checks(_chk)
+        except Exception as _ce:
+            _blocked = False
+            st.warning("점검을 돌리지 못했습니다 — " + str(_ce)[:120] + "  "
+                       "점검 없이도 발송은 됩니다. 담당자에게 알려 주십시오.")
+        st.session_state['_presend_blocked'] = _blocked
+
         st.divider()
         st.subheader("발송 미리보기")
         st.caption("실제 발송과 같은 함수(build_match_mail)로 만든 HTML입니다. 발송되지 않습니다.")
@@ -7022,7 +7155,11 @@ elif page == "발송":
 
         st.divider()
 
-        if st.button("📤 발송 실행", type="primary") or st.session_state.get('_send_preview_co'):
+        _blk = st.session_state.get('_presend_blocked', False)
+        if _blk:
+            st.error("⛔ 점검에서 걸린 것이 있어 발송 버튼을 잠갔습니다. "
+                     "위 '보내기 전 점검'을 먼저 확인해 주십시오.")
+        if st.button("📤 발송 실행", type="primary", disabled=_blk)                 or st.session_state.get('_send_preview_co'):
             from email.mime.multipart import MIMEMultipart
             from email.mime.text import MIMEText
             from email.mime.base import MIMEBase
