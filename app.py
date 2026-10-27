@@ -2605,11 +2605,19 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=
 
     text = " ".join([str(notice.get(k,'')) for k in ['공고명','사업개요','전문내용','해시태그','주관기관','지원대상']])
 
-    # ── 제외 키워드 필터 ──────────────────────────────
+    # ── 제외 키워드 필터 — 공고명만 본다 ────────────────
+    # 예전에는 text(전문 수천 자 포함)에서 찾았다. 그러면 본문에 한 번 스친
+    # 단어 때문에 멀쩡한 조달 공고가 통째로 사라진다. 실측(2026-10-27):
+    #   '소상공인' → 공고명 22종 vs 전문까지 79종
+    #   '고용'     → 공고명  8종 vs 전문까지 58종
+    # 제외 기준(개선방안 3쪽)은 '그 대상만을 위한 사업'을 빼라는 것이지
+    # 그 말이 언급된 사업을 빼라는 것이 아니다. 그래서 제목으로 판단한다.
     if kw_config:
-        for excl_kw in kw_config.get("exclude_keywords", []):
-            if excl_kw and excl_kw in text:
-                return None  # 제외 키워드 포함 공고 즉시 제거
+        title = str(notice.get('공고명', ''))
+        if not any(g in title for g in EXCL_GUARD):
+            for excl_kw in kw_config.get("exclude_keywords", []):
+                if excl_kw and excl_kw in title:
+                    return None  # 제외 대상 전용 공고 → 즉시 제거
 
     # 가중치 설정 (없으면 기본값)
     W = kw_config.get("weights", {}) if kw_config else {}
@@ -2861,11 +2869,17 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=
         '관광','숙박','외식','요식업',
         '섬유','패션','의류',
     ]
-    for ind_kw in INDUSTRY_SPECIFIC:
-        if ind_kw in text and not any(
-            ind_kw in kw or kw in ind_kw for kw in co_kws + demand_tags
-        ):
-            return None
+    # 이 필터도 부처·기관 이름에 걸린다. '식품'이 농림축산식품부에, '농업'이
+    # 한국농업기술진흥원에, '수산'이 해양수산부에 들어 있다. 그래서 실측상
+    # 조달·혁신제품 공고 20종이 업종 공고로 오인돼 지워지고 있었다 —
+    # 「혁신제품 지정제도 시행계획」, 「해양수산부 혁신제품 지정」,
+    # 「공공조달 입찰 컨설팅」, 「조달청 벤처나라 추천」 같은 것들이다.
+    if not any(g in str(notice.get('공고명', '')) for g in EXCL_GUARD):
+        for ind_kw in INDUSTRY_SPECIFIC:
+            if ind_kw in text and not any(
+                ind_kw in kw or kw in ind_kw for kw in co_kws + demand_tags
+            ):
+                return None
 
     # ── 점수 계산 ────────────────────────────────────
     seg_score = sum(min(seg_boost.get(cat, 0), W_SEG) for cat in matched_type.keys())
@@ -3021,9 +3035,19 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1027-48"
+BUILD_TAG = "v1027-49"
 
 NOTICE_TEXT_CAP = 8000
+
+# 제외 키워드보다 센 말들 — 공고명에 이 말이 있으면 제외 키워드를 적용하지 않는다.
+# 제외 키워드가 부처·기관 이름에 걸려 멀쩡한 조달 공고를 지우고 있었다(실측):
+#   '축산' → 「농림축산식품부 혁신제품 지정기간 연장 공고」 4종
+#   '농업' → 「조달청 벤처나라 추천 지원사업 모집공고(한국농업기술진흥원)」
+#   '채용' → 「해외조달시장 전문인력 양성과정 연계 채용희망기업 모집 공고」
+# 이 공고들은 선정기업이 가장 기다리는 종류다. 걸러서 잃는 쪽이 비싸다 —
+# 남겨 두면 AI 가 읽고 판단한다(비용은 공고 1건당 한 번).
+EXCL_GUARD = ('조달', '나라장터', '혁신제품', '혁신조달', '공공구매',
+              '벤처나라', '혁신장터', '공공판로', '공공입찰')
 
 # ⚡ 일괄 AI 분석을 시작하려면 매칭 공고 중 이 비율 이상이 전문을 갖고 있어야 한다.
 # 예전에는 1건만 겹쳐도 통과해서, 전문 없는 공고가 요약(300자)만으로 판정됐다.
@@ -6037,7 +6061,8 @@ elif page == "공고·매칭":
                 if feedback_map:
                     st.caption(f"🔄 피드백 반영 중 — {len(feedback_map)}개사 패턴 로드")
                 if kw_config.get('exclude_keywords'):
-                    st.caption(f"🚫 제외 키워드 {len(kw_config['exclude_keywords'])}개 적용")
+                    st.caption(f"🚫 제외 키워드 {len(kw_config['exclude_keywords'])}개 적용 "
+                               "— 공고명에 들어간 경우만")
 
                 total_cos = len(df_c)
                 for idx, (_, row) in enumerate(df_c.iterrows()):
