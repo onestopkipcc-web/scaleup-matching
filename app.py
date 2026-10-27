@@ -3021,7 +3021,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1026-47"
+BUILD_TAG = "v1027-48"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -3039,9 +3039,10 @@ _RE_NOTICE_FOOT = re.compile(r'자료이용 및 저작권보호|웹접근성정�
 # 캐시 키(기업명_공고ID)는 그대로 두고, 판정 결과 안에 어떤 입력으로 뽑았는지를
 # 기록한다. 프로필·전문·프롬프트가 바뀌면 '재분석 대상'으로 표시만 하고
 # 자동 실행하지 않는다 (비용이 나가는 일은 담당자가 누를 때만).
-AI_PROMPT_VER = "2026-09-29b"          # claude_analyze 프롬프트를 고칠 때 올린다
+AI_PROMPT_VER = "2026-10-27a"          # claude_analyze 프롬프트를 고칠 때 올린다
 _PROFILE_KEYS = ('소재지', '기업유형', '관심사업분야', '제품분야', '기술키워드',
-                 '핵심수요태그', '수출실적', 'TRL단계', '매출규모', '설립연도')
+                 '핵심수요태그', '수출실적', 'TRL단계', '매출규모', '설립연도',
+                 '입찰참가자격', '물품식별번호', '특허현황', '상용화단계', '혁신제품의향')
 
 def _short_hash(text, n=8):
     import hashlib
@@ -4020,6 +4021,46 @@ def company_profile(name):
         pass
     return {'기업명': name}
 
+def procure_profile(company_info):
+    """신청서에서 받은 조달 관련 항목을 프롬프트 줄로 만든다.
+
+    왜 필요한가: 「나라장터 입찰참가자격 보유 업체에 한함」 같은 조건을 AI 가
+    판정하려면 그 값이 프롬프트에 있어야 한다. 기업들은 WALLA 신청서에 이미
+    적어 냈는데 명단으로 옮겨지지 않아, AI 가 자격충족을 전부 △(확인 필요)로
+    올리고 있었다 — 2026-10-27 회차 검토 167건 중 자격충족 △ 가 141건.
+
+    빈칸과 '없음'을 구분한다. 열 자체가 없으면 '미확인'(옛 명단), 열은 있는데
+    값이 비어 있으면 그 기업이 해당 없다고 답한 것으로 본다. 둘을 섞으면
+    AI 가 모르는 것을 '없다'고 단정한다."""
+    ci = company_info or {}
+
+    def val(key):
+        if key not in ci:
+            return '미확인'
+        v = str(ci.get(key, '') or '').strip()
+        return v if v else '미확인'
+
+    if '물품식별번호' not in ci:
+        goods_txt = '미확인'
+    else:
+        raw = str(ci.get('물품식별번호', '') or '')
+        goods = [g.strip() for g in raw.split(',') if g.strip()]
+        if goods:
+            more = ' 외' if len(goods) > 3 else ''
+            goods_txt = f"{len(goods)}건 보유 ({', '.join(goods[:3])}{more})"
+        else:
+            goods_txt = '없음'
+
+    lines = [
+        f"- 나라장터 입찰참가자격: {val('입찰참가자격')}",
+        f"- 조달 물품식별번호: {goods_txt}",
+        f"- 대표제품 특허: {val('특허현황')}",
+        f"- 상용화 단계: {val('상용화단계')}",
+        f"- 혁신제품 제도 활용 의향: {val('혁신제품의향')}",
+    ]
+    return "\n".join(lines)
+
+
 def claude_analyze(company_info, notice_info):
     """Claude API로 공고-기업 적합성 분석"""
     api_key = ""
@@ -4059,6 +4100,7 @@ def claude_analyze(company_info, notice_info):
 - 수출실적: {company_info.get('수출실적','')} | 수출국가: {company_info.get('수출국가','')}
 - TRL단계: {company_info.get('TRL단계','')}
 - 매출규모: {company_info.get('매출규모','')}
+{procure_profile(company_info)}
 
 ## 공고 정보
 - 공고명: {notice_info.get('공고명','')}
@@ -4071,7 +4113,11 @@ def claude_analyze(company_info, notice_info):
 
 ## 판단 항목 (각각 구체적으로)
 1. 업종일치: 기업 제품/기술이 이 공고가 원하는 업종/분야와 맞는가
-2. 자격충족: 지원 자격(기업유형·매출·수출실적 등) 충족 가능성
+2. 자격충족: 지원 자격 충족 가능성. 위 기업 정보에 적힌 값으로 판정하세요.
+   나라장터 입찰참가자격·물품식별번호·특허·상용화 단계·혁신제품 의향은 기업이
+   신청서에 직접 적어 낸 값입니다 — 이 값으로 충족·미충족이 가려지면 O 또는 X로
+   답하세요. '미확인'인 항목이나 공고가 요구하는데 기업 정보에 아예 없는 항목
+   (예: 설립연도) 때문에 못 가릴 때만 △로 두고, 무엇을 확인해야 하는지 적으세요.
 3. 지역적합: 소재지와 공고 지역이 맞는가
 4. 수요일치: 기업이 원하는 지원(핵심수요태그)과 공고 내용이 맞는가
 5. 경쟁력: 이 기업이 선정될 가능성이 있는가
