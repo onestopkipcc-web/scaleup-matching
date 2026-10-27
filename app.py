@@ -3021,7 +3021,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1026-46"
+BUILD_TAG = "v1026-47"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -3187,6 +3187,38 @@ def _notice_open(n, _ref=None):
         return False
     _d = notice_deadline_date(n)
     return True if _d is None else _d >= _ref
+
+# 「설립 7년 이하」·「업력 7년 이상」처럼 업력이 걸린 공고를 찾아낸다.
+# 선정기업 명단에 설립연도가 없어서(2026-05 신청서에 문항 자체가 없었다)
+# AI 가 자격을 못 가리고 전부 '검토'로 올린다. 그 상태로 일괄 승인하면
+# 자격 미달 기업에 메일이 나가므로, 요건 문장을 승인 버튼 앞에 꺼내 보인다.
+_RE_TENURE = re.compile(
+    r'(?:설립|업력|창업|존속)[^.\n]{0,12}?(\d+)\s*년\s*(이하|이내|미만|이상|초과)'
+    r'|(\d+)\s*년\s*(이하|이내|미만|이상|초과)[^.\n]{0,8}?(?:설립|업력|창업)')
+
+
+def notice_tenure_note(rows, ai_cache):
+    """공고에 걸린 AI 판정에서 업력 요건 문장을 뽑는다. 없으면 ''.
+
+    rows 는 같은 공고의 (기업, 공고) 행들. AI 주의사항·판단근거는 기업마다
+    따로 쓰이므로 가장 많이 나온 표현을 고른다 — 한 기업 분석의 말버릇에
+    끌려가지 않게."""
+    if not ai_cache:
+        return ''
+    from collections import Counter as _C
+    _hits = _C()
+    for _r in rows:
+        _k = f"{_r.get('기업명','')}_{_r.get('공고ID','')}"
+        _a = ai_cache.get(_k) or {}
+        for _f in ('주의사항', '판단근거'):
+            for _sent in re.split(r'[.\n]', str(_a.get(_f, '') or '')):
+                _m = _RE_TENURE.search(_sent)
+                if _m:
+                    _n = _m.group(1) or _m.group(3)
+                    _w = _m.group(2) or _m.group(4)
+                    _hits[f"{_n}년 {_w}"] += 1
+    return _hits.most_common(1)[0][0] if _hits else ''
+
 
 def can_include_notice(notice, company, ai_cache=None, review_state=None, ref=None,
                        allow_undated=False):
@@ -6191,6 +6223,7 @@ elif page == "공고·매칭":
                                "공고 단위로 승인하거나 제외합니다. 지금 화면 필터가 걸러낸 범위 안에서만 처리합니다.")
 
                     _rv_now = st.session_state.get('review_state', {})
+                    _ai_tn = st.session_state.get('ai_analysis', {}) or {}
 
                     def _dec_of(_r):
                         return _rv_now.get(f"{_r['기업명']}_{_r.get('공고ID','')}", '')
@@ -6207,10 +6240,21 @@ elif page == "공고·매칭":
                     if _by_nt.empty:
                         st.success("아직 정하지 않은 공고가 없습니다.")
                     else:
+                        # 업력 요건이 걸린 공고를 미리 찾아 둔다 — 목록에 ⚠ 를 붙이고
+                        # 승인 직전에 요건을 다시 보여주기 위해.
+                        _tenure = {}
+                        for _nt in _by_nt['공고명']:
+                            _rows_nt = filtered[filtered['공고명'] == _nt].to_dict('records')
+                            _note = notice_tenure_note(_rows_nt, _ai_tn)
+                            if _note:
+                                _tenure[_nt] = _note
                         _opts = [
-                            f"{int(r['미결정'])}개사 · 평균 {r['평균점수']:.0f}점 — {r['공고명']}"
+                            ("⚠ " if r['공고명'] in _tenure else "")
+                            + f"{int(r['미결정'])}개사 · 평균 {r['평균점수']:.0f}점 — {r['공고명']}"
                             for _, r in _by_nt.iterrows()
                         ]
+                        if _tenure:
+                            st.caption(f"⚠ 표시 {len(_tenure)}건 — 업력·설립연수 요건이 걸린 공고입니다.")
                         _pick = st.multiselect(
                             "공고 고르기 (미결정 건이 많은 순)", _opts, key="bulk_notice_pick",
                             help="여러 개를 함께 고르셔도 됩니다.")
@@ -6223,6 +6267,16 @@ elif page == "공고·매칭":
                         if len(_target):
                             st.info(f"고르신 공고 {len(_sel_nt)}건 → 아직 정하지 않은 "
                                     f"**{len(_target)}건 / {_target['기업명'].nunique()}개사**가 처리됩니다.")
+                            # 업력 요건이 걸린 공고를 고르셨으면 승인 버튼 앞에서 한 번 세운다.
+                            _warn = [(_nt, _tenure[_nt]) for _nt in _sel_nt if _nt in _tenure]
+                            if _warn:
+                                st.warning(
+                                    f"**업력·설립연수 요건이 있는 공고 {len(_warn)}건이 들어 있습니다**\n\n"
+                                    + "\n".join(f"- {_nt} — **설립·업력 {_rq}**만 신청 가능"
+                                                for _nt, _rq in _warn)
+                                    + "\n\n선정기업 명단에 설립연도가 없어 앱이 자격을 "
+                                      "가려내지 못합니다. 해당되는 기업만 골라 승인하시고, "
+                                      "확실하지 않으면 그냥 두십시오.")
                             _bn1, _bn2 = st.columns(2)
                             with _bn1:
                                 if st.button(f"✅ {len(_target)}건 승인", type="primary",
