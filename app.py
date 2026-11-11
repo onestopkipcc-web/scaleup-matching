@@ -3039,7 +3039,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1030-51"
+BUILD_TAG = "v1111-52"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -3107,6 +3107,16 @@ FAIR_IND = {
     '항공':       ('항공', '우주', '드론', '무인기'),
     '물류':       ('물류', '운송', '창고', '포장'),
     '에너지':     ('에너지', '전력', '태양광', '배터리', '수소'),
+    # 11/11 회차에서 또 구멍이 났다. 업종 불일치 153건의 상위를 전부 전시회가
+    # 차지했는데, 여기 키가 없어서 걸러지지 않은 것들이다(실측):
+    #   「하노버 산업전시회(로봇분야)」 15개사  → '로봇' 키 없음
+    #   「하노버 산업전시회(기계분야)」 11개사  → '기계' 키 없음
+    #   「오슬로 선박 전시회」        11개사  → '선박'이 '조선'의 값으로만 있어
+    #                                        공고명 '선박'에 안 걸렸다
+    # 키는 공고명에서 찾고 값은 기업 프로필에서 찾는다 — 둘을 섞으면 이렇게 샌다.
+    '로봇':       ('로봇', '자동화', '메카트로닉스', '모션', '제어'),
+    '기계':       ('기계', '장비', '설비', '부품', '가공'),
+    '선박':       ('선박', '조선', '해양', '항만'),
 }
 
 # 한 기업이 한 회차에 받을 해외 전시회 공고의 최대 건수.
@@ -3246,6 +3256,27 @@ def notice_period_open(n):
     '상시 접수(예산 소진시까지)' 같은 혼합 표기는 위험 쪽이 이겨야 한다."""
     return bool(_RE_OPEN_PERIOD.search(f"{n.get('마감일','')} {n.get('접수기간','')}"))
 
+
+# 접수기간이 날짜로 안 적힌 공고에 붙이는 안내문.
+# can_include_notice() 가 이런 공고를 더는 막지 않으므로(위 주석 참고),
+# 기업이 직접 확인하도록 메일 카드에 한 줄을 얹는다. 상시 접수는 마감 위험이
+# 구조적으로 없으므로 아무 말도 붙이지 않는다.
+PERIOD_NOTE_RISKY = ("예산 소진 시 조기 마감될 수 있습니다. "
+                     "신청 전 접수 가능 여부를 먼저 확인해 주십시오.")
+PERIOD_NOTE_UNKNOWN = ("공고에 접수 일정이 명시돼 있지 않습니다. "
+                       "원문에서 해당 차수의 접수기간을 확인해 주십시오.")
+
+
+def notice_period_note(n):
+    """이 공고에 붙일 접수기간 주의 문구. 붙일 게 없으면 ''."""
+    if notice_deadline_date(n) is not None:
+        return ''                      # 마감일이 있으면 말할 게 없다
+    if notice_period_risky(n):
+        return PERIOD_NOTE_RISKY
+    if notice_period_open(n):
+        return ''                      # 상시·수시 접수 — 위험 없음
+    return PERIOD_NOTE_UNKNOWN
+
 def notice_deadline_date(n):
     """공고의 마감일을 date로. 마감일 → 접수기간 끝 순으로 찾고, 없으면 None."""
     from datetime import date as _date
@@ -3363,19 +3394,14 @@ def can_include_notice(notice, company, ai_cache=None, review_state=None, ref=No
         return False, '자격 미충족'
     if not _notice_open(notice, ref):
         return False, '마감 경과'
-    if notice_deadline_date(notice) is None:
-        # 소진형·선착순은 이미 끝났을 수 있다 — 본 공고든 참고 공고든 내보내지 않는다.
-        if notice_period_risky(notice):
-            return False, '소진·선착순 마감형'
-        # '상시 접수'는 마감 위험이 구조적으로 없으므로 날짜가 없어도 본 공고로 안내한다.
-        # REQUIRE_NOTICE_DATE 의 취지는 '마감된 공고를 보내지 말자'인데, 날짜가 없다는
-        # 이유만으로 상시 접수까지 막고 있었다(실측: 접수 중 공고 108건이 무날짜이고
-        # 그중 23건이 상시·수시 접수였다).
-        if notice_period_open(notice):
-            return True, ''
-        # 그 밖의 불명(세부사업별 상이·추후 공지 등)은 참고 공고에서만 허용한다.
-        if not allow_undated and REQUIRE_NOTICE_DATE:
-            return False, '접수기간 불명'
+    # 접수기간이 날짜로 안 적힌 공고는 예전에 여기서 막았다('소진·선착순 마감형',
+    # '접수기간 불명'). 그런데 공고 원문이 「예산 소진시까지」·「세부사업별 상이」·
+    # 「추후 공지」로 적혀 있을 뿐, 접수가 끝났다는 뜻이 아니다. 막는 대가가 너무 컸다 —
+    # 11/11 회차 실측: 이 두 사유로 76칸이 죽고 빈손 기업이 17개사까지 올라갔다.
+    # 풀면 발송 가능 칸 46→122건, 받는 기업 33→48개사, 빈손 17→2개사가 된다.
+    # 그래서 막지 않고 내보내되, notice_period_note() 가 메일에 주의 문구를 붙인다.
+    # 여기서 계속 막는 것은 진짜로 못 보내는 것들뿐이다 —
+    # 공고ID 없음·담당자 제외(✕)·자격 미충족·마감 경과.
     return True, ''
 
 def _region_cut_result(row):
@@ -3529,6 +3555,11 @@ def attach_ai_reason(n, company, ai_cache):
         # 주의사항은 경고문이라 '반드시 확인' 같은 표현이 오히려 맞다 — 완화하지 않고
         # 길이만 문장 경계로 맞춘다.
         n['_ai_caution'] = _h.escape(clip_text(caution, CAUTION_MAX))
+    # 접수기간이 날짜로 안 적힌 공고 — 막지 않고 보내는 대신 한 줄을 얹는다.
+    # AI 주의사항(_ai_caution)과는 성격이 다르다(자격 vs 일정)라 따로 담는다.
+    _pn = notice_period_note(n)
+    if _pn:
+        n['_period_note'] = _h.escape(_pn)
     return n
 
 # 받은편지함에 뜨는 발신자 표시 이름.
@@ -3641,6 +3672,12 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
             _n_fb['_undated_fallback'] = True
             notices_review.append(_n_fb)
 
+    # 참고 공고에도 접수기간 주의를 붙인다. 본 공고는 위에서 이미 붙였는데
+    # 참고 공고는 빠져 있었다 — 날짜가 없어 참고로 내려온 공고가 많으므로
+    # 오히려 이쪽에 더 필요하다.
+    for _n_rv in notices_review:
+        attach_ai_reason(_n_rv, company, _ai_an)
+
     # ── 빈 메일 방지: 승인·참고 공고가 전부 걸러져 보여줄 카드가 없으면 스킵 ──
     if not (notices_sss or notices_ss or notices_review):
         return None, {'sss': [], 'ss': [], 'review': [], 'empty': True}
@@ -3650,6 +3687,10 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
         _dl_txt = deadline_label(n)
         _trk = track_link(n.get('공고링크','#'), company,
                           n.get('공고ID',''), n.get('공고명',''))
+        # 날짜 없는 공고는 참고 쪽에 몰린다 — 심플 카드에도 접수기간 주의를 붙인다.
+        _pnote = (f"<p style=\"margin:6px 0 0;font-size:12px;color:#7E6C47;"
+                  f"line-height:1.55;\">🗓 접수기간 확인: {n['_period_note']}</p>"
+                  if n.get('_period_note') else "")
         return f"""
         <table width="100%" cellpadding="0" cellspacing="0"
                style="margin-bottom:6px;">
@@ -3667,6 +3708,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
               <p style="margin:3px 0 0;font-size:12px;color:#78736A;">
                 {n.get('주관기관','')} &nbsp;·&nbsp; {_dl_txt}
               </p>
+              {_pnote}
             </td>
           </tr>
         </table>"""
@@ -3697,6 +3739,13 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
                        f"color:#7E6C47;background:#FBF7EF;"
                        f"border-left:3px solid #D8C9A8;border-radius:4px;"
                        f"line-height:1.6;\">⚠️ 신청 전 확인: {n['_ai_caution']}</p>")
+        if n.get('_period_note'):
+            # 자격 주의(⚠️)와 같은 박스 모양을 쓰되 아이콘만 달리한다 —
+            # 하나는 '자격이 되는가', 하나는 '아직 접수를 받는가'로 질문이 다르다.
+            _extra += (f"<p style=\"margin:8px 0 0;padding:8px 10px;font-size:13px;"
+                       f"color:#7E6C47;background:#FBF7EF;"
+                       f"border-left:3px solid #D8C9A8;border-radius:4px;"
+                       f"line-height:1.6;\">🗓 접수기간 확인: {n['_period_note']}</p>")
         if n.get('_related'):
             _rl = []
             for _rn in n['_related'][:3]:
