@@ -3039,7 +3039,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1111-52"
+BUILD_TAG = "v1111-53"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -7550,6 +7550,11 @@ elif page == "발송":
                            "공고 데이터에서 비롯됩니다.")
         # 전체 기업 목록 로드 (선정 기업만)
         _df_c_top = load_excel(drive, SELECTED_FILE)
+        # 발송 이력 — 아래 '보내기 전 점검'이 쓴다. 이 줄이 없어서 점검이
+        # NameError('df_h' is not defined)로 매번 죽었고, 화면에는 「점검을
+        # 돌리지 못했습니다」만 뜬 채 7회차가 그냥 나갔다. 점검이 잡기로 한
+        # 중복 발송·수정공고 재발송이 정작 한 번도 검사되지 않은 것이다.
+        _df_h_top = load_excel(drive, HISTORY_FILE)
         if not _df_c_top.empty and '기업명' in _df_c_top.columns:
             if '선정구분' in _df_c_top.columns:
                 _df_c_top = _df_c_top[_df_c_top['선정구분'] == '선정']
@@ -7594,7 +7599,7 @@ elif page == "발송":
         st.divider()
         st.subheader("보내기 전 점검")
         try:
-            _chk = presend_checks(approved, df_h, _df_c_top, test_mode)
+            _chk = presend_checks(approved, _df_h_top, _df_c_top, test_mode)
             _blocked = render_presend_checks(_chk)
         except Exception as _ce:
             _blocked = False
