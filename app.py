@@ -2738,7 +2738,14 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=
             str(notice.get('해시태그','')),
             str(notice.get('전문내용','')),  # 전문내용도 소재지 판단에 반영
         ])
-        co_region = next((r for r in REGIONS if r in location), None)
+        # 소재지에 지역이 둘 적힌 기업이 있다 — 「경기, 인천」 10개사, 「대전, 세종」 4개사.
+        # 예전에는 next() 로 REGIONS 순서상 먼저 걸리는 하나만 봤다. 그러면
+        # 「경기, 인천」은 '인천'만 잡혀 [경기] 공고가 타지역으로 찍힌다.
+        # 와트·리얼디자인테크·필메디·탐투스·유비컨트롤이 실제로 그렇게
+        # 자기 지역 공고를 놓쳤다(실측 5건). 적힌 지역을 전부 본다.
+        co_regions = [r for r in REGIONS if r in location]
+        co_region  = co_regions[0] if co_regions else None   # 아래 분기 조건용
+        co_aliases = [a for r in co_regions for a in REGION_ALIAS.get(r, [r])]
 
         import re as _re
 
@@ -2750,11 +2757,16 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=
             if bracket_regions:
                 notice_region_tag = f"[{bracket_text}]"
                 if co_region:
-                    aliases = REGION_ALIAS.get(co_region, [co_region])
-                    if any(a in bracket_text for a in aliases):
+                    if any(a in bracket_text for a in co_aliases):
                         location_score = 3
                     else:
-                        location_score = -5
+                        # 공고명에 [지역]이 박혀 있고 소재지와 어긋나면 보내지 않는다.
+                        # 예전에는 -5 를 주고 별점만 한 단계 깎아 12칸에 남겼다.
+                        # 누적 판정 4,558쌍으로 재보니 이런 쌍 1,332건 가운데
+                        # AI 가 추천·검토로 본 것이 0건이었다. 전부 비추천이다.
+                        # 점수로 뒤에 세울 게 아니라 후보에서 빼는 것이 맞다.
+                        # (주관기관·전문내용으로 추정한 ②③ 은 근거가 약해 종전대로 감점만 준다.)
+                        return None
 
         # ② 주관기관이 지방자치단체
         elif co_region:
@@ -2762,7 +2774,7 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=
             org_regions = [r for r in REGIONS if r in organizer]
             if org_regions:
                 notice_region_tag = f"주관기관({organizer[:10]})"
-                aliases = REGION_ALIAS.get(co_region, [co_region])
+                aliases = co_aliases
                 if any(a in organizer for a in aliases):
                     location_score = 2
                 else:
@@ -2774,7 +2786,7 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=
                 sojaepat = _re.findall(r'([가-힣]{2,4}(?:도|시|군|구))\s*소재', notice_full)
                 if sojaepat:
                     notice_region_tag = ", ".join(sojaepat[:2])
-                    aliases = REGION_ALIAS.get(co_region, [co_region])
+                    aliases = co_aliases
                     if any(any(a in s for a in aliases) for s in sojaepat):
                         location_score = 2
                     else:
@@ -2787,7 +2799,7 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=
                                        if _re.search(rf'{r}.{{0,6}}(?:소재|지역|소속|위치|관내|내)', notice_full)]
                     if region_mentions:
                         notice_region_tag = ", ".join(region_mentions[:2])
-                        aliases = REGION_ALIAS.get(co_region, [co_region])
+                        aliases = co_aliases
                         if any(any(a in rm for a in aliases) for rm in region_mentions):
                             location_score = 2
                         else:
@@ -2905,7 +2917,11 @@ def score_notice(notice, row, already_sent, HIGH, MID, feedback=None, kw_config=
         ind_score * W_IND   +
         xs + (location_score * W_LOC // 3) + seg_score + feedback_penalty + rd_penalty
     )
-    if matched_demand: score += 8   # 핵심수요 직접매칭 강력 보너스
+    # 핵심수요 직접매칭에 무조건 +8 을 주던 자리다. 재보니 해로웠다 —
+    # 이 보너스가 붙은 508쌍은 평균 점수가 37.6 → 49.9 로 12점 오르는데
+    # 실제로 쓸 만한 비율은 8.7% → 7.5% 로 오히려 떨어졌다.
+    # 점수만 올리고 순위는 나쁘게 만드는 가산점이라 뺀다.
+    # 수요태그는 아래 hard_star3 에서 ★★★ 판정에 그대로 쓰이므로 역할이 사라지진 않는다.
     if score <= 0: return None
 
     # ── ④ 별점 판정 — 점수 기반 통합 ──────────────────
@@ -3039,7 +3055,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1111-53"
+BUILD_TAG = "v1125-54"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -6068,7 +6084,11 @@ elif page == "공고·매칭":
         with tab1:
             col1, col2 = st.columns(2)
             with col1:
-                max_per = st.slider("기업당 최대 추천 건수", 5, 20, 12)
+                # 기본값 12 → 8. 쓸 만한 공고가 그만큼 없는데 12칸을 채우느라
+                # 뒤쪽이 쓰레기로 메워졌다. 라벨 1,064쌍으로 재보니 상위 N칸의
+                # 적중률이 상위3 0.507 · 상위8 0.462 · 상위12 0.437 로
+                # 칸을 늘릴수록 떨어진다. 8칸이 적당한 선이다.
+                max_per = st.slider("기업당 최대 추천 건수", 5, 20, 8)
             with col2:
                 st.markdown("**발송 대상 그룹**")
                 target_group = st.radio(
