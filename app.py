@@ -3055,7 +3055,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1125-54"
+BUILD_TAG = "v1125-55"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -3420,6 +3420,56 @@ def can_include_notice(notice, company, ai_cache=None, review_state=None, ref=No
     # 공고ID 없음·담당자 제외(✕)·자격 미충족·마감 경과.
     return True, ''
 
+# ══════════════════════════════════════════════════════════
+# 공고 배치 기준 — docs/매칭기준.md v1 (2026-11-25 확정, 9회차부터)
+# ══════════════════════════════════════════════════════════
+# 상자마다 네 조건과 종합판정의 허용값을 적어 둔다. 위에서 아래로 검사해
+# 처음 통과한 상자에 들어가고, 셋 다 못 통과하면 버린다.
+#
+# 점수는 여기 들어오지 않는다. 9회차 396쌍으로 재보니 점수의 선별력이
+# AUC 0.527 로 무작위(0.5)와 구별되지 않았다 — 기업 안에서 점수 6위 칸이
+# 1위 칸보다 쓸모 있었다. 점수는 상자 안에서 순서를 정하는 데만 쓴다.
+# 회차마다 기준이 흔들린 원인의 절반이 점수식을 계속 만진 것이었다.
+#
+# 'O△' = 그 조건이 O 또는 △면 통과, X면 탈락.
+BOX_RULES = (
+    # (상자,  지역,   자격,   업종,   수요,    종합판정)
+    ('★',  'O',   'O△', 'O',   'O',    ('추천',)),
+    ('📎', 'O△', 'O△', 'O△', 'O△X', ('추천', '검토')),
+    ('🔎', 'O',   'O△', 'O△', 'O△X', ('비추천',)),
+)
+BOX_REF_TOTAL   = 3   # ★ + 📎 합계 상한
+BOX_ETC_MAX     = 2   # 🔎 상한
+BOX_ETC_OPEN_AT = 0   # ★+📎 가 이 값 이하인 기업에만 🔎 를 연다
+
+# 지역 X·자격 X 는 어느 상자에도 넣지 않는다 — 신청 자체가 불가능하기 때문이다.
+# 빈손 기업을 메울 때는 '업종 △' 를 푸는 것이지 지역·자격을 푸는 게 아니다.
+# 지역·자격을 풀면 「KDB NextONE 부산 6기」가 비부산 기업에, 「청년기업 인증」이
+# 요건 미달 기업에 나간다(실측 15장). 아무것도 안 보내는 것보다 나쁘다.
+
+
+def notice_box(notice, company, ai_cache):
+    """이 (기업, 공고)가 들어갈 상자 — '★' / '📎' / '🔎'. 어디에도 못 들어가면 ''.
+
+    네 조건 중 하나라도 판정이 비어 있으면(미판정) 상자에 넣지 않는다.
+    """
+    _pid = str(notice.get('공고ID', '') or notice.get('pblancId', '')).strip()
+    a = (ai_cache or {}).get(f"{company}_{_pid}", {}) or {}
+    vals = (a.get('지역적합', ''), a.get('자격충족', ''),
+            a.get('업종일치', ''), a.get('수요일치', ''))
+    verdict = a.get('추천여부', '')
+    if not all(vals) or not verdict:
+        return ''
+    for box, *allowed in BOX_RULES:
+        rules, verdicts = allowed[:4], allowed[4]
+        if verdict in verdicts and all(v in r for v, r in zip(vals, rules)):
+            return box
+    return ''
+
+
+BOX_LABEL = {'★': '★ 맞춤', '📎': '📎 참고', '🔎': '🔎 이런 공고도'}
+
+
 def _region_cut_result(row):
     """타지역 한정 공고 — AI 호출 없이 규칙으로 비추천 처리."""
     _rg = str(row.get('공고지역', '') or '해당 지역')
@@ -3595,7 +3645,10 @@ def mail_subject(company, meta=None):
     날짜는 메일함이 이미 보여주므로 앞자리를 쓸 이유가 없다."""
     from datetime import date as _date
     meta = meta or {}
-    _main = (meta.get('sss') or []) + (meta.get('ss') or [])
+    # '맞춤'은 ★ 상자에만 쓴다. 예전에는 sss+ss 를 묶어 세어서, 📎 참고 1건만
+    # 나가는 기업에게도 "맞춤 공고 1건"이라는 제목이 갔다. 제목이 본문보다
+    # 세게 말하면 안 된다 — docs/매칭기준.md
+    _main = meta.get('sss') or []
     if _main:
         head = f"[원스톱] {company} 맞춤 공고 {len(_main)}건"
         _left = []
@@ -3607,7 +3660,7 @@ def mail_subject(company, meta=None):
         if _near is not None and _near <= 7:
             head += " · 오늘 마감" if _near == 0 else f" · 마감 D-{_near}"
         return head
-    _ref = len(meta.get('review') or [])
+    _ref = len(meta.get('ss') or []) + len(meta.get('review') or [])
     if _ref:
         return f"[원스톱] {company} 참고 공고 {_ref}건"
     return f"[원스톱] {company} 맞춤 공고 안내"
@@ -3640,50 +3693,57 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
     def _may(n):
         return can_include_notice(n, company, _ai_an, review_state)[0]
 
-    # 별점 기준으로 분류 (공고유형 무관)
-    _sss_raw = [n for n in notices if n.get('관련도','')=='★★★' and _may(n)]
-    _ss_raw  = [n for n in notices if n.get('관련도','')=='★★' and _may(n)]
+    # ── 상자 배치 — docs/매칭기준.md v1 ─────────────────
+    # 별점(★★★/★★)으로 가르던 것을 그만뒀다. 별점은 점수에서 나오는데
+    # 점수의 선별력이 무작위와 같았다(AUC 0.527). 이제 AI 판정만으로 가른다.
+    #   notices_sss  → ★ 맞춤      (담당자 승인 ○ + ★ 기준 통과)
+    #   notices_ss   → 📎 참고      (★ 포함 3건까지)
+    #   notices_review → 🔎 이런 공고도 (★·📎가 0건인 기업에만 2건까지)
+    def _box(n):
+        return notice_box(n, company, _ai_an)
 
-    # 방향1: AI 업종일치가 △/X인 공고는 '맞춤'에서 제외 → 참고로 강등
-    # (업종 안 맞는 걸 맞춤이라 내보내면 신뢰도 하락)
-    def _ind_ok(n):
-        _k = f"{company}_{n.get('공고ID','')}"
-        _ind = _ai_an.get(_k, {}).get('업종일치', '')
-        return _ind != '△' and _ind != 'X'  # O이거나 미판정('')은 통과
-    notices_sss    = group_related_notices([n for n in _sss_raw if _ind_ok(n)])
-    notices_ss     = group_related_notices([n for n in _ss_raw if _ind_ok(n)])
+    _ref_map   = ref_map or {}
+    _approved  = [n for n in notices if _may(n)]
+    _cand_ref  = [r for r in _ref_map.get(company, []) if _may(r)]
+
+    notices_sss = group_related_notices([n for n in _approved if _box(n) == '★'])
+
+    # 📎 참고 — ★에 못 든 승인 공고와 AI '검토' 후보를 함께 본다.
+    _seen = {n.get('공고ID', '') for n in notices_sss}
+    _pool_ref = []
+    for n in _approved + _cand_ref:
+        _nid = n.get('공고ID', '')
+        if _nid in _seen or _box(n) != '📎':
+            continue
+        _seen.add(_nid); _pool_ref.append(n)
+    notices_ss = group_related_notices(_pool_ref)[
+        :max(0, BOX_REF_TOTAL - len(notices_sss))]
     for _n_dec in notices_sss + notices_ss:
         attach_ai_reason(_n_dec, company, _ai_an)
-    _demoted       = [n for n in (_sss_raw + _ss_raw) if not _ind_ok(n)]  # 업종△/X → 참고행
 
-    # 참고 공고: 승인 공고가 3건 미만이면 그 기업의 ★★ 검토 공고로 부족분 채움
-    # (최소 3건 보장 — 딸랑 1건만 나가는 허전함 방지)
-    # 업종 불일치로 강등된 공고(_demoted)도 참고 후보에 포함
-    _ref_map = ref_map or {}
+    # 🔎 이런 공고도 — AI 비추천이지만 걸린 이유가 사실상 '수요' 하나인 공고.
+    # 지역·업종·자격은 되므로 신청할 수 있다. ★·📎가 0건인 기업에만 연다 —
+    # 전 기업에 열면 「3건 채우기」가 다시 퍼져 품질 하락이 건수에 안 보인다.
     notices_review = []
-    _approved_cnt = len(notices_sss) + len(notices_ss)
-    if _approved_cnt < 3:
-        _need = 3 - _approved_cnt
-        _approved_ids = {n.get('공고ID','') for n in notices_sss + notices_ss}
-        # 강등된 것 우선, 그다음 검토 공고 — 양쪽 다 같은 관문을 통과해야 한다
-        _cand = [x for x in _demoted if _may(x)] + [
-            r for r in _ref_map.get(company, [])
-            if r.get('공고ID','') not in _approved_ids and _may(r)]
-        _seen_r = set()
-        _cand_uniq = []
-        for r in _cand:
-            _rid = r.get('공고ID','')
-            if _rid not in _approved_ids and _rid not in _seen_r:
-                _cand_uniq.append(r); _seen_r.add(_rid)
-        notices_review = _cand_uniq[:_need]
+    _seen |= {n.get('공고ID', '') for n in notices_ss}
+    if len(notices_sss) + len(notices_ss) <= BOX_ETC_OPEN_AT:
+        _pool_etc = []
+        for n in _approved + _cand_ref:
+            _nid = n.get('공고ID', '')
+            if _nid in _seen or _box(n) != '🔎':
+                continue
+            _seen.add(_nid); _pool_etc.append(n)
+        notices_review = group_related_notices(_pool_etc)[:BOX_ETC_MAX]
 
     # ── 빈손 폴백 ──────────────────────────────────────
-    # 보낼 카드가 한 장도 없을 때만, 접수기간이 명시되지 않은 공고를 참고로 허용한다.
+    # 보낼 카드가 한 장도 없을 때만, 접수기간이 명시되지 않은 공고를 허용한다.
     # 아무것도 못 받는 것보다는 낫되, 소진형·선착순은 여기서도 제외한다.
+    # 상자 기준은 그대로 적용한다 — 지역X·자격X는 여기서도 안 나간다.
     if not (notices_sss or notices_ss or notices_review):
         _fb = [r for r in _ref_map.get(company, [])
-               if can_include_notice(r, company, _ai_an, review_state,
-                                     allow_undated=True)[0]]
+               if _box(r) in ('📎', '🔎')
+               and can_include_notice(r, company, _ai_an, review_state,
+                                      allow_undated=True)[0]]
         for _n_fb in _fb[:2]:
             _n_fb['_undated_fallback'] = True
             notices_review.append(_n_fb)
@@ -3829,7 +3889,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
           </p>
         </div>"""
 
-    # ── 🔦 주목할 만한 공고 (★★★) ────────────
+    # ── 🔦 주목할 만한 공고 — ★ 맞춤 상자 ────────────
     if notices_sss:
         rows_html += """
         <p style="margin:0 0 12px;font-size:11px;font-weight:700;
@@ -3839,42 +3899,42 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
         for i, n in enumerate(notices_sss):
             rows_html += notice_card(n, i)
 
-    # ── 📌 이런 공고도 있어요 (★★) ──────────
+    # ── 📎 참고해보실 만한 공고 — 📎 참고 상자 ──────────
     if notices_ss:
         rows_html += """
-        <div style="border-top:1px solid #E8E2D5;
-                    padding-top:16px;margin-top:8px;">
-          <p style="margin:0 0 10px;font-size:11px;font-weight:700;
-                     color:#7E6C47;">
-            📌 &nbsp;이런 공고도 있어요
-          </p>"""
-        for i, n in enumerate(notices_ss):
-            rows_html += notice_card_simple(n, i)
-        rows_html += "</div>"
-
-    # ── 📎 참고 공고 (승인 공고 3건 미만 시 부족분 채움) ──
-    if notices_review:
-        _has_approved = bool(notices_sss or notices_ss)
-        # 맞춤 0건일 때는 위쪽에 이미 "딱 맞는 공고를 찾지 못했습니다" 안내가 나가므로
-        # 같은 말을 반복하지 않는다.
-        if any(x.get('_undated_fallback') for x in notices_review):
-            _ref_desc = "접수기간이 공고에 명시되지 않은 사업입니다. 신청 전 공고에서 일정을 직접 확인해 주세요."
-        elif _has_approved:
-            _ref_desc = "위 공고와 함께 참고하실 만한 공고입니다."
-        else:
-            _ref_desc = ""
-        _REF_DESC_HTML = (
-            f'<p style="margin:0 0 12px;font-size:12px;color:#757066;">{_ref_desc}</p>'
-            if _ref_desc else '')
-        rows_html += f"""
         <div style="border-top:1px solid #E8E2D5;
                     padding-top:16px;margin-top:8px;">
           <p style="margin:0 0 6px;font-size:11px;font-weight:700;
                      color:#7E6C47;">
             📎 &nbsp;참고해보실 만한 공고
           </p>
-          {_REF_DESC_HTML}"""
-        for i, n in enumerate(notices_review[:3]):
+          <p style="margin:0 0 12px;font-size:12px;color:#757066;">
+            신청 요건을 확인해 보시면 좋을 공고입니다.
+          </p>"""
+        for i, n in enumerate(notices_ss):
+            rows_html += notice_card_simple(n, i)
+        rows_html += "</div>"
+
+    # ── 🔎 이런 공고도 있어요 — 🔎 상자 ──────────────────
+    # 맞춤·참고가 한 건도 없는 기업에만 나간다. AI 는 비추천으로 봤지만
+    # 걸린 이유가 사실상 '수요'(신청서에 적은 희망서비스와 종류가 다름) 하나이고,
+    # 지역·업종·자격은 되므로 신청할 수 있는 공고다.
+    if notices_review:
+        if any(x.get('_undated_fallback') for x in notices_review):
+            _ref_desc = ("접수기간이 공고에 명시되지 않은 사업입니다. "
+                         "신청 전 공고에서 일정을 직접 확인해 주세요.")
+        else:
+            _ref_desc = ("귀사가 요청하신 분야와는 다르지만, "
+                         "지역·업종·신청 자격은 해당되는 공고입니다.")
+        rows_html += f"""
+        <div style="border-top:1px solid #E8E2D5;
+                    padding-top:16px;margin-top:8px;">
+          <p style="margin:0 0 6px;font-size:11px;font-weight:700;
+                     color:#7E6C47;">
+            🔎 &nbsp;이런 공고도 있어요
+          </p>
+          <p style="margin:0 0 12px;font-size:12px;color:#757066;">{_ref_desc}</p>"""
+        for i, n in enumerate(notices_review[:BOX_ETC_MAX]):
             rows_html += notice_card_simple(n, i)
         rows_html += "</div>"
 
@@ -7057,14 +7117,24 @@ elif page == "공고·매칭":
                         else:
                             st.info("AI 추천 공고가 없습니다.")
 
-                    # ── AI 비추천 일괄 제외 (정밀도 보정) ──────────
+                    # ── 어느 상자에도 못 들어가는 공고 일괄 제외 ──────────
+                    # 예전에는 'AI 비추천' 전체를 ✕ 로 찍었다. 그런데 비추천 가운데
+                    # 지역·업종·자격은 되고 수요만 안 맞는 공고가 있고, 그건
+                    # 🔎 상자(docs/매칭기준.md)로 나가야 한다. ✕ 를 찍으면
+                    # can_include_notice 가 막아 버려 🔎 가 영영 비어 버린다 —
+                    # 실측으로 🔎 20장이 0장이 되고 빈손이 11개사로 돌아왔다.
+                    # 그래서 '어느 상자에도 못 들어가는 것'만 제외한다.
                     ai_bad_rows = co_rows[[
-                        ai_analysis_map.get(f"{r['기업명']}_{r.get('공고ID','')}", {}).get('추천여부') == '비추천'
+                        notice_box(r.to_dict(), r['기업명'],
+                                   ai_analysis_map) == ''
+                        and f"{r['기업명']}_{r.get('공고ID','')}" in ai_analysis_map
                         for _, r in co_rows.iterrows()
                     ]]
                     if len(ai_bad_rows) > 0:
-                        if st.button(f"🔴 AI 비추천 {len(ai_bad_rows)}건 일괄 제외",
-                                     key="bulk_ai_reject"):
+                        if st.button(f"🔴 어느 상자에도 못 들어가는 {len(ai_bad_rows)}건 일괄 제외",
+                                     key="bulk_ai_reject",
+                                     help="지역✕·자격✕·업종✕ 등으로 ★·📎·🔎 어디에도 "
+                                          "배치되지 않는 공고만 제외합니다."):
                             for _, r in ai_bad_rows.iterrows():
                                 set_decision(f"{r['기업명']}_{r.get('공고ID','')}",
                                              "✕", 'AI 자동 제외')
@@ -7533,18 +7603,17 @@ elif page == "발송":
         if review_state.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", '') == '○'
     ]
 
-    # 참고 공고: 승인 0건 기업용 — AI가 '검토'로 판정한 것 중 점수 높은 순.
+    # 📎 참고 · 🔎 이런 공고도 후보 — 승인되지 않은 공고 중 상자 기준을 통과한 것.
     # _results_live가 이미 관문을 통과했으므로 ✕·자격 미충족·마감 공고는 들어올 수 없다.
-    # 참고 공고 풀은 폴백 후보까지 담는다. build_match_mail 의 정상 경로는
-    # 엄격한 관문으로 다시 거르므로, 접수기간 불명 건은 빈손일 때만 쓰인다.
+    # 상자 판정은 build_match_mail 이 다시 하므로 여기서는 풀만 넓게 담는다.
+    # 후보 풀은 폴백까지 고려해 넉넉히 둔다(📎 3 + 🔎 2 + 변형공고 묶임 여유).
     _ref_by_co = {}
     for r in _results_lax:
-        _rec = ai_cache.get(f"{r.get('기업명','')}_{r.get('공고ID','')}", {}).get('추천여부','')
-        if _rec == '검토':
-            _ref_by_co.setdefault(r.get('기업명',''), []).append(r)
+        if notice_box(r, r.get('기업명', ''), ai_cache) in ('📎', '🔎'):
+            _ref_by_co.setdefault(r.get('기업명', ''), []).append(r)
     for _co in _ref_by_co:
         _ref_by_co[_co] = sorted(_ref_by_co[_co],
-                                 key=lambda x: x.get('점수', 0), reverse=True)[:3]
+                                 key=lambda x: x.get('점수', 0), reverse=True)[:10]
     st.session_state['_ref_notices_by_co'] = _ref_by_co
     # 매칭 실행 탭을 안 열었거나 앱이 재시작되면 위젯 키가 비어 '미확인'이 떴다.
     # keywords.json 의 last_match 에 실제 값이 있으므로 세션 → 세션 캐시 → 드라이브 순으로 찾는다.
@@ -7657,9 +7726,9 @@ elif page == "발송":
             st.warning(f"{preview_co} — 안내할 공고가 없어 실제 발송에서도 제외됩니다.")
         else:
             _pv_fb = any(x.get('_undated_fallback') for x in _prev_meta['review'])
-            st.caption(f"🔦 주목 {len(_prev_meta['sss']):,}건 · "
-                       f"📌 이런 공고도 {len(_prev_meta['ss']):,}건 · "
-                       f"📎 참고 {len(_prev_meta['review']):,}건"
+            st.caption(f"★ 맞춤 {len(_prev_meta['sss']):,}건 · "
+                       f"📎 참고 {len(_prev_meta['ss']):,}건 · "
+                       f"🔎 이런 공고도 {len(_prev_meta['review']):,}건"
                        + ("  ·  ⚠️ 접수기간 미명시 공고로 채운 메일" if _pv_fb else ""))
             st.components.v1.html(_preview_html, height=900, scrolling=True)
 
@@ -7841,12 +7910,20 @@ elif page == "발송":
                 # 실패가 드러나지도 않았다. 공통 캘린더 등록은 발송이 끝난 뒤
                 # 아래에서 한 번만 한다. 기업에게 가는 알림은 .ics 첨부가 맡는다.
 
+                # 이력은 '승인된 공고'가 아니라 '메일에 실제로 실린 카드'로 남긴다.
+                # 예전에는 notices(승인분)만 적어서, 📎 참고로 나간 공고가 이력에
+                # 없었다. 다음 회차 already_sent 가 그걸 못 막으니 같은 공고가
+                # 참고로 또 나갈 수 있었다. 🔎 상자가 생기면서 승인 없이 나가는
+                # 카드가 늘어나므로 여기서 막는다.
+                _sent_cards = ([(n, "○")    for n in (_mail_meta or {}).get('sss', [])]
+                             + [(n, "참고") for n in (_mail_meta or {}).get('ss', [])]
+                             + [(n, "안내") for n in (_mail_meta or {}).get('review', [])])
                 _co_rows = [{"기업명":company,"pblancId":n.get('공고ID',''),
                         "공고명":n.get('공고명',''),"발송일":datetime.today().strftime("%Y-%m-%d"),
                         "마감일":n.get('마감일',''),"공고링크":n.get('공고링크',''),
-                        "매칭점수":n.get('점수',''),"담당자검토":"○",
+                        "매칭점수":n.get('점수',''),"담당자검토":_mark,
                         "검토의견":n.get('검토의견',''),"신청여부":"","선정결과":""}
-                    for n in notices]
+                    for n, _mark in _sent_cards]
                 history_records.extend(_co_rows)
 
                 # ── 발송 성공 → 이 기업 이력을 즉시 저장 ──────────
