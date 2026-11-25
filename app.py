@@ -851,10 +851,21 @@ def record_decision_log(drive, round_id=None, sent_map=None,
     except Exception:
         return False, 0
 
+def tracking_on():
+    """클릭·열람 추적을 켤 것인가. 미리보기·테스트에서는 끈다.
+
+    👁 미리보기를 누를 때마다 열람 픽셀이 발사돼 클릭추적_로그에 기록이 쌓이고
+    있었다. 11/25 실측: 아직 한 통도 안 보낸 9회차(20261125-1102)에 __OPEN__ 이
+    5건, 공고 클릭이 1건 찍혔다. 그 상태로 다음 회차 보고의 열람률을 내면
+    담당자가 미리 본 것까지 기업이 읽은 것으로 세게 된다.
+    """
+    return not st.session_state.get('_tracking_off', False)
+
+
 def track_link(dest_url, company, notice_id, notice_name):
     """공고 링크를 클릭 추적 URL로 감싼다. dest_url이 없으면 원본 그대로."""
     import urllib.parse as _up
-    if not dest_url or dest_url == "#" or not CLICK_TRACK_URL:
+    if not dest_url or dest_url == "#" or not CLICK_TRACK_URL or not tracking_on():
         return dest_url or "#"
     q = _up.urlencode({
         "co": company or "", "notice": notice_id or "",
@@ -3055,7 +3066,7 @@ def get_detail_map_cached():
 # AI에 넣는 공고 전문의 상한. 실측상 저장된 전문의 최대가 2,498자라 사실상 무제한이며,
 # 예전 1,500자 절단으로 뒷부분이 잘리던 문제를 없앤다.
 # 배포 검증용 빌드 태그. app.py 를 고칠 때마다 올린다 (형식: v[월일]-[순번]).
-BUILD_TAG = "v1125-56"
+BUILD_TAG = "v1125-57"
 
 NOTICE_TEXT_CAP = 8000
 
@@ -4021,7 +4032,7 @@ def build_match_mail(company, notices, co_row, ai_cache, ref_map, review_state=N
     # 공고명 자리에는 회차 ID를 넣어 어느 회차의 열람인지 남긴다.
     # 지메일은 이미지를 차단하는 경우가 있어 과소집계된다 — 절대값이 아니라 회차 추세로 본다.
     _open_px = ''
-    if CLICK_TRACK_URL:
+    if CLICK_TRACK_URL and tracking_on():
         import urllib.parse as _up_op
         _q_op = _up_op.urlencode({'co': company, 'notice': OPEN_MARK,
                                   'name': current_round_id() or '', 'url': ''})
@@ -7538,11 +7549,17 @@ elif page == "발송":
                 _notices_t = [r for r in _snap['match_results']
                               if str(r.get('기업명', '')).strip() == _co_t
                               and _rv_t.get(f"{_co_t}_{r.get('공고ID','')}", '') == '○']
-                _html_t, _meta_t = build_match_mail(
-                    _co_t, _notices_t, _row_t,
-                    _snap.get('ai_analysis', {}) or {},
-                    _snap.get('ref_notices', {}) or {},
-                    _snap.get('review_state', {}) or {})
+                # 테스트 메일도 추적을 끈다 — 담당자 앞으로 가는 메일이라
+                # 그 기업이 읽은 것으로 기록되면 안 된다.
+                st.session_state['_tracking_off'] = True
+                try:
+                    _html_t, _meta_t = build_match_mail(
+                        _co_t, _notices_t, _row_t,
+                        _snap.get('ai_analysis', {}) or {},
+                        _snap.get('ref_notices', {}) or {},
+                        _snap.get('review_state', {}) or {})
+                finally:
+                    st.session_state['_tracking_off'] = False
                 if _html_t is None:
                     st.warning(f"{_co_t} — 실을 공고가 없어 실제 발송에서도 건너뛰는 기업입니다.")
                 else:
@@ -7718,13 +7735,19 @@ elif page == "발송":
 
         _co_info = company_profile(preview_co)
 
-        _preview_html, _prev_meta = build_match_mail(
-            preview_co,
-            [r for r in approved if r['기업명'] == preview_co],
-            _co_info,
-            st.session_state.get('ai_analysis', {}),
-            st.session_state.get('_ref_notices_by_co', {}),
-            st.session_state.get('review_state', {}))
+        # 👁 미리보기는 추적을 끈 채로 만든다. 켜 두면 담당자가 미리 볼 때마다
+        # 열람 픽셀이 발사돼 클릭추적_로그에 그 기업이 '읽은' 것으로 쌓인다.
+        st.session_state['_tracking_off'] = True
+        try:
+            _preview_html, _prev_meta = build_match_mail(
+                preview_co,
+                [r for r in approved if r['기업명'] == preview_co],
+                _co_info,
+                st.session_state.get('ai_analysis', {}),
+                st.session_state.get('_ref_notices_by_co', {}),
+                st.session_state.get('review_state', {}))
+        finally:
+            st.session_state['_tracking_off'] = False
 
         if _preview_html is None:
             st.warning(f"{preview_co} — 안내할 공고가 없어 실제 발송에서도 제외됩니다.")
@@ -7833,6 +7856,10 @@ elif page == "발송":
                 grouped = dict(_picked)
                 st.info(f"테스트 추출: {len(grouped)}개사 — "
                         + ", ".join(f"{c}({len(n)}건)" for c, n in grouped.items()))
+
+            # 실제 발송에서만 추적을 켠다. 테스트 모드와 👁 미리보기는
+            # 담당자가 보는 것이므로 기업 열람으로 기록되면 안 된다.
+            st.session_state['_tracking_off'] = bool(test_mode or _pv_only)
 
             _empty_skipped = []
             for idx,(company,notices) in enumerate(grouped.items()):
